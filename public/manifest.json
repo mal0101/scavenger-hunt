@@ -1,0 +1,23 @@
+{
+  "name": "Aether Compass - Scavenger Hunt",
+  "short_name": "Aether Compass",
+  "description": "Gamified QR Code Treasure Hunt Platform - ENSAM Casablanca",
+  "start_url": "/dock",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1c110c",
+  "theme_color": "#d97707",
+  "categories": ["games", "education"],
+  "icons": [
+    {
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

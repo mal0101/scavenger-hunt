@@ -1,0 +1,179 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Enums ──────────────────────────────────────────────
+
+enum UserRole {
+  PLAYER
+  MENTOR
+}
+
+enum GameStatus {
+  PENDING
+  ACTIVE
+  ELIMINATING
+  FINISHED
+}
+
+enum RoundStatus {
+  LOCKED
+  ACTIVE
+  COMPLETED
+}
+
+enum PlayerStatus {
+  ACTIVE
+  ELIMINATED
+}
+
+// ── Tables ─────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(uuid())
+  phone_number String   @unique
+  nickname     String?
+  role         UserRole @default(PLAYER)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  player Player?
+
+  @@map("users")
+}
+
+model OTP {
+  id           String   @id @default(uuid())
+  phone_number String
+  code         String
+  expires_at   DateTime
+  used         Boolean  @default(false)
+  attempts     Int      @default(0)
+  created_at   DateTime @default(now())
+
+  @@index([phone_number, used])
+  @@map("otps")
+}
+
+model Game {
+  id              String     @id @default(uuid())
+  title           String
+  description     String?
+  status          GameStatus @default(PENDING)
+  max_rounds      Int        @default(3)
+  round_duration  Int        @default(1800)
+  elimination_pct Float      @default(0.2)
+  created_by      String
+  current_round   Int        @default(0)
+  started_at      DateTime?
+  finished_at     DateTime?
+  created_at      DateTime   @default(now())
+  updated_at      DateTime   @updatedAt
+
+  rounds  Round[]
+  players Player[]
+  teams   Team[]
+  indexes Index[]
+
+  @@index([status])
+  @@map("games")
+}
+
+model Round {
+  id           String      @id @default(uuid())
+  game_id      String
+  round_number Int
+  status       RoundStatus @default(LOCKED)
+  started_at   DateTime?
+  ended_at     DateTime?
+
+  game    Game    @relation(fields: [game_id], references: [id], onDelete: Cascade)
+  indexes Index[]
+
+  @@unique([game_id, round_number])
+  @@index([game_id, status])
+  @@map("rounds")
+}
+
+model Index {
+  id            String   @id @default(uuid())
+  game_id       String
+  round_id      String?
+  label         String
+  description   String?
+  points        Int      @default(25)
+  location_name String?
+  location_lat  Float?
+  location_lng  Float?
+  enigma_type   String?
+  created_at    DateTime @default(now())
+
+  game   Game    @relation(fields: [game_id], references: [id], onDelete: Cascade)
+  round  Round?  @relation(fields: [round_id], references: [id], onDelete: SetNull)
+  scans  Scan[]
+
+  @@index([game_id])
+  @@map("indexes")
+}
+
+model Player {
+  id          String       @id @default(uuid())
+  user_id     String       @unique
+  game_id     String
+  team_id     String?
+  total_score Int          @default(0)
+  rank        Int?
+  status      PlayerStatus @default(ACTIVE)
+  joined_at   DateTime     @default(now())
+
+  user   User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  game   Game   @relation(fields: [game_id], references: [id], onDelete: Cascade)
+  team   Team?  @relation(fields: [team_id], references: [id], onDelete: SetNull)
+  scans  Scan[]
+
+  @@map("players")
+}
+
+model Team {
+  id          String   @id @default(uuid())
+  name        String
+  invite_code String   @unique
+  game_id     String
+  total_score Int      @default(0)
+  eliminated  Boolean  @default(false)
+  created_at  DateTime @default(now())
+
+  game    Game     @relation(fields: [game_id], references: [id], onDelete: Cascade)
+  players Player[]
+  scans   Scan[]
+
+  @@index([game_id])
+  @@map("teams")
+}
+
+model Scan {
+  id            String   @id @default(uuid())
+  player_id     String
+  team_id       String?
+  index_id      String
+  game_id       String?
+  round_id      String?
+  points_earned Int
+  scanned_at    DateTime @default(now())
+  gps_lat       Float?
+  gps_lng       Float?
+
+  player Player  @relation(fields: [player_id], references: [id], onDelete: Cascade)
+  team   Team?   @relation(fields: [team_id], references: [id], onDelete: SetNull)
+  index  Index   @relation(fields: [index_id], references: [id], onDelete: Cascade)
+
+  @@unique([player_id, index_id])
+  @@index([team_id])
+  @@index([game_id])
+  @@map("scans")
+}

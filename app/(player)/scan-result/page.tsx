@@ -25,7 +25,7 @@ function ScanResultContent() {
       <div className="space-y-4">
         {isTrap ? (
           <Link href="/trap" className="block">
-            <div className="bg-surface-container-highest rounded-xl p-6 space-y-4 border-t-error border-l border-r border-b border-outline-variant hover:scale-[1.02] transition-transform cursor-pointer relative overflow-hidden">
+            <div className="bg-surface-container-highest rounded-xl p-6 space-y-4 border-t-error border-l border-r border-b border-outline-variant hover:scale-[1.02] transition-transform cursor-pointer relative overflow-hidden ambient-glow">
               <div
                 className="absolute inset-0 opacity-5 pointer-events-none"
                 style={{
@@ -68,7 +68,7 @@ function ScanResultContent() {
           </Link>
         ) : (
           <Link href="/enigma" className="block">
-            <div className="glass-panel rounded-xl p-6 space-y-4 border-t-primary-container hover:scale-[1.02] transition-transform cursor-pointer">
+            <div className="glass-panel rounded-xl p-6 space-y-4 border-t-primary-container hover:scale-[1.02] transition-transform cursor-pointer ambient-glow">
               <div className="flex justify-center">
                 <div className="porthole">
                   <div className="porthole-rivet top-2 left-1/2 -translate-x-1/2" />
@@ -76,7 +76,7 @@ function ScanResultContent() {
                   <div className="porthole-rivet left-2 top-1/2 -translate-y-1/2" />
                   <div className="porthole-rivet right-2 top-1/2 -translate-y-1/2" />
                   <div className="absolute inset-2 rounded-full border-2 border-primary-container/30 bg-surface flex items-center justify-center">
-                    <span className="material-symbols-outlined text-4xl text-primary-container animate-pulse">
+                    <span className="material-symbols-outlined text-4xl text-primary-container animate-flicker-amber">
                       key
                     </span>
                   </div>
@@ -84,7 +84,7 @@ function ScanResultContent() {
               </div>
 
               <div className="text-center">
-                <h2 className="font-headline text-headline-lg-mobile text-primary">
+                <h2 className="font-headline text-headline-lg-mobile text-primary etched-text">
                   ENIGMA UNLOCKED
                 </h2>
                 <p className="font-label text-label-sm text-on-surface-variant uppercase tracking-widest mt-1">
@@ -93,8 +93,8 @@ function ScanResultContent() {
               </div>
 
               {scanResult.points_earned != null && (
-                <div className="bg-surface/50 border border-outline-variant rounded-lg p-4 text-center space-y-1">
-                  <p className="font-headline text-xl text-primary font-bold">
+                <div className="bg-surface/50 border border-outline-variant rounded-lg p-4 text-center space-y-1 brass-plate">
+                  <p className="font-headline text-xl text-primary font-bold etched-text">
                     +{scanResult.points_earned} pts
                   </p>
                   {scanResult.team_total != null && (

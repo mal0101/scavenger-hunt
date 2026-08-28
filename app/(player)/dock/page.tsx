@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { apiFetch } from "@/lib/api-client";
 
 interface GameData {
   id: string;
@@ -33,13 +34,11 @@ export default function DockPage() {
     async function load() {
       try {
         const [gameRes, playerRes] = await Promise.all([
-          fetch("/api/v1/games/active"),
-          fetch("/api/v1/players/me"),
+          apiFetch<{ success: boolean; data: GameData | null }>("/api/v1/games/active"),
+          apiFetch<{ success: boolean; data: PlayerData }>("/api/v1/players/me"),
         ]);
-        const gameJson = await gameRes.json();
-        const playerJson = await playerRes.json();
-        if (gameJson.success) setGame(gameJson.data);
-        if (playerJson.success) setPlayer(playerJson.data);
+        if (gameRes.success && gameRes.data) setGame(gameRes.data);
+        if (playerRes.success) setPlayer(playerRes.data);
       } catch {
         // keep defaults
       } finally {

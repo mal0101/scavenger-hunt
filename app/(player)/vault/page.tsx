@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { apiFetch } from "@/lib/api-client";
 
 interface PlayerData {
   id: string;
@@ -20,8 +21,7 @@ export default function VaultPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/v1/players/me")
-      .then((r) => r.json())
+    apiFetch<{ success: boolean; data: PlayerData }>("/api/v1/players/me")
       .then((j) => {
         if (j.success) setPlayer(j.data);
       })

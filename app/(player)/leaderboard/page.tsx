@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useLeaderboard } from "@/hooks/use-leaderboard";
 import { useTimer } from "@/hooks/use-timer";
 import { LeaderboardSkeleton } from "@/components/ui/skeleton";
+import { apiFetch } from "@/lib/api-client";
 
 interface GameData {
   id: string;
@@ -16,10 +17,9 @@ export default function LeaderboardPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/v1/games/active")
-      .then((r) => r.json())
+    apiFetch<{ success: boolean; data: GameData | null }>("/api/v1/games/active")
       .then((j) => {
-        if (j.success) setGame(j.data);
+        if (j.success && j.data) setGame(j.data);
       })
       .catch(() => {})
       .finally(() => setLoading(false));

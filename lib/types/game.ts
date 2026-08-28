@@ -39,7 +39,7 @@ export interface IndexType {
 export type GameStatus = "PENDING" | "ACTIVE" | "ELIMINATING" | "FINISHED";
 
 export interface GameStateChangeRequest {
-  action: "start" | "eliminate" | "finish";
+  action: "start" | "eliminate" | "next_round" | "finish" | "reset";
 }
 
 export interface LeaderboardEntryType {

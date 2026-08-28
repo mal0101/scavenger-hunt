@@ -47,7 +47,7 @@ export default function LeaderboardPage() {
   return (
     <div className="px-4 space-y-6 max-w-lg mx-auto">
       <div className="text-center space-y-1 mt-2">
-        <h1 className="font-headline text-headline-lg-mobile text-on-surface">
+        <h1 className="font-headline text-headline-lg-mobile text-on-surface etched-text">
           Live Leaderboard
         </h1>
         <p className="font-label text-label-sm text-on-surface-variant uppercase tracking-widest">

@@ -56,9 +56,12 @@ export default function DockPage() {
 
   return (
     <div className="px-4 space-y-6 max-w-lg mx-auto">
-      <div className="glass-panel arch-top rounded-xl p-5 space-y-3 mt-2">
+      <div className="glass-panel rounded-xl p-5 space-y-3 mt-2 relative overflow-hidden ambient-glow">
+        <div className="absolute top-3 right-5 opacity-40 animate-gear-slow pointer-events-none">
+          <span className="material-symbols-outlined text-primary text-4xl">settings</span>
+        </div>
         <div className="flex items-center gap-2">
-          <span className="material-symbols-outlined text-primary text-lg">
+          <span className="material-symbols-outlined text-primary text-lg animate-flicker-amber">
             radar
           </span>
           <span className="font-label text-label-sm text-primary uppercase tracking-widest">
@@ -78,22 +81,29 @@ export default function DockPage() {
             </div>
           </div>
         )}
+        <div className="engraved-separator my-1" />
+        <div className="flex items-center gap-2 pt-1">
+          <span className="material-symbols-outlined text-on-surface-variant text-sm">explore</span>
+          <span className="font-label text-label-sm text-on-surface-variant uppercase tracking-widest animate-pulse">
+            Locating: Casablanca Coast
+          </span>
+        </div>
       </div>
 
-      <div className="bg-surface-container-low border border-outline-variant/40 rounded-xl p-5 space-y-4">
-        <h3 className="font-headline text-headline-lg-mobile text-on-surface border-b border-outline-variant/30 pb-2">
+      <div className="wood-grain rounded-xl p-5 space-y-4 brass-plate">
+        <h3 className="font-headline text-headline-lg-mobile text-on-surface pb-2 text-primary">
           Your Status
         </h3>
         <div className="grid grid-cols-2 gap-4">
-          <div className="bg-surface-container rounded-lg border border-outline-variant/30 p-3 text-center">
-            <p className="font-headline text-2xl text-primary font-bold">
+          <div className="brass-plate rounded-lg p-3 text-center">
+            <p className="font-headline text-2xl text-primary font-bold etched-text">
               {loading ? "--" : teamScore}
             </p>
             <p className="font-label text-label-sm text-on-surface-variant uppercase">
               Score
             </p>
           </div>
-          <div className="bg-surface-container rounded-lg border border-outline-variant/30 p-3 text-center">
+          <div className="brass-plate rounded-lg p-3 text-center">
             <p className="font-headline text-lg text-on-surface font-bold truncate">
               {loading ? "..." : teamName}
             </p>
@@ -102,18 +112,39 @@ export default function DockPage() {
             </p>
           </div>
         </div>
+
+        <div className="pt-2">
+          <div className="flex items-center justify-between mb-2">
+            <span className="font-label text-label-sm text-on-surface-variant uppercase">
+              Steam Pressure
+            </span>
+            <span className="font-headline text-sm text-primary font-bold">
+              {loading ? "--" : Math.min(100, teamScore)}%
+            </span>
+          </div>
+          <div className="tube-track h-4">
+            <div
+              className="tube-fill"
+              style={{ width: `${loading ? 0 : Math.min(100, teamScore)}%` }}
+            />
+          </div>
+        </div>
       </div>
 
       <div className="bg-surface-container border-t-2 border-primary-container border-x border-b border-outline-variant/50 rounded-xl p-5">
-        <h3 className="font-label text-label-sm uppercase text-on-surface-variant mb-4 text-center tracking-widest border-b border-outline-variant/20 pb-2 border-dashed">
-          Quick Actions
-        </h3>
+        <div className="flex items-center justify-center gap-3 mb-4">
+          <span className="material-symbols-outlined text-primary text-sm">tune</span>
+          <h3 className="font-label text-label-sm uppercase text-on-surface-variant text-center tracking-widest">
+            Quick Actions
+          </h3>
+          <span className="material-symbols-outlined text-primary text-sm">tune</span>
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <a
             href="/scan"
-            className="flex flex-col items-center gap-2 p-4 bg-primary-container/10 border border-primary/30 rounded-lg hover:bg-primary-container/20 transition-all"
+            className="flex flex-col items-center gap-2 p-4 bg-primary-container/10 border border-primary/30 rounded-lg hover:bg-primary-container/20 transition-all hover:shadow-[0_0_15px_rgba(217,119,7,0.3)] group"
           >
-            <span className="material-symbols-outlined text-primary text-2xl">
+            <span className="material-symbols-outlined text-primary text-2xl group-hover:scale-110 transition-transform">
               qr_code_scanner
             </span>
             <span className="font-label text-label-sm text-primary font-bold uppercase">
@@ -122,34 +153,34 @@ export default function DockPage() {
           </a>
           <a
             href="/leaderboard"
-            className="flex flex-col items-center gap-2 p-4 bg-surface-container-high border border-outline-variant/30 rounded-lg hover:bg-surface-container-highest transition-all"
+            className="flex flex-col items-center gap-2 p-4 brass-plate rounded-lg hover:bg-surface-container-highest transition-all group"
           >
-            <span className="material-symbols-outlined text-on-surface-variant text-2xl">
+            <span className="material-symbols-outlined text-on-surface-variant text-2xl group-hover:text-primary transition-colors">
               leaderboard
             </span>
-            <span className="font-label text-label-sm text-on-surface-variant font-bold uppercase">
+            <span className="font-label text-label-sm text-on-surface-variant font-bold uppercase group-hover:text-primary transition-colors">
               Leaderboard
             </span>
           </a>
           <a
             href="/vault"
-            className="flex flex-col items-center gap-2 p-4 bg-surface-container-high border border-outline-variant/30 rounded-lg hover:bg-surface-container-highest transition-all"
+            className="flex flex-col items-center gap-2 p-4 brass-plate rounded-lg hover:bg-surface-container-highest transition-all group"
           >
-            <span className="material-symbols-outlined text-on-surface-variant text-2xl">
+            <span className="material-symbols-outlined text-on-surface-variant text-2xl group-hover:text-primary transition-colors">
               lock_open
             </span>
-            <span className="font-label text-label-sm text-on-surface-variant font-bold uppercase">
+            <span className="font-label text-label-sm text-on-surface-variant font-bold uppercase group-hover:text-primary transition-colors">
               Vault
             </span>
           </a>
           <a
             href="/logs"
-            className="flex flex-col items-center gap-2 p-4 bg-surface-container-high border border-outline-variant/30 rounded-lg hover:bg-surface-container-highest transition-all"
+            className="flex flex-col items-center gap-2 p-4 brass-plate rounded-lg hover:bg-surface-container-highest transition-all group"
           >
-            <span className="material-symbols-outlined text-on-surface-variant text-2xl">
+            <span className="material-symbols-outlined text-on-surface-variant text-2xl group-hover:text-primary transition-colors">
               history_edu
             </span>
-            <span className="font-label text-label-sm text-on-surface-variant font-bold uppercase">
+            <span className="font-label text-label-sm text-on-surface-variant font-bold uppercase group-hover:text-primary transition-colors">
               Logs
             </span>
           </a>

@@ -113,17 +113,27 @@ export default function ScanPage() {
           className={`absolute inset-0 ${scanning ? "z-10" : "hidden"}`}
         />
 
+        {/* Steampunk scan frame */}
+        <div className="absolute inset-4 pointer-events-none z-30">
+          <span className="scan-corner tl" />
+          <span className="scan-corner tr" />
+          <span className="scan-corner bl" />
+          <span className="scan-corner br" />
+        </div>
+
+        {scanning && <div className="scan-sweep z-30" />}
+
         {!scanning && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-4">
             {scanStatus === "found" ? (
               <>
-                <div className="w-20 h-20 rounded-full bg-primary-container flex items-center justify-center">
+                <div className="w-20 h-20 rounded-full bg-primary-container flex items-center justify-center shadow-[0_0_30px_rgba(217,119,7,0.5)]">
                   <span className="material-symbols-outlined text-on-primary-container text-4xl animate-spin">
                     progress_activity
                   </span>
                 </div>
                 <div className="text-center space-y-2">
-                  <p className="font-headline text-headline-lg-mobile text-primary">
+                  <p className="font-headline text-headline-lg-mobile text-primary etched-text">
                     {submitting ? "Decoding..." : "QR Code Found!"}
                   </p>
                   <p className="font-body text-body-md text-on-surface-variant">
@@ -136,7 +146,7 @@ export default function ScanPage() {
             ) : (
               <>
                 <div className="w-20 h-20 rounded-full bg-surface-container-high border-2 border-outline-variant flex items-center justify-center">
-                  <span className="material-symbols-outlined text-primary text-4xl">
+                  <span className="material-symbols-outlined text-primary text-4xl animate-flicker-amber">
                     qr_code_scanner
                   </span>
                 </div>

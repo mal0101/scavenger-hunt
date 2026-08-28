@@ -97,7 +97,7 @@ function TrapContent() {
             CRITICAL PRESSURE BREACH
           </span>
         </div>
-        <h1 className="font-headline text-headline-xl text-on-surface drop-shadow-md">
+        <h1 className="font-headline text-headline-xl text-on-surface drop-shadow-md etched-text-error">
           Tidal Trap
         </h1>
         <div className="font-label text-label-md text-outline flex items-center gap-2">

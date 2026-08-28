@@ -63,7 +63,7 @@ function EnigmaContent() {
   return (
     <div className="px-4 space-y-6 max-w-md mx-auto">
       <div className="text-center space-y-1 mt-2">
-        <h2 className="font-headline text-headline-lg-mobile text-primary">
+        <h2 className="font-headline text-headline-lg-mobile text-primary etched-text">
           PRESSURE VAULT
         </h2>
         <p className="font-label text-label-sm text-on-surface-variant uppercase tracking-widest">

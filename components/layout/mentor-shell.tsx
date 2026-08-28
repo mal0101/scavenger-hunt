@@ -17,9 +17,9 @@ export default function MentorShell({
 
   return (
     <div className="min-h-dvh bg-surface flex">
-      <aside className="hidden lg:flex flex-col w-64 bg-surface-container-low border-r border-outline-variant/30 fixed top-0 left-0 bottom-0 z-50">
+      <aside className="hidden lg:flex flex-col w-64 bg-surface-container-low border-r border-outline-variant/30 fixed top-0 left-0 bottom-0 z-50 shadow-[2px_0_24px_rgba(217,119,7,0.08)]">
         <div className="h-16 flex items-center gap-3 px-5 border-b border-outline-variant/30">
-          <div className="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center">
+          <div className="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center shadow-[0_0_12px_rgba(217,119,7,0.5)] animate-flicker-amber">
             <span
               className="material-symbols-outlined text-on-primary-container text-lg"
               style={{ fontVariationSettings: "'FILL' 1" }}
@@ -74,10 +74,10 @@ export default function MentorShell({
         </div>
       </aside>
 
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 h-14 bg-surface-container-high border-b border-outline-variant/30 flex items-center justify-between px-4">
+      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 h-14 bg-surface-container-high/95 backdrop-blur-md border-b border-primary-container/40 flex items-center justify-between px-4 shadow-[0_4px_20px_rgba(217,119,7,0.08)]">
         <div className="flex items-center gap-2">
           <span
-            className="material-symbols-outlined text-primary text-xl"
+            className="material-symbols-outlined text-primary text-xl animate-flicker-amber"
             style={{ fontVariationSettings: "'FILL' 1" }}
           >
             compass_calibration
@@ -88,7 +88,7 @@ export default function MentorShell({
         </div>
       </div>
 
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-surface-container-high border-t border-outline-variant/30 h-16 flex items-center justify-around px-2">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-surface-container-high/95 backdrop-blur-md border-t border-primary-container/40 h-16 flex items-center justify-around px-2 shadow-[0_-8px_24px_rgba(217,119,7,0.06)]">
         {MENTOR_NAV_ITEMS.map((item) => {
           const active = isActive(item.href);
           return (

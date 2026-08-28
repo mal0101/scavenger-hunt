@@ -19,11 +19,25 @@ export async function GET(
       include: {
         rounds: { orderBy: { round_number: "asc" } },
         indexes: true,
+        teams: {
+          include: { _count: { select: { players: true } } },
+        },
         _count: { select: { teams: true } },
       },
     });
 
     if (!game) return apiNotFound("Game not found");
+
+    const teams = [...game.teams]
+      .sort((a, b) => b.total_score - a.total_score)
+      .map((t, i) => ({
+        id: t.id,
+        name: t.name,
+        total_score: t.total_score,
+        eliminated: t.eliminated,
+        member_count: t._count.players,
+        rank: i + 1,
+      }));
 
     return apiSuccess({
       id: game.id,
@@ -34,6 +48,7 @@ export async function GET(
       round_duration: game.round_duration,
       elimination_pct: game.elimination_pct,
       team_count: game._count.teams,
+      teams,
       rounds: game.rounds.map((r) => ({
         id: r.id,
         round_number: r.round_number,

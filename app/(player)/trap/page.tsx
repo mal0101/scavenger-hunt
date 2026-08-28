@@ -177,7 +177,7 @@ function TrapContent() {
           <div className="relative w-full aspect-square rounded-2xl overflow-hidden glass-panel border-t-error p-1">
             <div className="absolute inset-1 rounded-xl overflow-hidden bg-surface-container-lowest">
               <div className="absolute bottom-0 left-0 right-0 bg-surface-container-high/80 backdrop-blur-sm border-t border-outline-variant transition-all duration-1000" style={{ height: `${waterPct}%` }}>
-                <div className="absolute top-0 left-0 right-0 h-4 bg-gradient-to-b from-secondary/20 to-transparent" />
+                <div className="absolute top-0 left-0 right-0 h-4 bg-gradient-to-b from-secondary/20 to-transparent animate-water-sway" />
                 <span className="material-symbols-outlined text-secondary/30 text-6xl absolute top-8 left-1/2 -translate-x-1/2">
                   water_drop
                 </span>
@@ -196,6 +196,15 @@ function TrapContent() {
                 <span className="font-label text-label-sm text-primary-container">TEMP HI</span>
               </div>
 
+              <svg
+                className="absolute inset-0 w-full h-full stroke-on-surface-variant/30 pointer-events-none"
+                fill="none"
+                viewBox="0 0 100 100"
+                preserveAspectRatio="none"
+              >
+                <path d="M 22,18 L 50,50 L 78,28 M 50,50 L 58,88 M 50,50 L 12,72" strokeWidth="1" />
+              </svg>
+
               {sequence.length > 0 && (
                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1 bg-surface/70 border border-outline-variant rounded px-2 py-1">
                   {sequence.map((id, i) => (
@@ -207,7 +216,7 @@ function TrapContent() {
           </div>
 
           {/* Hydraulic relays */}
-          <div className="glass-panel p-4 rounded-xl space-y-4">
+          <div className="glass-panel p-4 rounded-xl space-y-4 rivet-corners">
             <div className="flex items-center justify-between px-1 pt-1">
               <span className="font-headline text-headline-lg-mobile text-primary">HYDRAULIC RELAYS</span>
               <span className="font-label text-label-sm text-outline-variant">SEQ REQ</span>

@@ -1,44 +1,80 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { apiFetch } from "@/lib/api-client";
 
 interface TeamEntry {
-  rank: number;
   id: string;
   name: string;
   invite_code: string;
+  game_id: string;
+  game_title: string;
   total_score: number;
   eliminated: boolean;
   member_count: number;
-  last_scan: {
-    index_label: string;
-    points_earned: number;
-    at: string;
-  } | null;
 }
+
+interface MiniGame {
+  id: string;
+  title: string;
+  elimination_pct: number;
+}
+
+const REFRESH_MS = 10000;
 
 export default function MentorTeamsPage() {
   const [teams, setTeams] = useState<TeamEntry[]>([]);
+  const [games, setGames] = useState<MiniGame[]>([]);
+  const [selectedGame, setSelectedGame] = useState("all");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function load() {
+    async function loadGames() {
       try {
-        const res = await fetch("/api/v1/admin/teams");
-        const j = await res.json();
-        if (j.success) setTeams(j.data);
+        const j = await apiFetch<{ success: boolean; data: MiniGame[] }>("/api/v1/admin/games");
+        if (j.success) setGames(j.data);
       } catch {
         // keep defaults
+      }
+    }
+    loadGames();
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    async function load() {
+      try {
+        const url = selectedGame !== "all"
+          ? `/api/v1/admin/teams?game_id=${selectedGame}`
+          : "/api/v1/admin/teams";
+        const j = await apiFetch<{ success: boolean; data: TeamEntry[] }>(url);
+        if (active && j.success) setTeams(j.data);
+      } catch {
+        // keep last good data
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     }
     load();
-  }, []);
+    const id = setInterval(load, REFRESH_MS);
+    return () => {
+      active = false;
+      clearInterval(id);
+    };
+  }, [selectedGame]);
 
-  const activeCount = teams.filter((t) => !t.eliminated).length;
-  const eliminatedCount = teams.filter((t) => t.eliminated).length;
-  const totalPlayers = teams.reduce((sum, t) => sum + t.member_count, 0);
+  const rankedTeams = teams.map((t, i) => ({ ...t, rank: i + 1 }));
+  const activeCount = rankedTeams.filter((t) => !t.eliminated).length;
+  const eliminatedCount = rankedTeams.filter((t) => t.eliminated).length;
+  const totalPlayers = rankedTeams.reduce((sum, t) => sum + t.member_count, 0);
+
+  const selectedPct =
+    selectedGame !== "all"
+      ? games.find((g) => g.id === selectedGame)?.elimination_pct ?? 0.2
+      : null;
+  const cutCount = selectedPct && rankedTeams.length > 0
+    ? Math.max(1, Math.floor(rankedTeams.length * selectedPct))
+    : null;
 
   return (
     <div className="p-6 space-y-6 max-w-6xl mx-auto">
@@ -47,50 +83,48 @@ export default function MentorTeamsPage() {
           Team Telemetry
         </h1>
         <p className="font-body text-body-md text-on-surface-variant">
-          Monitor all teams and their progress in real-time
+          Monitor all teams and their progress in real-time (auto-refreshes every {REFRESH_MS / 1000}s)
         </p>
       </div>
 
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="font-label text-label-sm text-on-surface-variant">Filter by game:</span>
+        <select
+          value={selectedGame}
+          onChange={(e) => setSelectedGame(e.target.value)}
+          className="px-3 py-1.5 bg-surface-container border border-outline-variant rounded-lg font-body text-body-md text-on-surface focus:outline-none focus:border-primary"
+        >
+          <option value="all">All Games</option>
+          {games.map((g) => (
+            <option key={g.id} value={g.id}>{g.title}</option>
+          ))}
+        </select>
+      </div>
+
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-surface-container rounded-xl border border-outline-variant/30 p-4">
-          <p className="font-label text-label-sm text-on-surface-variant uppercase">
-            Total Teams
-          </p>
-          <p className="font-headline text-2xl text-on-surface font-bold">
-            {loading ? "--" : teams.length}
-          </p>
+        <div className="bg-surface-container rivet-corners rounded-xl border border-outline-variant/30 p-4">
+          <p className="font-label text-label-sm text-on-surface-variant uppercase">Total Teams</p>
+          <p className="font-headline text-2xl text-on-surface font-bold">{loading ? "--" : rankedTeams.length}</p>
         </div>
-        <div className="bg-surface-container rounded-xl border border-outline-variant/30 p-4">
-          <p className="font-label text-label-sm text-on-surface-variant uppercase">
-            Active
-          </p>
-          <p className="font-headline text-2xl text-primary font-bold">
-            {loading ? "--" : activeCount}
-          </p>
+        <div className="bg-surface-container rivet-corners rounded-xl border border-outline-variant/30 p-4">
+          <p className="font-label text-label-sm text-on-surface-variant uppercase">Active</p>
+          <p className="font-headline text-2xl text-primary font-bold">{loading ? "--" : activeCount}</p>
         </div>
-        <div className="bg-surface-container rounded-xl border border-outline-variant/30 p-4">
-          <p className="font-label text-label-sm text-on-surface-variant uppercase">
-            Eliminated
-          </p>
-          <p className="font-headline text-2xl text-error font-bold">
-            {loading ? "--" : eliminatedCount}
-          </p>
+        <div className="bg-surface-container rivet-corners rounded-xl border border-outline-variant/30 p-4">
+          <p className="font-label text-label-sm text-on-surface-variant uppercase">Eliminated</p>
+          <p className="font-headline text-2xl text-error font-bold">{loading ? "--" : eliminatedCount}</p>
         </div>
-        <div className="bg-surface-container rounded-xl border border-outline-variant/30 p-4">
-          <p className="font-label text-label-sm text-on-surface-variant uppercase">
-            Total Players
-          </p>
-          <p className="font-headline text-2xl text-on-surface font-bold">
-            {loading ? "--" : totalPlayers}
-          </p>
+        <div className="bg-surface-container rivet-corners rounded-xl border border-outline-variant/30 p-4">
+          <p className="font-label text-label-sm text-on-surface-variant uppercase">Total Players</p>
+          <p className="font-headline text-2xl text-on-surface font-bold">{loading ? "--" : totalPlayers}</p>
         </div>
       </div>
 
-      {teams.length > 0 && (
+      {cutCount !== null && rankedTeams.length > 0 && (
         <div className="flex items-center gap-3 py-2">
           <div className="flex-1 h-px bg-error/50 border-t border-dashed border-error" />
           <span className="font-label text-label-sm text-error uppercase">
-            Elimination Line (Bottom 20%)
+            Elimination Line (Bottom {Math.round(selectedPct! * 100)}% · {cutCount} team{cutCount > 1 ? "s" : ""})
           </span>
           <div className="flex-1 h-px bg-error/50 border-t border-dashed border-error" />
         </div>
@@ -101,13 +135,13 @@ export default function MentorTeamsPage() {
           <div className="bg-surface-container rounded-xl border border-outline-variant/30 p-8 text-center">
             <p className="font-body text-body-md text-on-surface-variant animate-pulse">Loading teams...</p>
           </div>
-        ) : teams.length === 0 ? (
+        ) : rankedTeams.length === 0 ? (
           <div className="bg-surface-container rounded-xl border border-outline-variant/30 p-8 text-center">
             <span className="material-symbols-outlined text-on-surface-variant text-4xl mb-2 block">group</span>
-            <p className="font-body text-body-md text-on-surface-variant">No teams yet</p>
+            <p className="font-body text-body-md text-on-surface-variant">No teams {selectedGame !== "all" ? "for this game" : "yet"}</p>
           </div>
         ) : (
-          teams.map((team) => (
+          rankedTeams.map((team) => (
             <div
               key={team.id}
               className={`bg-surface-container rounded-xl border p-5 transition-all ${
@@ -131,9 +165,7 @@ export default function MentorTeamsPage() {
                   <div className="flex items-center gap-2">
                     <h3
                       className={`font-headline text-sm ${
-                        team.eliminated
-                          ? "text-on-surface-variant line-through"
-                          : "text-on-surface"
+                        team.eliminated ? "text-on-surface-variant line-through" : "text-on-surface"
                       }`}
                     >
                       {team.name}
@@ -148,7 +180,7 @@ export default function MentorTeamsPage() {
                       {team.eliminated ? "ELIMINATED" : "ACTIVE"}
                     </span>
                   </div>
-                  <div className="flex items-center gap-3 mt-1">
+                  <div className="flex items-center gap-3 mt-1 flex-wrap">
                     <span className="font-label text-label-sm text-on-surface-variant flex items-center gap-1">
                       <span className="material-symbols-outlined text-sm">group</span>
                       {team.member_count}
@@ -156,18 +188,14 @@ export default function MentorTeamsPage() {
                     <span className="font-label text-label-sm text-on-surface-variant">
                       Code: {team.invite_code}
                     </span>
-                    {team.last_scan && (
-                      <span className="font-label text-label-sm text-on-surface-variant">
-                        Last: {team.last_scan.index_label}
-                      </span>
-                    )}
+                    <span className="font-label text-label-sm text-on-surface-variant">
+                      Game: {team.game_title}
+                    </span>
                   </div>
                 </div>
 
                 <div className="text-right">
-                  <p className="font-headline text-xl text-primary font-bold">
-                    {team.total_score}
-                  </p>
+                  <p className="font-headline text-xl text-primary font-bold">{team.total_score}</p>
                   <p className="font-label text-label-sm text-on-surface-variant">pts</p>
                 </div>
               </div>

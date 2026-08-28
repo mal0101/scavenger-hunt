@@ -14,7 +14,15 @@ const VALID_TRANSITIONS: GameStateTransition[] = [
   { from: "ACTIVE", to: "ELIMINATING", action: "eliminate" },
   { from: "ELIMINATING", to: "ACTIVE", action: "next_round" },
   { from: "ELIMINATING", to: "FINISHED", action: "finish" },
+  { from: "FINISHED", to: "PENDING", action: "reset" },
 ];
+
+export type GameAction =
+  | "start"
+  | "eliminate"
+  | "next_round"
+  | "finish"
+  | "reset";
 
 export function canTransition(currentState: GameStatus, action: string): boolean {
   return VALID_TRANSITIONS.some(

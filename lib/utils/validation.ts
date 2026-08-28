@@ -48,7 +48,13 @@ export const scanSchema = z.object({
 });
 
 export const stateTransitionSchema = z.object({
-  action: z.enum(["start", "eliminate", "finish"]),
+  action: z.enum([
+    "start",
+    "eliminate",
+    "next_round",
+    "finish",
+    "reset",
+  ]),
 });
 
 export type PhoneInput = z.infer<typeof phoneSchema>;

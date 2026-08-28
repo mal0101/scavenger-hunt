@@ -1,22 +1,16 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db/postgres";
-import { apiSuccess, apiCreated, apiError, apiInternal, apiForbidden } from "@/lib/types/api";
+import { apiSuccess, apiCreated, apiError, apiInternal } from "@/lib/types/api";
 import { indexSchema } from "@/lib/utils/validation";
-
-function requireMentor(request: NextRequest): string | null {
-  const userId = request.headers.get("x-user-id");
-  const role = request.headers.get("x-user-role");
-  if (!userId || role !== "MENTOR") return null;
-  return userId;
-}
+import { requireMentor } from "@/lib/auth/guard";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userId = requireMentor(request);
-    if (!userId) return apiForbidden("Mentor access required");
+    const auth = await requireMentor(request);
+    if (auth instanceof Response) return auth;
 
     const { id: gameId } = await params;
 
@@ -52,8 +46,8 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userId = requireMentor(request);
-    if (!userId) return apiForbidden("Mentor access required");
+    const auth = await requireMentor(request);
+    if (auth instanceof Response) return auth;
 
     const { id: gameId } = await params;
     const body = await request.json();

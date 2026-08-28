@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { verifyAccessToken } from "@/lib/auth/jwt";
-import { redis } from "@/lib/db/redis";
+import { getLeaderboardRows } from "@/lib/game/leaderboard";
 import { GAME_CONSTANTS } from "@/lib/utils/constants";
 
 export async function GET(
@@ -49,23 +49,16 @@ export async function GET(
 
       const pollLeaderboard = async () => {
         try {
-          const key = `leaderboard:${gameId}`;
-          const entries = await redis.zrange(key, 0, -1, {
-            withScores: true,
-            rev: true,
-          });
+          const rows = await getLeaderboardRows(gameId);
 
-          const teams: Array<{ rank: number; team_id: string; score: number }> =
-            [];
-          let rank = 1;
-          for (let i = 0; i < entries.length; i += 2) {
-            teams.push({
-              rank,
-              team_id: entries[i] as string,
-              score: entries[i + 1] as number,
-            });
-            rank++;
-          }
+          const teams = rows.map((r) => ({
+            rank: r.rank,
+            team_id: r.teamId,
+            name: r.name,
+            score: r.score,
+            eliminated: r.eliminated,
+            member_count: r.memberCount,
+          }));
 
           send({ type: "leaderboard", teams, timestamp: new Date().toISOString() });
         } catch (err) {
@@ -73,7 +66,7 @@ export async function GET(
         }
       };
 
-      const pollInterval = setInterval(pollLeaderboard, 5000);
+      const pollInterval = setInterval(pollLeaderboard, 3000);
       pollLeaderboard();
 
       request.signal.addEventListener("abort", () => {

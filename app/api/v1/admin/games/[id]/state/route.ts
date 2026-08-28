@@ -35,8 +35,7 @@ export async function POST(
       );
     }
 
-    const targetState = getTargetState(game.status, action);
-
+    // ── START (PENDING → ACTIVE) ────────────────────────────────
     if (action === "start") {
       const roundNumber = game.current_round + 1;
 
@@ -63,7 +62,45 @@ export async function POST(
         type: "round_started",
         round_number: roundNumber,
       });
-    } else if (action === "eliminate") {
+    }
+
+    // ── NEXT ROUND (ELIMINATING → ACTIVE) ───────────────────────
+    else if (action === "next_round") {
+      const roundNumber = game.current_round + 1;
+
+      if (roundNumber > game.max_rounds) {
+        return apiError(
+          `All ${game.max_rounds} rounds are complete. End the game or reset it.`,
+          "MAX_ROUNDS_REACHED"
+        );
+      }
+
+      await db.$transaction([
+        db.game.update({
+          where: { id },
+          data: {
+            status: "ACTIVE",
+            current_round: roundNumber,
+          },
+        }),
+        db.round.create({
+          data: {
+            game_id: id,
+            round_number: roundNumber,
+            status: "ACTIVE",
+            started_at: new Date(),
+          },
+        }),
+      ]);
+
+      await publishEvent(id, "state", {
+        type: "round_started",
+        round_number: roundNumber,
+      });
+    }
+
+    // ── ELIMINATE (ACTIVE → ELIMINATING) ────────────────────────
+    else if (action === "eliminate") {
       const activeRound = await db.round.findFirst({
         where: { game_id: id, status: "ACTIVE" },
       });
@@ -77,7 +114,7 @@ export async function POST(
 
       const teams = await db.team.findMany({
         where: { game_id: id },
-        select: { id: true, total_score: true },
+        select: { id: true, total_score: true, eliminated: true },
       });
 
       const eliminatedIds = getEliminatedTeams(
@@ -85,24 +122,30 @@ export async function POST(
         game.elimination_pct
       );
 
-      if (eliminatedIds.length > 0) {
+      const newlyEliminated = eliminatedIds.filter(
+        (tid) => !teams.find((t) => t.id === tid)?.eliminated
+      );
+
+      if (newlyEliminated.length > 0) {
         await db.team.updateMany({
-          where: { id: { in: eliminatedIds } },
+          where: { id: { in: newlyEliminated } },
           data: { eliminated: true },
         });
       }
 
-      const newStatus = targetState === "ACTIVE" ? "ACTIVE" : "ELIMINATING";
       await db.game.update({
         where: { id },
-        data: { status: newStatus as GameStatus },
+        data: { status: "ELIMINATING" },
       });
 
       await publishEvent(id, "state", {
         type: "elimination",
-        eliminated_teams: eliminatedIds,
+        eliminated_teams: newlyEliminated,
       });
-    } else if (action === "finish") {
+    }
+
+    // ── FINISH (ELIMINATING → FINISHED) ─────────────────────────
+    else if (action === "finish") {
       const activeRound = await db.round.findFirst({
         where: { game_id: id, status: "ACTIVE" },
       });
@@ -124,11 +167,37 @@ export async function POST(
       });
     }
 
+    // ── RESET (FINISHED → PENDING) ──────────────────────────────
+    else if (action === "reset") {
+      await db.$transaction([
+        db.game.update({
+          where: { id },
+          data: {
+            status: "PENDING",
+            current_round: 0,
+            started_at: null,
+            finished_at: null,
+          },
+        }),
+        db.round.updateMany({
+          where: { game_id: id },
+          data: { status: "COMPLETED" },
+        }),
+      ]);
+
+      await publishEvent(id, "state", {
+        type: "game_reset",
+      });
+    }
+
+    const refreshed = await db.game.findUnique({ where: { id } });
+
     return apiSuccess(
       {
         game_id: id,
         action,
-        new_status: targetState,
+        new_status: refreshed?.status ?? nextTargetStatus(game.status, action),
+        current_round: refreshed?.current_round ?? 0,
       },
       `Game ${action} successful`
     );
@@ -136,4 +205,11 @@ export async function POST(
     console.error("State transition error:", error);
     return apiInternal("Failed to transition game state");
   }
+}
+
+function nextTargetStatus(
+  current: GameStatus,
+  action: string
+): GameStatus | null {
+  return getTargetState(current, action);
 }

@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { apiFetch } from "@/lib/api-client";
 
 interface ScanEntry {
   id: string;
   index_label: string;
   points_earned: number;
   scanned_at: string;
-  location_name?: string;
+  location_name?: string | null;
 }
 
 interface GameData {
@@ -22,7 +23,9 @@ interface PlayerData {
 }
 
 export default function LogsPage() {
-  const [scans] = useState<ScanEntry[]>([]);
+  const [scans, setScans] = useState<ScanEntry[]>([]);
+  const [scanTotal, setScanTotal] = useState(0);
+  const [pointTotal, setPointTotal] = useState(0);
   const [game, setGame] = useState<GameData | null>(null);
   const [player, setPlayer] = useState<PlayerData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -30,14 +33,20 @@ export default function LogsPage() {
   useEffect(() => {
     async function load() {
       try {
-        const [gameRes, playerRes] = await Promise.all([
-          fetch("/api/v1/games/active"),
-          fetch("/api/v1/players/me"),
+        const [scansRes, gameRes, playerRes] = await Promise.all([
+          apiFetch<{ success: boolean; data?: { scans: ScanEntry[]; total: number; total_points: number } }>(
+            "/api/v1/players/me/scans"
+          ),
+          apiFetch<{ success: boolean; data: GameData | null }>("/api/v1/games/active"),
+          apiFetch<{ success: boolean; data: PlayerData }>("/api/v1/players/me"),
         ]);
-        const gj = await gameRes.json();
-        const pj = await playerRes.json();
-        if (gj.success) setGame(gj.data);
-        if (pj.success) setPlayer(pj.data);
+        if (scansRes.success && scansRes.data) {
+          setScans(scansRes.data.scans);
+          setScanTotal(scansRes.data.total);
+          setPointTotal(scansRes.data.total_points);
+        }
+        if (gameRes.success && gameRes.data) setGame(gameRes.data);
+        if (playerRes.success) setPlayer(playerRes.data);
       } catch {
         // keep defaults
       } finally {
@@ -47,7 +56,8 @@ export default function LogsPage() {
     load();
   }, []);
 
-  const totalPoints = scans.reduce((sum, s) => sum + s.points_earned, 0);
+  const totalPoints = pointTotal;
+
 
   return (
     <div className="px-4 space-y-6 max-w-lg mx-auto">
@@ -63,7 +73,7 @@ export default function LogsPage() {
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-surface-container rounded-lg border border-outline-variant/30 p-3 text-center">
           <p className="font-headline text-2xl text-primary font-bold">
-            {loading ? "--" : scans.length}
+            {loading ? "--" : scanTotal}
           </p>
           <p className="font-label text-label-sm text-on-surface-variant uppercase">
             Scans

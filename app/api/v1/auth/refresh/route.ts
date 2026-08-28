@@ -29,12 +29,14 @@ export async function POST(request: NextRequest) {
     const payload = await verifyRefreshToken(refreshToken);
 
     const familyKey = `${REFRESH_TOKEN_FAMILY_PREFIX}${payload.sub}`;
-    const storedJti = await redis.get(familyKey);
-
     const jti = typeof payload.jti === "string" ? payload.jti : null;
-    if (storedJti && storedJti !== jti) {
+
+    // Reuse detection: if we've already rotated with a different token id,
+    // the refresh token was presented twice (theft/replay).
+    const storedJti = jti ? await redis.get(familyKey) : null;
+    if (storedJti !== null && storedJti !== jti) {
       await redis.del(familyKey);
-      return apiUnauthorized("Refresh token revoked — possible theft detected");
+      return apiUnauthorized("Refresh token reused — revoked");
     }
 
     const newAccessToken = await signAccessToken(
@@ -49,7 +51,8 @@ export async function POST(request: NextRequest) {
     );
 
     const newPayload = await verifyRefreshToken(newRefreshToken);
-    const newJti = typeof newPayload.jti === "string" ? newPayload.jti : "active";
+    const newJti =
+      typeof newPayload.jti === "string" ? newPayload.jti : jti ?? "active";
     await redis.set(familyKey, newJti, {
       ex: getRefreshExpiry(),
     });

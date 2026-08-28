@@ -124,15 +124,35 @@ export default function MentorGameDetailPage() {
           State Controls
         </h3>
         <div className="flex flex-wrap gap-3">
-          {(game.status === "PENDING" || game.status === "ELIMINATING") && (
+          {game.status === "PENDING" && (
             <button
               onClick={() => handleState("start")}
               disabled={actionLoading}
               className="px-4 py-2 bg-primary-container text-on-primary-container font-label text-label-sm font-bold uppercase tracking-widest rounded-lg hover:shadow-[0_0_15px_rgba(217,119,7,0.3)] transition-all flex items-center gap-2 disabled:opacity-50"
             >
               <span className="material-symbols-outlined text-lg">play_arrow</span>
-              {game.status === "PENDING" ? "Start Game" : "Start Next Round"}
+              Start Game
             </button>
+          )}
+          {game.status === "ELIMINATING" && (
+            <>
+              <button
+                onClick={() => handleState("next_round")}
+                disabled={actionLoading}
+                className="px-4 py-2 bg-primary-container text-on-primary-container font-label text-label-sm font-bold uppercase tracking-widest rounded-lg hover:shadow-[0_0_15px_rgba(217,119,7,0.3)] transition-all flex items-center gap-2 disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined text-lg">play_arrow</span>
+                Start Next Round
+              </button>
+              <button
+                onClick={() => handleState("finish")}
+                disabled={actionLoading}
+                className="px-4 py-2 bg-surface-container-high border border-outline-variant text-on-surface-variant font-label text-label-sm font-bold uppercase tracking-widest rounded-lg hover:bg-surface-container-highest transition-all flex items-center gap-2 disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined text-lg">flag</span>
+                Declare Winner
+              </button>
+            </>
           )}
           {game.status === "ACTIVE" && (
             <>
@@ -142,7 +162,7 @@ export default function MentorGameDetailPage() {
                 className="px-4 py-2 bg-error-container/20 border border-error/30 text-error font-label text-label-sm font-bold uppercase tracking-widest rounded-lg hover:bg-error/10 transition-all flex items-center gap-2 disabled:opacity-50"
               >
                 <span className="material-symbols-outlined text-lg">skip_next</span>
-                Eliminate Bottom 20%
+                Eliminate Bottom {Math.round(game.elimination_pct * 100)}%
               </button>
               <button
                 onClick={() => handleState("finish")}
@@ -153,6 +173,16 @@ export default function MentorGameDetailPage() {
                 Finish Game
               </button>
             </>
+          )}
+          {game.status === "FINISHED" && (
+            <button
+              onClick={() => handleState("reset")}
+              disabled={actionLoading}
+              className="px-4 py-2 bg-surface-container-high border border-outline-variant text-on-surface-variant font-label text-label-sm font-bold uppercase tracking-widest rounded-lg hover:bg-surface-container-highest transition-all flex items-center gap-2 disabled:opacity-50"
+            >
+              <span className="material-symbols-outlined text-lg">replay</span>
+              Reset Game
+            </button>
           )}
         </div>
       </div>

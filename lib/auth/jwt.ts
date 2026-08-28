@@ -1,4 +1,5 @@
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
+import crypto from "crypto";
 
 export interface TokenPayload extends JWTPayload {
   sub: string;
@@ -33,6 +34,7 @@ export async function signRefreshToken(
 ): Promise<string> {
   return new SignJWT({ sub: userId, role, phone })
     .setProtectedHeader({ alg: "HS256" })
+    .setJti(crypto.randomUUID())
     .setIssuedAt()
     .setExpirationTime(`${REFRESH_EXPIRY}s`)
     .setIssuer("scavenger-hunt")

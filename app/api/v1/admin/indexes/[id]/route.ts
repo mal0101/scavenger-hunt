@@ -1,21 +1,15 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db/postgres";
-import { apiSuccess, apiInternal, apiForbidden } from "@/lib/types/api";
-
-function requireMentor(request: NextRequest): string | null {
-  const userId = request.headers.get("x-user-id");
-  const role = request.headers.get("x-user-role");
-  if (!userId || role !== "MENTOR") return null;
-  return userId;
-}
+import { apiSuccess, apiInternal } from "@/lib/types/api";
+import { requireMentor } from "@/lib/auth/guard";
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userId = requireMentor(request);
-    if (!userId) return apiForbidden("Mentor access required");
+    const auth = await requireMentor(request);
+    if (auth instanceof Response) return auth;
 
     const { id } = await params;
     const body = await request.json();
@@ -48,8 +42,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const userId = requireMentor(request);
-    if (!userId) return apiForbidden("Mentor access required");
+    const auth = await requireMentor(request);
+    if (auth instanceof Response) return auth;
 
     const { id } = await params;
 

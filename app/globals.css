@@ -564,6 +564,24 @@ body::before {
   animation: steam-rise 3.2s ease-out infinite;
 }
 
+/* ── QR Reader (html5-qrcode overrides) ── */
+#qr-reader {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 250px;
+  border: none !important;
+}
+#qr-reader video {
+  width: 100% !important;
+  height: 100% !important;
+}
+#qr-reader img[alt="Info icon"],
+#qr-reader__dashboard_span,
+#qr-reader__dashboard_section,
+#qr-reader__scan_region > br {
+  display: none !important;
+}
+
 /* ── Scanner Sweep (QR / radar line) ── */
 @keyframes scan-sweep {
   0% {

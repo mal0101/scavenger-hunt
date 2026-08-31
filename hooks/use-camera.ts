@@ -35,9 +35,12 @@ export function useCamera({ onScan, onError }: UseCameraOptions) {
       await html5QrCode.start(
         { facingMode: "environment" },
         {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
-          aspectRatio: 1.0,
+          fps: 15,
+          qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+            const minDim = Math.min(viewfinderWidth, viewfinderHeight);
+            const size = Math.floor(minDim * 0.7);
+            return { width: size, height: size };
+          },
         },
         (decodedText: string) => {
           callbackRef.current.onScan?.(decodedText);

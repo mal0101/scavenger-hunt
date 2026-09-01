@@ -3,6 +3,17 @@ import { redis } from "@/lib/db/redis";
 
 const isDev = process.env.NODE_ENV === "development";
 
+// True only in a genuine production deployment backed by a real Upstash
+// endpoint. A placeholder or missing URL/token means we are running against
+// the LocalRedisMock (or an unprovisioned env), where rate limiters are
+// pass-through — fail-closed would otherwise lock users out of auth.
+const realUpstashConfigured =
+  (process.env.UPSTASH_REDIS_REST_URL ?? "").startsWith("https://") &&
+  (process.env.UPSTASH_REDIS_REST_TOKEN ?? "").length > 0;
+
+const shouldFailClosed =
+  process.env.NODE_ENV === "production" && realUpstashConfigured;
+
 export const generalLimiter = new Ratelimit({
   redis,
   limiter: Ratelimit.slidingWindow(100, "1 m"),
@@ -51,7 +62,7 @@ export async function checkRateLimit(
       reset: result.reset,
     };
   } catch {
-    if (opts.failClosed) {
+    if (opts.failClosed && shouldFailClosed) {
       return { success: false, remaining: 0, reset: Date.now() + 60000 };
     }
     return { success: true, remaining: 999, reset: Date.now() + 60000 };

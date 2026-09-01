@@ -17,7 +17,7 @@ dist/
 .env.*.local
 
 # ── Database ──────────────────────────
-prisma/migrations/
+# prisma/migrations/ is intentionally versioned (schema is a first-class citizen)
 
 # ── Debug ─────────────────────────────
 npm-debug.log*

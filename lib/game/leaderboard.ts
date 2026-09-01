@@ -30,6 +30,25 @@ export interface LeaderboardRow {
   memberCount: number;
 }
 
+async function fetchRowsFromDb(
+  gameId: string,
+  offset: number,
+  count: number
+): Promise<Array<{ teamId: string; score: number; rank: number }>> {
+  const teams = await db.team.findMany({
+    where: { game_id: gameId },
+    orderBy: [{ total_score: "desc" }, { created_at: "asc" }],
+    skip: offset,
+    take: count,
+    select: { id: true, name: true, total_score: true, eliminated: true },
+  });
+  return teams.map((t, i) => ({
+    teamId: t.id,
+    score: t.total_score,
+    rank: offset + i + 1,
+  }));
+}
+
 export async function getLeaderboardRows(
   gameId: string,
   offset = 0,
@@ -38,30 +57,31 @@ export async function getLeaderboardRows(
   let entries: Array<{ teamId: string; score: number; rank: number }>;
 
   if (REAL_REDIS) {
-    const key = getLeaderboardKey(gameId);
-    const results = await redis.zrange(key, offset, count - 1, {
-      rev: true,
-      withScores: true,
-    });
-    entries = [];
-    for (let i = 0; i < results.length; i += 2) {
-      entries.push({
-        teamId: results[i] as string,
-        score: results[i + 1] as number,
-        rank: offset + i / 2 + 1,
+    let entriesFromRedis: Array<{ teamId: string; score: number; rank: number }>;
+    try {
+      const key = getLeaderboardKey(gameId);
+      const results = await redis.zrange(key, offset, count - 1, {
+        rev: true,
+        withScores: true,
       });
+      entriesFromRedis = [];
+      for (let i = 0; i < results.length; i += 2) {
+        entriesFromRedis.push({
+          teamId: results[i] as string,
+          score: results[i + 1] as number,
+          rank: offset + i / 2 + 1,
+        });
+      }
+      entries = entriesFromRedis;
+    } catch (error) {
+      console.warn(
+        `[Leaderboard] Redis read failed for game ${gameId}, falling back to DB:`,
+        error instanceof Error ? error.message : "unknown"
+      );
+      entries = await fetchRowsFromDb(gameId, offset, count);
     }
   } else {
-    const teams = await db.team.findMany({
-      where: { game_id: gameId },
-      orderBy: [{ total_score: "desc" }, { created_at: "asc" }],
-      select: { id: true, name: true, total_score: true, eliminated: true },
-    });
-    entries = teams.map((t, i) => ({
-      teamId: t.id,
-      score: t.total_score,
-      rank: offset + i + 1,
-    }));
+    entries = await fetchRowsFromDb(gameId, offset, count);
   }
 
   const rows: LeaderboardRow[] = [];

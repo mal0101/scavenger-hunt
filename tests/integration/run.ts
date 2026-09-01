@@ -1,0 +1,649 @@
+/**
+ * Zero-dependency integration suite for the scavenger-hunt API.
+ *
+ * Runs against a live server (default http://localhost:3000) with the DB
+ * provisioned from the migrations + seed. Use in mock-OAuth/mock-Redis mode:
+ *
+ *   export UPSTASH_REDIS_REST_URL=
+ *   export UPSTASH_REDIS_REST_TOKEN=
+ *   npm run dev (in a separate process)
+ *   npm run test:integration
+ *
+ * The runner provisions isolated QA fixtures and scrubs them afterwards,
+ * so it is safe to re-run repeatedly against the same database.
+ */
+
+import { PrismaClient } from "@prisma/client";
+import { calculateScanScore } from "@/lib/game/engine";
+import { hmacSign } from "@/lib/utils/crypto";
+import { encodeQrPayload } from "@/lib/qr/generator";
+
+const BASE_URL = process.env.BASE_URL ?? "http://localhost:3000";
+const SEED_GAME_ID = "00000000-0000-0000-0000-000000000001";
+const SEED_MENTOR_PHONE = "+212600000001";
+const FULL_PHONE = "+13105550001";
+const PENDING_PHONE = "+13105550002";
+
+const db = new PrismaClient();
+
+const failures: string[] = [];
+function check(condition: boolean, label: string): void {
+  if (condition) {
+    console.log(`  ok   ${label}`);
+  } else {
+    failures.push(label);
+    console.error(`  FAIL ${label}`);
+  }
+}
+
+const now = Date.now();
+function uniquePhone(label: string): string {
+  return `+354${label}${now % 10000000}`;
+}
+
+// ─── HTTP / cookie helpers ──────────────────────────────────────────────
+type Jar = Map<string, string>;
+
+function jarToHeader(jar: Jar): string {
+  return [...jar.entries()].map(([k, v]) => `${k}=${v}`).join("; ");
+}
+
+// Safe dotted-path lookup over arbitrary nested JSON.
+function at(value: unknown, path: string): unknown {
+  let cur: unknown = value;
+  for (const key of path.split(".")) {
+    if (cur === null || cur === undefined) return undefined;
+    if (typeof cur !== "object") return undefined;
+    cur = (cur as Record<string, unknown>)[key];
+  }
+  return cur;
+}
+
+async function api(
+  path: string,
+  opts: { method?: string; body?: unknown; jar?: Jar; token?: string } = {}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- dynamic HTTP JSON in test harness; narrowing is done at call sites
+): Promise<{ status: number; json: any; setCookies: Map<string, string> }> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (opts.jar && opts.jar.size > 0) headers.Cookie = jarToHeader(opts.jar);
+  if (opts.token) headers.Cookie = `access_token=${opts.token}`;
+
+  const res = await fetch(BASE_URL + path, {
+    method: opts.method ?? "GET",
+    headers,
+    body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+  });
+
+  const setCookies = new Map<string, string>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- same reason as above; chained access (res.json?.data?.x) needs indexable
+  let json: any = null;
+  try {
+    json = await res.json();
+  } catch {
+    // non-JSON (SSE / empty) responses are handled by callers
+  }
+
+  for (const raw of res.headers.getSetCookie()) {
+    const [pair] = raw.split(";");
+    const eq = pair.indexOf("=");
+    const key = pair.slice(0, eq);
+    const value = pair.slice(eq + 1);
+    setCookies.set(key, value);
+    if (opts.jar) {
+      if (value === "" || raw.includes("Max-Age=0")) opts.jar.delete(key);
+      else opts.jar.set(key, value);
+    } else if (opts.jar === undefined && value !== "" && !raw.includes("Max-Age=0")) {
+      // If no jar passed, we don't track cookies.
+    }
+  }
+
+  return { status: res.status, json, setCookies };
+}
+
+async function signIn(jar: Jar, phone: string): Promise<{ role: string; user_id: string }> {
+  await api(`/api/v1/auth/send-otp`, { method: "POST", body: { phone_number: phone } });
+  const res = await api(`/api/v1/auth/verify-otp`, {
+    method: "POST",
+    body: { phone_number: phone, code: "000000" },
+    jar,
+  });
+  if (res.status !== 200) {
+    throw new Error(`signIn(${phone}) failed with status ${res.status}: ${JSON.stringify(res.json)}`);
+  }
+  return { role: res.json?.data?.user?.role, user_id: res.json?.data?.user?.id };
+}
+
+// Build a QR payload string signed with the shared HMAC_SECRET.
+function signedQr(indexId: string, gameId: string, roundId: string, ts?: string): string {
+  const timestamp = ts ?? new Date().toISOString();
+  return encodeQrPayload({
+    index_id: indexId,
+    game_id: gameId,
+    round_id: roundId,
+    timestamp,
+    signature: hmacSign(indexId, gameId, roundId, timestamp),
+  });
+}
+
+// ─── SSE helpers ────────────────────────────────────────────────────────
+async function readSse(
+  path: string,
+  token: string,
+  wanted: (e: Record<string, unknown>) => boolean,
+  timeoutMs: number
+): Promise<Record<string, unknown>[]> {
+  const ac = new AbortController();
+  const res = await fetch(BASE_URL + path, {
+    headers: { Cookie: `access_token=${token}` },
+    signal: ac.signal,
+  });
+  if (!res.ok || !res.body) throw new Error(`SSE ${path} returned ${res.status}`);
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buf = "";
+  const events: Record<string, unknown>[] = [];
+  const deadline = Date.now() + timeoutMs;
+  try {
+    while (Date.now() < deadline) {
+      const remaining = deadline - Date.now();
+      let chunk;
+      try {
+        chunk = await Promise.race([
+          reader.read(),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), remaining)),
+        ]);
+      } catch {
+        break;
+      }
+      if (chunk === null) break;
+      const { done, value } = chunk;
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      let sep: number;
+      while ((sep = buf.indexOf("\n\n")) !== -1) {
+        const raw = buf.slice(0, sep);
+        buf = buf.slice(sep + 2);
+        const dataLine = raw.split("\n").find((l) => l.startsWith("data:") && l.length > 5);
+        if (!dataLine) continue;
+        const event = JSON.parse(dataLine.slice(5).trim());
+        events.push(event);
+        if (wanted(event)) return events;
+      }
+    }
+  } finally {
+    ac.abort();
+  }
+  return events;
+}
+
+// ─── Fixtures & cleanup ────────────────────────────────────────────────
+function fixtureTeamCode(seed: number): string {
+  return `QA${seed.toString(36).padStart(4, "0").toUpperCase()}`;
+}
+
+async function createFixtures(): Promise<void> {
+  await db.user.deleteMany({ where: { phone_number: { in: [FULL_PHONE, PENDING_PHONE] } } });
+  await db.game.deleteMany({ where: { title: { startsWith: "QA-" } } });
+  await db.team.deleteMany({ where: { name: { startsWith: "QA-" } } });
+
+  const mentor = await db.user.findUnique({ where: { phone_number: SEED_MENTOR_PHONE } });
+  const createdBy = mentor?.id ?? "unknown";
+
+  const fullGame = await db.game.create({
+    data: {
+      title: "QA-Full-Game",
+      description: "fixture: game already at the team cap",
+      created_by: createdBy,
+      max_rounds: 3,
+      round_duration: 1800,
+      elimination_pct: 0.2,
+      status: "PENDING",
+    },
+  });
+  await db.team.createMany({
+    data: Array.from({ length: 100 }, (_, i) => ({
+      name: `QA-Full-${i}`,
+      invite_code: fixtureTeamCode(1000 + i),
+      game_id: fullGame.id,
+    })),
+  });
+  const fullUser = await db.user.create({
+    data: { phone_number: FULL_PHONE, role: "PLAYER" },
+  });
+  await db.player.create({
+    data: { user_id: fullUser.id, game_id: fullGame.id, status: "ACTIVE" },
+  });
+
+  const pendingGame = await db.game.create({
+    data: {
+      title: "QA-Pending-Game",
+      description: "fixture: game not yet started",
+      created_by: createdBy,
+      max_rounds: 3,
+      round_duration: 1800,
+      elimination_pct: 0.2,
+      status: "PENDING",
+    },
+  });
+  const pendingTeam = await db.team.create({
+    data: { name: "QA-PendingTeam", invite_code: fixtureTeamCode(999), game_id: pendingGame.id },
+  });
+  const pendingUser = await db.user.create({
+    data: { phone_number: PENDING_PHONE, role: "PLAYER" },
+  });
+  await db.player.create({
+    data: {
+      user_id: pendingUser.id,
+      game_id: pendingGame.id,
+      team_id: pendingTeam.id,
+      status: "ACTIVE",
+    },
+  });
+
+  console.log("  fixtures ready (full game @100 teams, pending game + team)");
+}
+
+async function cleanup(phones: string[]): Promise<void> {
+  await db.user.deleteMany({ where: { phone_number: { in: phones } } });
+  await db.game.deleteMany({ where: { title: { startsWith: "QA-" } } });
+  await db.team.deleteMany({ where: { name: { startsWith: "QA-" } } });
+}
+
+// ─── Scenarios ──────────────────────────────────────────────────────────
+async function s1AuthLifecycle(): Promise<string[]> {
+  console.log("S1 auth lifecycle");
+  const jar: Jar = new Map();
+  const p1 = uniquePhone("1");
+
+  let res = await api("/api/v1/auth/me");
+  check(res.status === 401, "unauthenticated /auth/me -> 401");
+
+  res = await api("/api/v1/auth/send-otp", { method: "POST", body: { phone_number: "abc" } });
+  check(res.status === 400 && res.json?.error === "VALIDATION_ERROR", "send-otp rejects malformed phone");
+
+  res = await api("/api/v1/auth/send-otp", { method: "POST", body: { phone_number: p1 } });
+  check(res.status === 200, "send-otp dispatches (mock)");
+
+  res = await api("/api/v1/auth/verify-otp", { method: "POST", body: { phone_number: p1, code: "111111" } });
+  check(res.status === 400 && res.json?.error === "OTP_INVALID", "wrong OTP rejected");
+
+  res = await api("/api/v1/auth/verify-otp", {
+    method: "POST", body: { phone_number: p1, code: "000000" }, jar,
+  });
+  check(res.status === 200 && res.json?.data?.user?.role === "PLAYER", "correct OTP signs in as PLAYER");
+  check(jar.has("access_token") && jar.has("refresh_token"), "auth cookies set");
+  const accessBeforeRefresh = jar.get("access_token");
+
+  res = await api("/api/v1/auth/me", { jar });
+  check(res.status === 200 && res.json?.data?.user?.phone === p1, "me returns the signed-in user");
+
+  res = await api("/api/v1/players/me", { jar });
+  check(res.status === 200 && res.json?.data?.total_score === 0 && res.json?.data?.team === null, "fresh player profile with zero balance");
+
+  res = await api("/api/v1/players/me", { method: "PUT", body: { nickname: "x".repeat(51) }, jar });
+  check(res.status === 400 && res.json?.error === "VALIDATION_ERROR", "nickname over 50 chars rejected");
+
+  res = await api("/api/v1/players/me", { method: "PUT", body: { nickname: "QA Niffler" }, jar });
+  check(res.status === 200 && res.json?.data?.nickname === "QA Niffler", "nickname updated");
+
+  res = await api("/api/v1/auth/refresh", { method: "POST", jar });
+  check(res.status === 200 && Boolean(jar.get("refresh_token")), "refresh rotates tokens");
+  check(jar.get("access_token") !== accessBeforeRefresh, "access token rotated on refresh");
+
+  // A stale/garbage refresh token must be rejected.
+  const staleJar: Jar = new Map([["access_token", "x"], ["refresh_token", "not-a-jwt"]]);
+  const staleRes = await api("/api/v1/auth/refresh", { method: "POST", jar: staleJar });
+  check(staleRes.status === 401, "refresh with garbage token -> 401");
+
+  res = await api("/api/v1/auth/logout", { method: "POST", jar });
+  check(res.status === 200, "logout succeeds");
+  const cookieJarAfterLogout = res.setCookies;
+  check(
+    !cookieJarAfterLogout.get("access_token") && !cookieJarAfterLogout.get("refresh_token"),
+    "logout expires auth cookies (empty-value deletion entries)"
+  );
+
+  const clearedJar: Jar = new Map();
+  res = await api("/api/v1/auth/me", { jar: clearedJar });
+  check(res.status === 401, "me after logout -> 401");
+
+  return [p1];
+}
+
+async function s2AutoRegistration(): Promise<string[]> {
+  console.log("S2 player auto-registration");
+  const p2 = uniquePhone("2");
+  const jar: Jar = new Map();
+  await signIn(jar, p2);
+
+  const user = await db.user.findUnique({ where: { phone_number: p2 } });
+  check(Boolean(user), "user row created for new phone");
+
+  const player = user ? await db.player.findUnique({ where: { user_id: user.id } }) : null;
+  check(Boolean(player), "player profile auto-created on sign-in");
+  check(player ? player.game_id === SEED_GAME_ID : false, "auto-registration lands in the active seeded game");
+  check((player?.total_score ?? -1) === 0, "new player starts at zero");
+
+  const res = await api("/api/v1/players/me", { jar });
+  check(res.status === 200, "player profile readable over HTTP");
+
+  return [p2];
+}
+
+async function s3Teams(): Promise<string[]> {
+  console.log("S3 teams");
+  const phones = [uniquePhone("1"), uniquePhone("2"), uniquePhone("3"), uniquePhone("4"), uniquePhone("5")];
+  const jars = phones.map(() => new Map() as Jar);
+  const roles = await Promise.all(phones.map((p, i) => signIn(jars[i], p)));
+  check(roles.every((r) => r.role === "PLAYER"), "all team players signed in");
+
+  const teamName = `QA-Team-${now}`;
+  let res = await api("/api/v1/players/me/team", { method: "POST", body: { team_name: teamName }, jar: jars[0] });
+  check(res.status === 200 && res.json?.data?.invite_code, "player 1 creates a team");
+  const inviteCode = res.json?.data?.invite_code as string;
+
+  res = await api("/api/v1/players/me/team", { method: "POST", body: { team_name: "dup" }, jar: jars[0] });
+  check(res.status === 409, "already-in-team create -> conflict");
+
+  res = await api("/api/v1/players/me", { jar: jars[0] });
+  check(res.json?.data?.team?.invite_code === inviteCode, "me reports the created team");
+
+  res = await api("/api/v1/players/me/team", { method: "POST", body: { team_name: "x", invite_code: "ZZZZZZ" }, jar: jars[1] });
+  check(res.status === 400 && res.json?.error === "INVALID_CODE", "join with bad invite code rejected");
+
+  for (let i = 1; i <= 3; i++) {
+    res = await api("/api/v1/players/me/team", { method: "POST", body: { team_name: "x", invite_code: inviteCode }, jar: jars[i] });
+    check(res.status === 200 && res.json?.data?.member_count === i + 1, `join fills slot ${i + 1}`);
+  }
+
+  res = await api("/api/v1/players/me/team", { method: "POST", body: { team_name: "x", invite_code: inviteCode }, jar: jars[4] });
+  check(res.status === 409 && res.json?.error === "TEAM_FULL", "5th member rejected with TEAM_FULL");
+
+  res = await api("/api/v1/players/me/team", { method: "POST", body: { team_name: "own" }, jar: jars[1] });
+  check(res.status === 409, "player already in a team cannot create another");
+
+  const fullJar: Jar = new Map();
+  await signIn(fullJar, FULL_PHONE);
+  res = await api("/api/v1/players/me/team", { method: "POST", body: { team_name: "QA-Overflow" }, jar: fullJar });
+  check(res.status === 409 && res.json?.error === "MAX_TEAMS_REACHED", "team create blocked at MAX_TEAMS_PER_GAME");
+
+  return phones;
+}
+
+async function s4ScanMatrix(): Promise<string[]> {
+  console.log("S4 scan matrix");
+  const index = await db.index.findFirst({
+    where: { game_id: SEED_GAME_ID },
+    orderBy: { id: "asc" },
+  });
+  const round = await db.round.findFirst({
+    where: { game_id: SEED_GAME_ID, status: "ACTIVE" },
+  });
+  const game = await db.game.findUnique({ where: { id: SEED_GAME_ID } });
+  if (!index || !round || !game) throw new Error("seed data missing for scan matrix");
+
+  const expectedScore = calculateScanScore(
+    index.points,
+    Math.max(0, game.round_duration - Math.floor((Date.now() - round.started_at!.getTime()) / 1000)),
+    game.round_duration
+  );
+
+  const phones = [uniquePhone("1"), uniquePhone("5")];
+  const jars = phones.map(() => new Map() as Jar);
+  await signIn(jars[0], phones[0]);
+  await signIn(jars[1], phones[1]);
+
+  // P1 already belongs to a team (created in S3), so scans are permitted.
+
+  // Mentor is forbidden to scan.
+  const mentorJar: Jar = new Map();
+  await signIn(mentorJar, SEED_MENTOR_PHONE);
+  let res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: signedQr(index.id, SEED_GAME_ID, round.id) }, jar: mentorJar });
+  check(res.status === 403, "mentor cannot scan (403)");
+
+  // Happy path
+  const qr1 = signedQr(index.id, SEED_GAME_ID, round.id);
+  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: qr1 }, jar: jars[0] });
+  check(res.status === 200 && res.json?.data?.points_earned === expectedScore, `scan awards expected score (${expectedScore})`);
+  check(res.json?.data?.index?.label === index.label, "scan response identifies the index");
+
+  // Duplicate scan
+  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: qr1 }, jar: jars[0] });
+  check(res.status === 400 && res.json?.error === "ALREADY_SCANNED", "second scan of same index rejected");
+
+  // Negative cases use a *second*, unscanned index so the ALREADY_SCANNED
+  // guard can't short-circuit the validation path under test.
+  const index2 = await db.index.findFirst({
+    where: { game_id: SEED_GAME_ID, id: { not: index.id } },
+    orderBy: { id: "asc" },
+  });
+  if (!index2) throw new Error("expected a second seeded index");
+
+  // Round mismatch (QR signed for a different round)
+  const otherRound = "ffffffff-ffff-ffff-ffff-ffffffffffff";
+  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: signedQr(index2.id, SEED_GAME_ID, otherRound) }, jar: jars[0] });
+  check(res.status === 400 && res.json?.error === "QR_ROUND_MISMATCH", "QR for another round rejected");
+
+  // Invalid signature (corrupt the signed signature field, keep base64 valid)
+  const stamp = new Date().toISOString();
+  const signature = hmacSign(index2.id, SEED_GAME_ID, round.id, stamp);
+  const corrupted = encodeQrPayload({
+    index_id: index2.id,
+    game_id: SEED_GAME_ID,
+    round_id: round.id,
+    timestamp: stamp,
+    signature: `0${signature.slice(1)}`,
+  });
+  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: corrupted }, jar: jars[0] });
+  check(res.status === 400 && String(res.json?.message).includes("QR_SIGNATURE_INVALID"), "tampered signature rejected");
+
+  // Game mismatch
+  const otherGame = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee";
+  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: signedQr(index2.id, otherGame, round.id) }, jar: jars[0] });
+  check(res.status === 400 && String(res.json?.message).includes("QR_GAME_MISMATCH"), "QR bound to another game rejected");
+
+  // Jailbroken / expired / future / undecodable timestamps
+  const old = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
+  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: signedQr(index2.id, SEED_GAME_ID, round.id, old) }, jar: jars[0] });
+  check(res.status === 400 && String(res.json?.message).includes("QR_EXPIRED"), "expired QR rejected");
+
+  const future = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: signedQr(index2.id, SEED_GAME_ID, round.id, future) }, jar: jars[0] });
+  check(res.status === 400 && String(res.json?.message).includes("QR_FUTURE_TIMESTAMP"), "future-dated QR rejected");
+
+  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: "@@@not-qr@@@" }, jar: jars[0] });
+  check(res.status === 400 && String(res.json?.message).includes("QR_DECODE_FAILED"), "undecodable QR rejected");
+
+  // Fresh player with no team can't scan
+  const qr2 = signedQr(index.id, SEED_GAME_ID, round.id);
+  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: qr2 }, jar: jars[1] });
+  check(res.status === 400 && res.json?.error === "NO_TEAM", "scan without a team rejected");
+
+  // Player in a not-yet-started game
+  const pendingUser = await db.user.findUnique({ where: { phone_number: PENDING_PHONE } });
+  const pendingGame = pendingUser
+    ? await db.player.findUnique({ where: { user_id: pendingUser.id } })
+    : null;
+  const pendingGameId = pendingGame?.game_id ?? "";
+  const pendingJar: Jar = new Map();
+  await signIn(pendingJar, PENDING_PHONE);
+  res = await api(`/api/v1/games/${pendingGameId}/scan`, { method: "POST", body: { qr_data: signedQr(index.id, pendingGameId, round.id) }, jar: pendingJar });
+  check(res.status === 400 && res.json?.error === "GAME_NOT_ACTIVE", "scan in a PENDING game rejected");
+
+  // Scan history ledger
+  res = await api("/api/v1/players/me/scans", { jar: jars[0] });
+  check(res.status === 200 && res.json?.data?.total >= 1, "player scans ledger populated");
+  check(res.json?.data?.scans?.[0]?.index_label === index.label, "scan ledger reports index label");
+
+  return phones;
+}
+
+async function s5Admin(): Promise<string[]> {
+  console.log("S5 admin");
+  const phones: string[] = [];
+  const mentorJar: Jar = new Map();
+  const role = await signIn(mentorJar, SEED_MENTOR_PHONE);
+  check(role.role === "MENTOR", "mentor signs in with MENTOR role");
+
+  // PLAYER forbidden on admin surface
+  const playerPhones = [uniquePhone("9")];
+  const playerJar: Jar = new Map();
+  await signIn(playerJar, playerPhones[0]);
+  phones.push(...playerPhones);
+  let res = await api("/api/v1/admin/runtime", { jar: playerJar });
+  check(res.status === 403, "player blocked from admin runtime");
+
+  // Runtime config truthfulness
+  res = await api("/api/v1/admin/runtime", { jar: mentorJar });
+  check(res.status === 200, "mentor reads runtime config");
+  check(res.json?.data?.sse?.timer_sync_interval === 10000, "runtime reports timer_sync_interval 10000");
+  check(res.json?.data?.sse?.heartbeat_interval === 25000, "runtime reports heartbeat_interval 25000");
+  check(res.json?.data?.otp?.mock === true, "runtime reports mock OTP in dev");
+
+  // Seed game visible
+  res = await api("/api/v1/admin/games", { jar: mentorJar });
+  const seedGame = (res.json?.data ?? []).find((g: Record<string, unknown>) => g.id === SEED_GAME_ID);
+  check(Boolean(seedGame) && seedGame.status === "ACTIVE", "seeded game listed as ACTIVE");
+
+  // Batch QR generation (svg field shape — fix D)
+  res = await api("/api/v1/admin/indexes/generate", {
+    method: "POST", jar: mentorJar,
+    body: { game_id: SEED_GAME_ID, format: "svg" },
+  });
+  check(res.status === 200 && Array.isArray(res.json?.data?.codes), "batch QR generation returns codes");
+  const codes = res.json?.data?.codes ?? [];
+  check(codes.length === 5, "batch QR generates one code per seeded index");
+  check(codes.every((c: Record<string, unknown>) => typeof c.svg === "string" && (c.svg as string).startsWith("<svg")), "svg payload under `svg` field");
+  check(codes.every((c: Record<string, unknown>) => !("data" in c)), "no legacy `data` field leaked");
+
+  // Single QR generation missing fields (fix F)
+  res = await api(`/api/v1/admin/indexes/${"00000000-0000-0000-0000-000000000001"}/qr`, {
+    method: "POST", jar: mentorJar, body: {},
+  });
+  check(res.status === 400 && res.json?.error === "VALIDATION_ERROR", "single QR without fields -> 400");
+
+  // Game creation
+  res = await api("/api/v1/admin/games", { method: "POST", jar: mentorJar, body: { title: "" } });
+  check(res.status === 400 && res.json?.error === "VALIDATION_ERROR", "game create rejects empty title");
+
+  res = await api("/api/v1/admin/games", {
+    method: "POST", jar: mentorJar,
+    body: { title: `QA-Transitions-${now}` },
+  });
+  check(res.status === 201, "mentor creates a game");
+  const newGameId = res.json?.data?.id as string;
+
+  // Full state machine lifecycle
+  async function transition(action: string) {
+    return api(`/api/v1/admin/games/${newGameId}/state`, { method: "POST", jar: mentorJar, body: { action } });
+  }
+
+  res = await transition("start");
+  check(res.status === 200 && res.json?.data?.new_status === "ACTIVE" && res.json?.data?.current_round === 1, "start -> ACTIVE (round 1)");
+
+  res = await transition("start");
+  check(res.status === 400 && res.json?.error === "INVALID_TRANSITION", "start twice rejected");
+
+  res = await transition("eliminate");
+  check(res.status === 200 && res.json?.data?.new_status === "ELIMINATING", "eliminate -> ELIMINATING");
+
+  res = await transition("next_round");
+  check(res.status === 200 && res.json?.data?.new_status === "ACTIVE" && res.json?.data?.current_round === 2, "next_round -> ACTIVE (round 2)");
+
+  res = await transition("eliminate");
+  check(res.status === 200 && res.json?.data?.new_status === "ELIMINATING", "round 2 elimination");
+
+  res = await transition("finish");
+  check(res.status === 200 && res.json?.data?.new_status === "FINISHED", "finish -> FINISHED");
+
+  res = await transition("reset");
+  check(res.status === 200 && res.json?.data?.new_status === "PENDING" && res.json?.data?.current_round === 0, "reset -> PENDING (round 0)");
+
+  return [`${newGameId}`, ...phones];
+}
+
+async function s6Sse(): Promise<string[]> {
+  console.log("S6 SSE");
+  const phone = uniquePhone("6");
+  const jar: Jar = new Map();
+  await signIn(jar, phone);
+  const token = jar.get("access_token") as string;
+
+  const timerEvents = await readSse(`/api/v1/sse/timer/${SEED_GAME_ID}`, token, (e) => e.type === "timer", 8000);
+  const timer = timerEvents.find((e) => e.type === "timer");
+  check(Boolean(timer), "timer SSE emits a timer event");
+  check(at(timer, "round.number") === 1 && at(timer, "round.total") === 1800, "timer reports round 1 / 1800s");
+  check(at(timer, "status") === "ACTIVE", "timer reports ACTIVE game state");
+
+  const leaderboardEvents = await readSse(`/api/v1/sse/leaderboard/${SEED_GAME_ID}`, token, (e) => e.type === "leaderboard", 8000);
+  const leaderboard = leaderboardEvents.find((e) => e.type === "leaderboard");
+  check(Boolean(leaderboard) && Array.isArray(at(leaderboard, "teams")), "leaderboard SSE emits a team list");
+  const teams = at(leaderboard, "teams") as Record<string, unknown>[];
+  check(teams.length >= 1, `leaderboard lists ${teams.length} team(s)`);
+  const scores = teams.map((t) => Number(t.score));
+  check(scores.every((s: number, i: number) => i === 0 || s <= scores[i - 1]), "leaderboard sorted by score descending");
+  check(scores.some((s: number) => s > 0), "at least one team scored during the run");
+
+  const noToken = await api(`/api/v1/sse/timer/${SEED_GAME_ID}`);
+  check(noToken.status === 401, "SSE without token -> 401");
+
+  return [phone];
+}
+
+async function s7Ledger(): Promise<void> {
+  console.log("S7 ledger/telemetry");
+  const mentorJar: Jar = new Map();
+  await signIn(mentorJar, SEED_MENTOR_PHONE);
+
+  const res = await api(`/api/v1/admin/teams?game_id=${SEED_GAME_ID}`, { jar: mentorJar });
+  check(res.status === 200, "admin lists teams");
+  const scored = (res.json?.data ?? []).filter((t: Record<string, unknown>) => Number(t.total_score) > 0);
+  check(scored.length >= 1, `admin sees ${scored.length} scored team(s)`);
+
+  const byGame = await api(`/api/v1/admin/games/${SEED_GAME_ID}/teams`, { jar: mentorJar });
+  check(byGame.status === 200 && Array.isArray(byGame.json?.data), "per-game teams endpoint works");
+  check((byGame.json?.data ?? []).length >= 1, "per-game teams endpoint lists teams");
+}
+
+async function main(): Promise<void> {
+  console.log(`scavenger-hunt integration suite -> ${BASE_URL}`);
+  if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required");
+
+  await db.$connect();
+
+  let allPhones: string[] = [];
+  let qaGameIds: string[] = [];
+  try {
+    await createFixtures();
+
+    const p1 = await s1AuthLifecycle();
+    const p2 = await s2AutoRegistration();
+    const p3 = await s3Teams();
+    const p4 = await s4ScanMatrix();
+    const p5 = await s5Admin();
+    const p6 = await s6Sse();
+    await s7Ledger();
+
+    allPhones = [...new Set([...p1, ...p2, ...p3, ...p4, ...p5, ...p6])];
+    qaGameIds = p5.filter((x) => x.length === 36); // the transition game id
+  } finally {
+    await cleanup(allPhones);
+    await db.game.deleteMany({ where: { id: { in: qaGameIds } } });
+    await db.$disconnect();
+  }
+
+  console.log("");
+  if (failures.length === 0) {
+    console.log("ALL INTEGRATION SCENARIOS PASSED");
+  } else {
+    console.error(`${failures.length} integration assertion(s) FAILED:`);
+    for (const f of failures) console.error(`  - ${f}`);
+    process.exitCode = 1;
+  }
+}
+
+main().catch((err) => {
+  console.error("integration suite crashed:", err);
+  process.exitCode = 1;
+});

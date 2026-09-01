@@ -27,6 +27,7 @@ export async function signAccessToken(
 ): Promise<string> {
   return new SignJWT({ sub: userId, role, phone })
     .setProtectedHeader({ alg: "HS256" })
+    .setJti(crypto.randomUUID())
     .setIssuedAt()
     .setExpirationTime(`${ACCESS_EXPIRY}s`)
     .setIssuer("scavenger-hunt")

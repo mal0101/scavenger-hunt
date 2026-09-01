@@ -123,10 +123,17 @@ export async function POST(
 
     const team = await db.team.findUnique({ where: { id: player.team_id } });
     if (team) {
-      await redis.zadd(`leaderboard:${gameId}`, {
-        score: team.total_score,
-        member: team.id,
-      });
+      try {
+        await redis.zadd(`leaderboard:${gameId}`, {
+          score: team.total_score,
+          member: team.id,
+        });
+      } catch (error) {
+        console.warn(
+          `[Scan] Redis leaderboard sync skipped for team ${team.id}:`,
+          error instanceof Error ? error.message : "unknown"
+        );
+      }
     }
 
     await publishEvent(gameId, "leaderboard", {

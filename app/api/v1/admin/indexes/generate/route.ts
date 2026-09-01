@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
           points: index.points,
           location_name: index.location_name,
           format: "svg",
-          data: svg,
+          svg,
         });
       } else {
         const dataUrl = await generateQrImage(index.id, game_id, activeRound);

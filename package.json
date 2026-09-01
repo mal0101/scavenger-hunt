@@ -11,7 +11,9 @@
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
-    "db:studio": "prisma studio"
+    "db:studio": "prisma studio",
+    "test": "tsx --test tests/unit/*.test.ts",
+    "test:integration": "tsx --env-file=.env.local tests/integration/run.ts"
   },
   "dependencies": {
     "next": "^16.3.0",

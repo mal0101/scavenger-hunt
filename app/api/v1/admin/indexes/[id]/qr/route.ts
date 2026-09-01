@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { apiSuccess, apiInternal } from "@/lib/types/api";
+import { apiSuccess, apiError, apiInternal } from "@/lib/types/api";
 import { generateQrImage, generateQrSvg } from "@/lib/qr/generator";
 import { requireMentor } from "@/lib/auth/guard";
 
@@ -16,7 +16,7 @@ export async function POST(
     const { game_id, round_id, format = "png" } = body;
 
     if (!game_id || !round_id) {
-      return apiInternal("game_id and round_id are required");
+      return apiError("game_id and round_id are required", "VALIDATION_ERROR");
     }
 
     if (format === "svg") {

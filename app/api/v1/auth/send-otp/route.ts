@@ -4,6 +4,7 @@ import { phoneSchema } from "@/lib/utils/validation";
 import { db } from "@/lib/db/postgres";
 import { apiSuccess, apiError, apiInternal } from "@/lib/types/api";
 import { checkRateLimit, otpLimiter } from "@/lib/utils/rate-limiter";
+import { getSmsProvider } from "@/lib/sms/provider";
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,7 +17,7 @@ export async function POST(request: NextRequest) {
 
     const { phone_number } = parsed.data;
 
-    const rateLimitResult = await checkRateLimit(otpLimiter, phone_number);
+    const rateLimitResult = await checkRateLimit(otpLimiter, phone_number, { failClosed: true });
     if (!rateLimitResult.success) {
       return apiError(
         "Too many OTP requests. Please wait before requesting again.",
@@ -41,8 +42,9 @@ export async function POST(request: NextRequest) {
 
     const code = await generateOtp(phone_number);
 
-    if (process.env.OTP_MOCK === "true") {
-      console.log(`[MOCK] OTP for ${phone_number.slice(0, 4)}****: ${code}`);
+    const smsSent = await getSmsProvider().sendOtp(phone_number, code);
+    if (!smsSent && process.env.OTP_MOCK !== "true") {
+      return apiInternal("Failed to dispatch OTP via SMS");
     }
 
     return apiSuccess(

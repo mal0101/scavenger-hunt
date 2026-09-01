@@ -37,20 +37,21 @@ export default function MentorShell({
           </div>
         </div>
 
-        <nav className="flex-1 py-4 space-y-1 px-3">
+        <nav className="flex-1 py-4 space-y-1 px-3" aria-label="Mentor navigation">
           {MENTOR_NAV_ITEMS.map((item) => {
             const active = isActive(item.href);
             return (
               <Link
                 key={item.href}
                 href={item.href}
+                aria-current={active ? "page" : undefined}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg font-label text-label-sm transition-all ${
                   active
                     ? "bg-primary-container/10 text-primary border border-primary/20"
                     : "text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
                 }`}
               >
-                <span className="material-symbols-outlined text-xl">
+                <span className="material-symbols-outlined text-xl" aria-hidden="true">
                   {item.icon}
                 </span>
                 <span className="uppercase tracking-wider">{item.label}</span>
@@ -88,20 +89,21 @@ export default function MentorShell({
         </div>
       </div>
 
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-surface-container-high/95 backdrop-blur-md border-t border-primary-container/40 h-16 flex items-center justify-around px-2 shadow-[0_-8px_24px_rgba(217,119,7,0.06)]">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-surface-container-high/95 backdrop-blur-md border-t border-primary-container/40 h-16 flex items-center justify-around px-2 shadow-[0_-8px_24px_rgba(217,119,7,0.06)]" aria-label="Mentor navigation">
         {MENTOR_NAV_ITEMS.map((item) => {
           const active = isActive(item.href);
           return (
             <Link
               key={item.href}
               href={item.href}
+              aria-current={active ? "page" : undefined}
               className={`flex flex-col items-center justify-center p-1.5 transition-all ${
                 active
                   ? "text-primary"
                   : "text-on-surface-variant opacity-60 hover:opacity-100"
               }`}
             >
-              <span className="material-symbols-outlined text-xl">
+              <span className="material-symbols-outlined text-xl" aria-hidden="true">
                 {item.icon}
               </span>
               <span className="font-label text-[10px] mt-0.5 uppercase">

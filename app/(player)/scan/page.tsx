@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useCamera } from "@/hooks/use-camera";
 import { useQRStore } from "@/stores/qr-store";
 import { useRouter } from "next/navigation";
@@ -20,6 +20,7 @@ export default function ScanPage() {
   const [gameLoading, setGameLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const scanInFlightRef = useRef(false);
 
   useEffect(() => {
     apiFetch<{ success: boolean; data: ActiveGame | null }>("/api/v1/games/active")
@@ -32,10 +33,12 @@ export default function ScanPage() {
 
   const handleScan = useCallback(
     async (data: string) => {
+      if (scanInFlightRef.current) return;
       if (!game) {
         setSubmitError("No active hunt to scan against.");
         return;
       }
+      scanInFlightRef.current = true;
       setScanStatus("found");
       setSubmitting(true);
       setSubmitError("");
@@ -75,6 +78,7 @@ export default function ScanPage() {
         setScanStatus("idle");
       } finally {
         setSubmitting(false);
+        scanInFlightRef.current = false;
       }
     },
     [game, router]
@@ -110,6 +114,8 @@ export default function ScanPage() {
       <div className="relative aspect-square rounded-2xl overflow-hidden bg-surface-container-lowest border-2 border-outline-variant">
         <div
           id="qr-reader"
+          role="img"
+          aria-label="QR code scanner viewfinder"
           className={`absolute inset-0 ${scanning ? "z-10" : "hidden"}`}
         />
 

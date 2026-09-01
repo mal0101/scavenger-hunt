@@ -12,7 +12,7 @@ export async function generateOtp(phoneNumber: string): Promise<string> {
     return "000000";
   }
 
-  const code = String(Math.floor(100000 + Math.random() * 900000));
+  const code = String(crypto.randomInt(100000, 999999));
 
   await db.oTP.create({
     data: {

@@ -278,9 +278,12 @@ export default function MentorIndexesPage() {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={code.data_url} alt={code.label} className="w-28 h-28" />
                 ) : code.svg ? (
-                  <div
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={`data:image/svg+xml;utf8,${encodeURIComponent(code.svg)}`}
+                    alt={`QR code for ${code.label}`}
+                    role="img"
                     className="w-28 h-28"
-                    dangerouslySetInnerHTML={{ __html: code.svg }}
                   />
                 ) : (
                   <span className="material-symbols-outlined text-4xl text-on-surface-variant">qr_code</span>

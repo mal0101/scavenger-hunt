@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { apiFetch } from "@/lib/api-client";
 
 interface User {
   id: string;
@@ -12,7 +13,7 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   setUser: (user: User | null) => void;
-  logout: () => void;
+  logout: () => Promise<void>;
   setLoading: (loading: boolean) => void;
 }
 
@@ -28,11 +29,12 @@ export const useAuthStore = create<AuthState>((set) => ({
       isLoading: false,
     }),
 
-  logout: () => {
-    document.cookie =
-      "access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-    document.cookie =
-      "refresh_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+  logout: async () => {
+    try {
+      await apiFetch("/api/v1/auth/logout", { method: "POST" });
+    } catch {
+      // Clear client state regardless of network/server errors.
+    }
     set({ user: null, isAuthenticated: false, isLoading: false });
   },
 

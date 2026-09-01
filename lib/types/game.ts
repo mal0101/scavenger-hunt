@@ -17,7 +17,6 @@ export interface RoundType {
   id: string;
   game_id: string;
   round_number: number;
-  score_threshold: number;
   status: string;
   started_at: string | null;
   ended_at: string | null;
@@ -25,14 +24,15 @@ export interface RoundType {
 
 export interface IndexType {
   id: string;
-  round_id: string;
+  game_id: string;
+  round_id: string | null;
   label: string;
   description: string | null;
   points: number;
   location_name: string | null;
   location_lat: number | null;
   location_lng: number | null;
-  qr_signature: string;
+  enigma_type: string | null;
   created_at: string;
 }
 

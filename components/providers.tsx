@@ -10,5 +10,15 @@ export function Providers({ children }: { children: React.ReactNode }) {
     setHydrated(true);
   }, [setHydrated]);
 
+  useEffect(() => {
+    if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("/sw.js").catch(() => {
+          // Service worker support is best-effort.
+        });
+      });
+    }
+  }, []);
+
   return <>{children}</>;
 }

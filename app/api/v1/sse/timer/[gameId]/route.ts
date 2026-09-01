@@ -89,7 +89,7 @@ export async function GET(
         }
       };
 
-      const pollInterval = setInterval(pollTimer, GAME_CONSTANTS.TIMER_SYNC_INTERVAL);
+      const pollInterval = setInterval(pollTimer, 10000);
       pollTimer();
 
       request.signal.addEventListener("abort", () => {

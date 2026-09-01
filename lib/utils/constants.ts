@@ -22,23 +22,8 @@ export const GAME_STATES = {
 } as const;
 
 export const ROUND_STATUS = {
-  LOCKED: "locked",
-  ACTIVE: "active",
-  COMPLETED: "completed",
+  LOCKED: "LOCKED",
+  ACTIVE: "ACTIVE",
+  COMPLETED: "COMPLETED",
 } as const;
 
-export const NAV_ITEMS = {
-  player: [
-    { label: "DOCK", icon: "anchor", href: "/dock" },
-    { label: "LOGS", icon: "history_edu", href: "/logs" },
-    { label: "SCAN", icon: "qr_code_scanner", href: "/scan" },
-    { label: "VAULT", icon: "lock_open", href: "/vault" },
-  ],
-  mentor: [
-    { label: "Dashboard", icon: "dashboard", href: "/mentor/dashboard" },
-    { label: "Games", icon: "sports_esports", href: "/mentor/games" },
-    { label: "Indexes", icon: "qr_code", href: "/mentor/indexes" },
-    { label: "Teams", icon: "group", href: "/mentor/teams" },
-    { label: "Settings", icon: "settings", href: "/mentor/settings" },
-  ],
-} as const;

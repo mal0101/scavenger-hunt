@@ -55,8 +55,13 @@ async function main() {
   ];
 
   for (const idx of indexes) {
-    const created = await db.index.create({
-      data: {
+    const created = await db.index.upsert({
+      where: {
+        id: `00000000-0000-0000-0000-${String(indexes.indexOf(idx) + 1).padStart(12, "0")}`,
+      },
+      update: {},
+      create: {
+        id: `00000000-0000-0000-0000-${String(indexes.indexOf(idx) + 1).padStart(12, "0")}`,
         game_id: game.id,
         round_id: round1.id,
         label: idx.label,

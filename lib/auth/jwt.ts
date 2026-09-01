@@ -7,8 +7,15 @@ export interface TokenPayload extends JWTPayload {
   phone: string;
 }
 
-const ACCESS_SECRET = new TextEncoder().encode(process.env.JWT_SECRET!);
-const REFRESH_SECRET = new TextEncoder().encode(process.env.JWT_REFRESH_SECRET!);
+if (!process.env.JWT_SECRET) {
+  throw new Error("JWT_SECRET environment variable is required");
+}
+if (!process.env.JWT_REFRESH_SECRET) {
+  throw new Error("JWT_REFRESH_SECRET environment variable is required");
+}
+
+const ACCESS_SECRET = new TextEncoder().encode(process.env.JWT_SECRET);
+const REFRESH_SECRET = new TextEncoder().encode(process.env.JWT_REFRESH_SECRET);
 
 const ACCESS_EXPIRY = process.env.JWT_EXPIRY ?? "900";
 const REFRESH_EXPIRY = process.env.JWT_REFRESH_EXPIRY ?? "604800";

@@ -3,12 +3,16 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import { apiFetch } from "@/lib/api-client";
+
+const PHONE_REGEX = /^\+?[0-9]{10,15}$/;
 
 function VerifyForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const phone = searchParams.get("phone") || "";
   const redirect = searchParams.get("redirect") || "/dock";
+  const missingPhone = !PHONE_REGEX.test(phone);
 
   const [digits, setDigits] = useState(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
@@ -49,6 +53,11 @@ function VerifyForm() {
 
   async function handleVerify(e: React.FormEvent) {
     e.preventDefault();
+    if (missingPhone) {
+      setError("Phone number is missing. Go back and request a new code.");
+      return;
+    }
+
     const code = digits.join("");
     if (code.length !== 6) {
       setError("Please enter the complete 6-digit code");
@@ -59,13 +68,10 @@ function VerifyForm() {
     setError("");
 
     try {
-      const res = await fetch("/api/v1/auth/verify-otp", {
+      const data = await apiFetch<{ success: boolean; message?: string; data?: { user?: { role?: string } } }>("/api/v1/auth/verify-otp", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone_number: phone, code }),
+        body: { phone_number: phone, code },
       });
-
-      const data = await res.json();
 
       if (!data.success) {
         setError(data.message || "Invalid verification code");
@@ -80,8 +86,8 @@ function VerifyForm() {
         router.push(redirect);
       }
       router.refresh();
-    } catch {
-      setError("Network error. Please try again.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Network error. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -92,18 +98,16 @@ function VerifyForm() {
     setError("");
 
     try {
-      const res = await fetch("/api/v1/auth/send-otp", {
+      const data = await apiFetch<{ success: boolean; message?: string }>("/api/v1/auth/send-otp", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone_number: phone }),
+        body: { phone_number: phone },
       });
 
-      const data = await res.json();
       if (!data.success) {
         setError(data.message || "Failed to resend OTP");
       }
-    } catch {
-      setError("Network error.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Network error.");
     } finally {
       setLoading(false);
     }
@@ -154,13 +158,15 @@ function VerifyForm() {
                 onChange={(e) => handleChange(i, e.target.value)}
                 onKeyDown={(e) => handleKeyDown(i, e)}
                 onPaste={handlePaste}
+                aria-label={`OTP digit ${i + 1} of 6`}
+                aria-invalid={!!error}
                 className="w-12 h-14 text-center font-label text-headline-lg-mobile text-on-surface bg-surface-container-low border-2 border-outline-variant rounded-lg focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all"
               />
             ))}
           </div>
 
           {error && (
-            <div className="bg-error-container/20 border border-error/30 rounded-lg p-3">
+            <div role="alert" className="bg-error-container/20 border border-error/30 rounded-lg p-3">
               <p className="font-label text-label-sm text-error">{error}</p>
             </div>
           )}
@@ -168,6 +174,7 @@ function VerifyForm() {
           <button
             type="submit"
             disabled={loading || digits.some((d) => !d)}
+            aria-busy={loading}
             className="w-full py-3 bg-primary-container text-on-primary-container font-label text-label-sm font-bold uppercase tracking-widest rounded-lg hover:shadow-[0_0_20px_rgba(217,119,7,0.4)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? "Verifying..." : "Verify Code"}

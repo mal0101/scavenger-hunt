@@ -70,7 +70,7 @@ export default function RoleSelectPage() {
       </div>
 
       <p className="font-label text-xs text-on-surface-variant/50 text-center">
-        You can switch roles later in settings
+        Your role is determined by your account. Contact a mentor if you need access to the operations console.
       </p>
     </div>
   );

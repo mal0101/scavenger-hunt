@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Suspense } from "react";
 
-const CIPHER = "ZSTFDN"; 
+const CIPHER = "TUBOF";
 const SOLUTION = "STEAM";
 const SYMBOLS = ["water_drop", "thermostat", "speed", "waves", "gas_meter", "bolt"];
 

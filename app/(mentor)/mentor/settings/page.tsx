@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { apiFetch } from "@/lib/api-client";
 
 interface RuntimeData {
   environment: string;
@@ -60,11 +61,11 @@ export default function MentorSettingsPage() {
   useEffect(() => {
     async function load() {
       try {
-        const res = await fetch("/api/v1/admin/runtime");
-        const j = await res.json();
+        const j = await apiFetch<{ success: boolean; data: RuntimeData }>("/api/v1/admin/runtime");
         if (j.success) setRuntime(j.data);
         else setStatus("error");
-      } catch {
+      } catch (err) {
+        console.error("Runtime load error:", err);
         setStatus("error");
       } finally {
         setStatus("ready");
@@ -76,7 +77,7 @@ export default function MentorSettingsPage() {
   async function handleSignOut() {
     setSigningOut(true);
     try {
-      await fetch("/api/v1/auth/logout", { method: "POST" });
+      await apiFetch("/api/v1/auth/logout", { method: "POST" });
     } catch {
       // proceed regardless
     } finally {

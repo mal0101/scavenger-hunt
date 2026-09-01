@@ -105,6 +105,26 @@ class LocalRedisMock {
   async zcard(): Promise<number> {
     return 0;
   }
+
+  async publish(): Promise<number> {
+    return 1;
+  }
+
+  async zscore(): Promise<null> {
+    return null;
+  }
+
+  async zrevrank(): Promise<null> {
+    return null;
+  }
+
+  async zrem(): Promise<number> {
+    return 0;
+  }
+
+  async subscribe(): Promise<string> {
+    return "OK";
+  }
 }
 
 export const redis = isProduction

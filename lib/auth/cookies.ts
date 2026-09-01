@@ -1,13 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
 
-export function getAccessTokenFromRequest(request: NextRequest): string | null {
-  const authHeader = request.headers.get("Authorization");
-  if (authHeader && authHeader.startsWith("Bearer ")) {
-    return authHeader.slice(7);
-  }
-  return null;
-}
-
 export function getRefreshTokenFromRequest(request: NextRequest): string | null {
   return request.cookies.get("refresh_token")?.value ?? null;
 }

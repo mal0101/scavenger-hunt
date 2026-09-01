@@ -39,8 +39,8 @@ export default function DockPage() {
         ]);
         if (gameRes.success && gameRes.data) setGame(gameRes.data);
         if (playerRes.success) setPlayer(playerRes.data);
-      } catch {
-        // keep defaults
+      } catch (err) {
+        console.error("Dock load error:", err instanceof Error ? err.message : err);
       } finally {
         setLoading(false);
       }
@@ -57,11 +57,11 @@ export default function DockPage() {
   return (
     <div className="px-4 space-y-6 max-w-lg mx-auto">
       <div className="glass-panel rounded-xl p-5 space-y-3 mt-2 relative overflow-hidden ambient-glow">
-        <div className="absolute top-3 right-5 opacity-40 animate-gear-slow pointer-events-none">
+        <div className="absolute top-3 right-5 opacity-40 animate-gear-slow pointer-events-none" aria-hidden="true">
           <span className="material-symbols-outlined text-primary text-4xl">settings</span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="material-symbols-outlined text-primary text-lg animate-flicker-amber">
+          <span className="material-symbols-outlined text-primary text-lg animate-flicker-amber" aria-hidden="true">
             radar
           </span>
           <span className="font-label text-label-sm text-primary uppercase tracking-widest">

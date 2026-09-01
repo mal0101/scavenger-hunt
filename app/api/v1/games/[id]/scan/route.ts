@@ -78,6 +78,10 @@ export async function POST(
       return apiError("No active round", "NO_ACTIVE_ROUND");
     }
 
+    if (payload!.round_id !== activeRound.id) {
+      return apiError("QR code is not valid for the current round", "QR_ROUND_MISMATCH");
+    }
+
     const index = await db.index.findUnique({
       where: { id: payload!.index_id },
     });

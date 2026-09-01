@@ -24,7 +24,7 @@ function ScanResultContent() {
     <div className="px-4 space-y-4 max-w-lg mx-auto">
       <div className="space-y-4">
         {isTrap ? (
-          <Link href="/trap" className="block">
+          <Link href={`/trap?data=${searchParams.get("data") ?? ""}`} className="block">
             <div className="bg-surface-container-highest rounded-xl p-6 space-y-4 border-t-error border-l border-r border-b border-outline-variant hover:scale-[1.02] transition-transform cursor-pointer relative overflow-hidden ambient-glow">
               <div
                 className="absolute inset-0 opacity-5 pointer-events-none"
@@ -67,7 +67,7 @@ function ScanResultContent() {
             </div>
           </Link>
         ) : (
-          <Link href="/enigma" className="block">
+          <Link href={`/enigma?data=${searchParams.get("data") ?? ""}`} className="block">
             <div className="glass-panel rounded-xl p-6 space-y-4 border-t-primary-container hover:scale-[1.02] transition-transform cursor-pointer ambient-glow">
               <div className="flex justify-center">
                 <div className="porthole">

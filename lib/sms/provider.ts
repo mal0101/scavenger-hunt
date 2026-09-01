@@ -15,9 +15,15 @@ class TwilioSmsProvider implements SmsProvider {
   private fromPhone: string;
 
   constructor() {
-    this.accountSid = process.env.TWILIO_SID!;
-    this.authToken = process.env.TWILIO_AUTH_TOKEN!;
-    this.fromPhone = process.env.TWILIO_PHONE!;
+    this.accountSid = process.env.TWILIO_SID ?? "";
+    this.authToken = process.env.TWILIO_AUTH_TOKEN ?? "";
+    this.fromPhone = process.env.TWILIO_PHONE ?? "";
+
+    if (!this.accountSid || !this.authToken || !this.fromPhone) {
+      throw new Error(
+        "TWILIO_SID, TWILIO_AUTH_TOKEN, and TWILIO_PHONE are required when OTP_MOCK is disabled"
+      );
+    }
   }
 
   async sendOtp(phoneNumber: string, code: string): Promise<boolean> {

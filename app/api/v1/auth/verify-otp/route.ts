@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { verifyOtp } from "@/lib/auth/otp";
+import { verifyOtp, invalidateOtp } from "@/lib/auth/otp";
 import {
   signAccessToken,
   signRefreshToken,
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
 
     const { phone_number, code } = parsed.data;
 
-    const rateLimitResult = await checkRateLimit(otpVerifyLimiter, phone_number);
+    const rateLimitResult = await checkRateLimit(otpVerifyLimiter, phone_number, { failClosed: true });
     if (!rateLimitResult.success) {
       return apiError("Too many failed attempts. Request a new code.", "RATE_LIMITED", 429);
     }
@@ -34,17 +34,40 @@ export async function POST(request: NextRequest) {
       return apiError("Invalid or expired OTP code", "OTP_INVALID");
     }
 
+    await invalidateOtp(phone_number);
+
     let user = await db.user.findUnique({
       where: { phone_number },
     });
 
+    let isNewUser = false;
+
     if (!user) {
+      isNewUser = true;
       user = await db.user.create({
         data: {
           phone_number,
           role: "PLAYER",
         },
       });
+    }
+
+    if (user.role === "PLAYER" && isNewUser) {
+      const activeGame = await db.game.findFirst({
+        where: { status: "ACTIVE" },
+        orderBy: { created_at: "desc" },
+      });
+
+      if (activeGame) {
+        await db.player.create({
+          data: {
+            user_id: user.id,
+            game_id: activeGame.id,
+            total_score: 0,
+            status: "ACTIVE",
+          },
+        });
+      }
     }
 
     const accessToken = await signAccessToken(

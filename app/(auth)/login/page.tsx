@@ -3,6 +3,9 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import { apiFetch } from "@/lib/api-client";
+
+const PHONE_REGEX = /^\+?[0-9]{10,15}$/;
 
 function LoginForm() {
   const router = useRouter();
@@ -14,28 +17,31 @@ function LoginForm() {
 
   async function handleSendOtp(e: React.FormEvent) {
     e.preventDefault();
+
+    if (!PHONE_REGEX.test(phoneNumber.replace(/[\s-]/g, ""))) {
+      setError("Enter a valid phone number (digits only, 10-15 characters, optional + prefix).");
+      return;
+    }
+
     setLoading(true);
     setError("");
 
     try {
-      const res = await fetch("/api/v1/auth/send-otp", {
+      const j = await apiFetch<{ success: boolean; message?: string }>("/api/v1/auth/send-otp", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone_number: phoneNumber }),
+        body: { phone_number: phoneNumber.replace(/[\s-]/g, "") },
       });
 
-      const data = await res.json();
-
-      if (!data.success) {
-        setError(data.message || "Failed to send OTP");
+      if (!j.success) {
+        setError(j.message || "Failed to send OTP");
         return;
       }
 
       router.push(
-        `/verify?phone=${encodeURIComponent(phoneNumber)}&redirect=${encodeURIComponent(redirect)}`
+        `/verify?phone=${encodeURIComponent(phoneNumber.replace(/[\s-]/g, ""))}&redirect=${encodeURIComponent(redirect)}`
       );
-    } catch {
-      setError("Network error. Please try again.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Network error. Please try again.");
     } finally {
       setLoading(false);
     }

@@ -4,6 +4,7 @@ import { apiSuccess, apiError, apiInternal, apiConflict } from "@/lib/types/api"
 import { teamSchema } from "@/lib/utils/validation";
 import { generateInviteCode } from "@/lib/utils/crypto";
 import { requirePlayer } from "@/lib/auth/guard";
+import { GAME_CONSTANTS } from "@/lib/utils/constants";
 
 export async function POST(request: NextRequest) {
   try {
@@ -41,6 +42,18 @@ export async function POST(request: NextRequest) {
         return apiError("Invalid invite code", "INVALID_CODE");
       }
 
+      if (team.eliminated) {
+        return apiError("This team has been eliminated", "TEAM_ELIMINATED");
+      }
+
+      if (team.players.length >= GAME_CONSTANTS.PLAYERS_PER_TEAM) {
+        return apiError(
+          `Team is full (max ${GAME_CONSTANTS.PLAYERS_PER_TEAM} players)`,
+          "TEAM_FULL",
+          409
+        );
+      }
+
       await db.player.update({
         where: { user_id: auth.sub },
         data: { team_id: team.id },
@@ -57,7 +70,37 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const code = generateInviteCode();
+    const teamCount = await db.team.count({
+      where: { game_id: existingPlayer.game_id },
+    });
+
+    if (teamCount >= GAME_CONSTANTS.MAX_TEAMS_PER_GAME) {
+      return apiError(
+        `Game has reached the maximum of ${GAME_CONSTANTS.MAX_TEAMS_PER_GAME} teams`,
+        "MAX_TEAMS_REACHED",
+        409
+      );
+    }
+
+    let code = generateInviteCode();
+    let codeExists = await db.team.findUnique({
+      where: { invite_code: code },
+      select: { id: true },
+    });
+
+    let attempts = 0;
+    while (codeExists && attempts < 10) {
+      code = generateInviteCode();
+      codeExists = await db.team.findUnique({
+        where: { invite_code: code },
+        select: { id: true },
+      });
+      attempts++;
+    }
+
+    if (codeExists) {
+      return apiInternal("Failed to generate a unique invite code");
+    }
 
     const team = await db.team.create({
       data: {

@@ -47,8 +47,8 @@ export default function LogsPage() {
         }
         if (gameRes.success && gameRes.data) setGame(gameRes.data);
         if (playerRes.success) setPlayer(playerRes.data);
-      } catch {
-        // keep defaults
+      } catch (err) {
+        console.error("Logs load error:", err);
       } finally {
         setLoading(false);
       }

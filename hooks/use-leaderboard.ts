@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useCallback, useState } from "react";
+import { useRouter } from "next/navigation";
 
 interface LeaderboardEntry {
   rank: number;
@@ -25,6 +26,8 @@ export function useLeaderboard({
   const [teams, setTeams] = useState<LeaderboardEntry[]>([]);
   const eventSourceRef = useRef<EventSource | null>(null);
   const callbackRef = useRef(onLeaderboardUpdate);
+  const consecutiveErrorsRef = useRef(0);
+  const router = useRouter();
 
   useEffect(() => {
     callbackRef.current = onLeaderboardUpdate;
@@ -59,6 +62,7 @@ export function useLeaderboard({
           try {
             const data = JSON.parse(event.data);
             if (data.type === "leaderboard" && data.teams) {
+              consecutiveErrorsRef.current = 0;
               setTeams(data.teams);
               callbackRef.current?.(data.teams);
             }
@@ -68,9 +72,15 @@ export function useLeaderboard({
         };
 
         es.onerror = () => {
-          if (!cancelled) setConnected(false);
+          if (cancelled) return;
+          setConnected(false);
           es.close();
-          if (!cancelled) setTimeout(connect, 3000);
+          consecutiveErrorsRef.current += 1;
+          if (consecutiveErrorsRef.current >= 5) {
+            router.replace("/login");
+            return;
+          }
+          setTimeout(connect, 3000);
         };
       } catch {
         if (!cancelled) setTimeout(connect, 3000);
@@ -83,7 +93,7 @@ export function useLeaderboard({
       cancelled = true;
       disconnect();
     };
-  }, [gameId, enabled, disconnect]);
+  }, [gameId, enabled, disconnect, router]);
 
   return { connected, teams, disconnect };
 }

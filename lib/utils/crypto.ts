@@ -1,6 +1,15 @@
 import crypto from "crypto";
 
-const HMAC_SECRET = process.env.HMAC_SECRET || "dev_hmac_secret_change_in_production";
+function getHmacSecret(): string {
+  const secret = process.env.HMAC_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("HMAC_SECRET environment variable is required in production");
+    }
+    return "dev_hmac_secret_change_in_production";
+  }
+  return secret;
+}
 
 export function hmacSign(
   indexId: string,
@@ -9,7 +18,7 @@ export function hmacSign(
   timestamp: string
 ): string {
   const payload = `${indexId}:${gameId}:${roundId}:${timestamp}`;
-  return crypto.createHmac("sha256", HMAC_SECRET).update(payload).digest("hex");
+  return crypto.createHmac("sha256", getHmacSecret()).update(payload).digest("hex");
 }
 
 export function hmacVerify(

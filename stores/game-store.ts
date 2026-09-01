@@ -72,7 +72,7 @@ export const useGameStore = create<GameState>((set) => ({
     set({
       team,
       teamId: team?.id ?? null,
-      isCaptain: team ? team.id === team.id : false,
+      isCaptain: false,
     }),
   setPlayer: (player) =>
     set({

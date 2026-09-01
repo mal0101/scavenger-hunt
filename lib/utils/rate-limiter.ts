@@ -40,7 +40,8 @@ export const refreshLimiter = new Ratelimit({
 
 export async function checkRateLimit(
   limiter: Ratelimit,
-  identifier: string
+  identifier: string,
+  opts: { failClosed?: boolean } = {}
 ): Promise<{ success: boolean; remaining: number; reset: number }> {
   try {
     const result = await limiter.limit(identifier);
@@ -50,6 +51,9 @@ export async function checkRateLimit(
       reset: result.reset,
     };
   } catch {
+    if (opts.failClosed) {
+      return { success: false, remaining: 0, reset: Date.now() + 60000 };
+    }
     return { success: true, remaining: 999, reset: Date.now() + 60000 };
   }
 }

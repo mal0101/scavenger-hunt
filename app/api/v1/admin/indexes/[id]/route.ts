@@ -1,7 +1,8 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db/postgres";
-import { apiSuccess, apiInternal } from "@/lib/types/api";
+import { apiSuccess, apiError, apiInternal } from "@/lib/types/api";
 import { requireMentor } from "@/lib/auth/guard";
+import { indexSchema } from "@/lib/utils/validation";
 
 export async function PUT(
   request: NextRequest,
@@ -14,15 +15,21 @@ export async function PUT(
     const { id } = await params;
     const body = await request.json();
 
+    const parsed = indexSchema.partial().safeParse(body);
+
+    if (!parsed.success) {
+      return apiError("Invalid index data", "VALIDATION_ERROR");
+    }
+
     const index = await db.index.update({
       where: { id },
       data: {
-        label: body.label,
-        description: body.description,
-        points: body.points,
-        location_name: body.location_name,
-        location_lat: body.location_lat,
-        location_lng: body.location_lng,
+        ...(parsed.data.label !== undefined && { label: parsed.data.label }),
+        ...(parsed.data.description !== undefined && { description: parsed.data.description }),
+        ...(parsed.data.points !== undefined && { points: parsed.data.points }),
+        ...(parsed.data.location_name !== undefined && { location_name: parsed.data.location_name }),
+        ...(parsed.data.location_lat !== undefined && { location_lat: parsed.data.location_lat }),
+        ...(parsed.data.location_lng !== undefined && { location_lng: parsed.data.location_lng }),
       },
     });
 

@@ -65,35 +65,29 @@ export async function getLeaderboardRows(
   }
 
   const rows: LeaderboardRow[] = [];
+
+  const teamIds = entries.map((e) => e.teamId);
+  const teamDetails = await db.team.findMany({
+    where: { id: { in: teamIds } },
+    select: {
+      id: true,
+      name: true,
+      eliminated: true,
+      _count: { select: { players: true } },
+    },
+  });
+
+  const teamMap = new Map(teamDetails.map((t) => [t.id, t]));
+
   for (const e of entries) {
-    let name = "Team";
-    let eliminated = false;
-    let memberCount = 0;
-    try {
-      const team = await db.team.findUnique({
-        where: { id: e.teamId },
-        select: {
-          id: true,
-          name: true,
-          eliminated: true,
-          _count: { select: { players: true } },
-        },
-      });
-      if (team) {
-        name = team.name;
-        eliminated = team.eliminated;
-        memberCount = team._count.players;
-      }
-    } catch {
-      // keep defaults
-    }
+    const team = teamMap.get(e.teamId);
     rows.push({
       teamId: e.teamId,
-      name,
+      name: team?.name ?? "Team",
       score: e.score,
       rank: e.rank,
-      eliminated,
-      memberCount,
+      eliminated: team?.eliminated ?? false,
+      memberCount: team?._count.players ?? 0,
     });
   }
 

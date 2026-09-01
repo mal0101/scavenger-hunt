@@ -25,7 +25,7 @@ export default function VaultPage() {
       .then((j) => {
         if (j.success) setPlayer(j.data);
       })
-      .catch(() => {})
+      .catch((err) => console.error("Vault load error:", err))
       .finally(() => setLoading(false));
   }, []);
 

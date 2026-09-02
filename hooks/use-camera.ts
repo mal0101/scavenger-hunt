@@ -18,6 +18,11 @@ export function useCamera({ onScan, onError }: UseCameraOptions) {
   }, [onScan, onError]);
 
   const startScanning = useCallback(async (elementId: string) => {
+    // Surface the viewfinder container before html5-qrcode sizes its decode
+    // canvas. If it stays hidden (display:none), start() measures a 0x0
+    // container and the decoder can never read frames — the camera would
+    // preview but never detect a QR.
+    setScanning(true);
     try {
       const { Html5Qrcode } = await import("html5-qrcode");
 
@@ -49,8 +54,6 @@ export function useCamera({ onScan, onError }: UseCameraOptions) {
           // ignore errors during scanning
         }
       );
-
-      setScanning(true);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
       if (message.includes("NotAllowedError")) {

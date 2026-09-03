@@ -31,6 +31,7 @@ export const gameSchema = z.object({
 
 export const indexSchema = z.object({
   game_id: z.string().uuid(),
+  round_id: z.string().uuid().optional(),
   label: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
   points: z.number().int().min(1).max(100).default(25),

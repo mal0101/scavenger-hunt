@@ -207,6 +207,14 @@ export default function MentorGameDetailPage() {
                   (advances to elimination)
                 </span>
               </button>
+              <button
+                onClick={() => handleState("finish")}
+                disabled={actionLoading}
+                className="px-4 py-2 bg-surface-container-high border border-outline-variant text-on-surface-variant font-label text-label-sm font-bold uppercase tracking-widest rounded-lg hover:bg-surface-container-highest transition-all flex items-center gap-2 disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined text-lg">flag</span>
+                End Game
+              </button>
             </>
           )}
           {game.status === "FINISHED" && (

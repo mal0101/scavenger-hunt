@@ -54,6 +54,8 @@ async function main() {
     { label: "The Enigma Vault", points: 75, location_name: "Library corner", enigma_type: "logic" },
   ];
 
+  // Reset indexes for this game so re-seeding is idempotent (no duplicates)
+  await db.index.deleteMany({ where: { game_id: game.id } });
   for (const idx of indexes) {
     const created = await db.index.upsert({
       where: {
@@ -71,6 +73,58 @@ async function main() {
       },
     });
     console.log(`Index: ${created.label} (${created.points} pts)`);
+  }
+
+  // ── Full demo environment: 2 teams × 2 players ──────────────
+
+  const teamDefs = [
+    { name: "Brass Falcons", invite: "BRASS1", members: [
+      { phone: "+212600000101", nick: "Falcon Alpha" },
+      { phone: "+212600000102", nick: "Falcon Beta" },
+      { phone: "+212777628130", nick: "Test WhatsApp" },
+    ]},
+    { name: "Steam Serpents", invite: "SERPNT", members: [
+      { phone: "+212600000201", nick: "Serpent Alpha" },
+      { phone: "+212600000202", nick: "Serpent Beta" },
+    ]},
+  ];
+
+  for (const teamDef of teamDefs) {
+    const team = await db.team.upsert({
+      where: { invite_code: teamDef.invite },
+      update: {},
+      create: {
+        name: teamDef.name,
+        invite_code: teamDef.invite,
+        game_id: game.id,
+      },
+    });
+    console.log(`Team: ${team.name} (${team.id})`);
+
+    for (const m of teamDef.members) {
+      const user = await db.user.upsert({
+        where: { phone_number: m.phone },
+        update: {},
+        create: {
+          phone_number: m.phone,
+          nickname: m.nick,
+          role: "PLAYER",
+        },
+      });
+
+      const player = await db.player.upsert({
+        where: { user_id: user.id },
+        update: { game_id: game.id, team_id: team.id, status: "ACTIVE" },
+        create: {
+          user_id: user.id,
+          game_id: game.id,
+          team_id: team.id,
+          total_score: 0,
+          status: "ACTIVE",
+        },
+      });
+      console.log(`  Player: ${m.nick} → ${team.name} (${player.id})`);
+    }
   }
 
   console.log("Seed complete!");

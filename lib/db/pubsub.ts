@@ -9,15 +9,19 @@ export async function publishEvent(
   event: string,
   data: Record<string, unknown>
 ): Promise<void> {
+  const channel = getGameChannel(gameId);
+  const payload = JSON.stringify({
+    event,
+    data,
+    timestamp: new Date().toISOString(),
+  });
   try {
-    const channel = getGameChannel(gameId);
-    const payload = JSON.stringify({
-      event,
-      data,
-      timestamp: new Date().toISOString(),
-    });
     await redis.publish(channel, payload);
-  } catch {
-    console.warn(`[PubSub] Failed to publish event "${event}" for game ${gameId}`);
+  } catch (err) {
+    // Pub/sub for live UI is best-effort; never fail the underlying operation.
+    console.warn(
+      "[pubsub] publish skipped:",
+      err instanceof Error ? err.message : err
+    );
   }
 }

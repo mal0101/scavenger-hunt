@@ -59,7 +59,18 @@ export default function ScanPage() {
         };
 
         if (!j.success || !j.data) {
-          throw new Error(j.message || "Scan validation failed");
+          // Silently ignore scans of already-scanned indexes
+          if (j.message && j.message.includes("already scanned")) {
+            setScanStatus("idle");
+            return;
+          }
+          if (j.message && j.message.includes("team")) {
+            setSubmitError("You must be in a team to scan");
+          } else {
+            setSubmitError(j.message || "Scan validation failed");
+          }
+          setScanStatus("idle");
+          return;
         }
 
         const type = j.data.index.type === "trap" ? "trap" : "enigma";

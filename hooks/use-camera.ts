@@ -51,7 +51,7 @@ export function useCamera({ onScan, onError }: UseCameraOptions) {
           callbackRef.current.onScan?.(decodedText);
         },
         () => {
-          // ignore errors during scanning
+          // ignore errors during scanning (fires on every undecoded frame)
         }
       );
     } catch (err: unknown) {

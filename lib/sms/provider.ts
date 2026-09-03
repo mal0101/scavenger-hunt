@@ -13,11 +13,13 @@ class TwilioSmsProvider implements SmsProvider {
   private accountSid: string;
   private authToken: string;
   private fromPhone: string;
+  private channel: "sms" | "whatsapp";
 
   constructor() {
     this.accountSid = process.env.TWILIO_SID ?? "";
     this.authToken = process.env.TWILIO_AUTH_TOKEN ?? "";
     this.fromPhone = process.env.TWILIO_PHONE ?? "";
+    this.channel = process.env.TWILIO_CHANNEL === "whatsapp" ? "whatsapp" : "sms";
 
     if (!this.accountSid || !this.authToken || !this.fromPhone) {
       throw new Error(
@@ -26,11 +28,18 @@ class TwilioSmsProvider implements SmsProvider {
     }
   }
 
+  private prefixIfNeeded(number: string): string {
+    if (this.channel === "whatsapp") {
+      return number.startsWith("whatsapp:") ? number : `whatsapp:${number}`;
+    }
+    return number.replace(/^whatsapp:/, "");
+  }
+
   async sendOtp(phoneNumber: string, code: string): Promise<boolean> {
     const url = `https://api.twilio.com/2010-04-01/Accounts/${this.accountSid}/Messages.json`;
     const body = new URLSearchParams({
-      To: phoneNumber,
-      From: this.fromPhone,
+      To: this.prefixIfNeeded(phoneNumber),
+      From: this.prefixIfNeeded(this.fromPhone),
       Body: `Your verification code is: ${code}. It expires in 5 minutes.`,
     });
 

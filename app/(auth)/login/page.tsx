@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import { apiFetch } from "@/lib/api-client";
 
+const PHONE_PREFIX = "+212";
 const PHONE_REGEX = /^\+?[0-9]{10,15}$/;
 
 function LoginForm() {
@@ -15,11 +16,13 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const fullPhoneNumber = PHONE_PREFIX + phoneNumber;
+
   async function handleSendOtp(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!PHONE_REGEX.test(phoneNumber.replace(/[\s-]/g, ""))) {
-      setError("Enter a valid phone number (digits only, 10-15 characters, optional + prefix).");
+    if (!PHONE_REGEX.test(fullPhoneNumber)) {
+      setError("Enter a valid phone number (digits only).");
       return;
     }
 
@@ -29,7 +32,7 @@ function LoginForm() {
     try {
       const j = await apiFetch<{ success: boolean; message?: string }>("/api/v1/auth/send-otp", {
         method: "POST",
-        body: { phone_number: phoneNumber.replace(/[\s-]/g, "") },
+        body: { phone_number: fullPhoneNumber },
       });
 
       if (!j.success) {
@@ -38,7 +41,7 @@ function LoginForm() {
       }
 
       router.push(
-        `/verify?phone=${encodeURIComponent(phoneNumber.replace(/[\s-]/g, ""))}&redirect=${encodeURIComponent(redirect)}`
+        `/verify?phone=${encodeURIComponent(fullPhoneNumber)}&redirect=${encodeURIComponent(redirect)}`
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Network error. Please try again.");
@@ -92,15 +95,20 @@ function LoginForm() {
               <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant text-xl">
                 phone
               </span>
-              <input
-                id="phone"
-                type="tel"
-                placeholder="+212 6XX XXX XXX"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                required
-                className="w-full pl-12 pr-4 py-3 bg-surface-container-low border border-outline-variant rounded-lg font-label text-body-md text-on-surface placeholder:text-outline focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all"
-              />
+              <div className="w-full pl-12 pr-4 py-3 bg-surface-container-low border border-outline-variant rounded-lg font-label text-body-md text-on-surface focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/30 transition-all flex items-center gap-0">
+                <span className="text-on-surface select-none whitespace-nowrap">{PHONE_PREFIX}</span>
+                <input
+                  id="phone"
+                  type="tel"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  placeholder="6XX XXX XXX"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, ""))}
+                  required
+                  className="flex-1 min-w-0 outline-none bg-transparent placeholder:text-outline text-on-surface"
+                />
+              </div>
             </div>
           </div>
 

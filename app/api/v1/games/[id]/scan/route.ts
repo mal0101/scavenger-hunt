@@ -42,12 +42,19 @@ export async function POST(
 
     const { payload } = validation;
 
-    const player = await db.player.findUnique({
+    let player = await db.player.findUnique({
       where: { user_id: auth.sub },
     });
 
     if (!player) {
-      return apiError("Player profile not found", "NOT_FOUND", 404);
+      player = await db.player.create({
+        data: {
+          user_id: auth.sub,
+          game_id: gameId,
+          total_score: 0,
+          status: "ACTIVE",
+        },
+      });
     }
 
     if (!player.team_id) {

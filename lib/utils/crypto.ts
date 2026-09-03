@@ -18,7 +18,11 @@ export function hmacSign(
   timestamp: string
 ): string {
   const payload = `${indexId}:${gameId}:${roundId}:${timestamp}`;
-  return crypto.createHmac("sha256", getHmacSecret()).update(payload).digest("hex");
+  return crypto
+    .createHmac("sha256", getHmacSecret())
+    .update(payload)
+    .digest("hex")
+    .slice(0, 32);
 }
 
 export function hmacVerify(

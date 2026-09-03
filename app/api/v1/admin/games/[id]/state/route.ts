@@ -39,6 +39,11 @@ export async function POST(
     if (action === "start") {
       const roundNumber = game.current_round + 1;
 
+      const existingRound = await db.round.findFirst({
+        where: { game_id: id, round_number: roundNumber },
+        select: { id: true },
+      });
+
       await db.$transaction([
         db.game.update({
           where: { id },
@@ -48,15 +53,23 @@ export async function POST(
             started_at: game.started_at ?? new Date(),
           },
         }),
-        db.round.create({
+      ]);
+
+      if (existingRound) {
+        await db.round.update({
+          where: { id: existingRound.id },
+          data: { status: "ACTIVE", started_at: new Date() },
+        });
+      } else {
+        await db.round.create({
           data: {
             game_id: id,
             round_number: roundNumber,
             status: "ACTIVE",
             started_at: new Date(),
           },
-        }),
-      ]);
+        });
+      }
 
       await publishEvent(id, "state", {
         type: "round_started",
@@ -75,6 +88,11 @@ export async function POST(
         );
       }
 
+      const existingRound = await db.round.findFirst({
+        where: { game_id: id, round_number: roundNumber },
+        select: { id: true },
+      });
+
       await db.$transaction([
         db.game.update({
           where: { id },
@@ -83,15 +101,23 @@ export async function POST(
             current_round: roundNumber,
           },
         }),
-        db.round.create({
+      ]);
+
+      if (existingRound) {
+        await db.round.update({
+          where: { id: existingRound.id },
+          data: { status: "ACTIVE", started_at: new Date() },
+        });
+      } else {
+        await db.round.create({
           data: {
             game_id: id,
             round_number: roundNumber,
             status: "ACTIVE",
             started_at: new Date(),
           },
-        }),
-      ]);
+        });
+      }
 
       await publishEvent(id, "state", {
         type: "round_started",

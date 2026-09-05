@@ -1,6 +1,7 @@
 export interface User {
   id: string;
-  phone_number: string;
+  username: string;
+  phone_number?: string | null;
   nickname: string | null;
   role: "PLAYER" | "MENTOR";
   created_at: string;
@@ -13,7 +14,6 @@ export interface Player {
   game_id: string;
   team_id: string | null;
   total_score: number;
-  rank: number | null;
   status: "ACTIVE" | "ELIMINATED";
   joined_at: string;
 }
@@ -24,6 +24,7 @@ export interface Team {
   invite_code: string;
   game_id: string;
   total_score: number;
+  captain_id: string | null;
   created_at: string;
   player_count?: number;
 }

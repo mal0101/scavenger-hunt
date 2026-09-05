@@ -3,7 +3,6 @@ import { db } from "@/lib/db/postgres";
 import { apiSuccess, apiError, apiInternal } from "@/lib/types/api";
 import { scanSchema } from "@/lib/utils/validation";
 import { validateQrCode } from "@/lib/qr/validator";
-import { calculateScanScore } from "@/lib/game/engine";
 import { publishEvent } from "@/lib/db/pubsub";
 import { redis } from "@/lib/db/redis";
 import { checkRateLimit, scanLimiter } from "@/lib/utils/rate-limiter";
@@ -54,17 +53,6 @@ export async function POST(
       return apiError("You must be in a team to scan", "NO_TEAM");
     }
 
-    const existingScan = await db.scan.findFirst({
-      where: {
-        player_id: player.id,
-        index_id: payload!.index_id,
-      },
-    });
-
-    if (existingScan) {
-      return apiError("You have already scanned this index", "ALREADY_SCANNED");
-    }
-
     const game = await db.game.findUnique({ where: { id: gameId } });
     if (!game || game.status !== "ACTIVE") {
       return apiError("Game is not active", "GAME_NOT_ACTIVE");
@@ -82,6 +70,23 @@ export async function POST(
       return apiError("QR code is not valid for the current round", "QR_ROUND_MISMATCH");
     }
 
+    const qrCode = await db.qrCode.findUnique({
+      where: { id: payload!.code_id },
+    });
+
+    if (
+      !qrCode ||
+      qrCode.index_id !== payload!.index_id ||
+      qrCode.game_id !== gameId ||
+      qrCode.round_id !== activeRound.id
+    ) {
+      return apiError("QR code does not match a registered checkpoint", "QR_UNKNOWN_CODE");
+    }
+
+    if (qrCode.status !== "ACTIVE") {
+      return apiError("This QR code has already been fully claimed", "QR_DEPLETED");
+    }
+
     const index = await db.index.findUnique({
       where: { id: payload!.index_id },
     });
@@ -90,15 +95,30 @@ export async function POST(
       return apiError("Index not found", "INDEX_NOT_FOUND");
     }
 
-    const elapsed = Math.floor(
-      (Date.now() - activeRound.started_at!.getTime()) / 1000
-    );
-    const remaining = Math.max(0, game.round_duration - elapsed);
-    const score = calculateScanScore(
-      index.points,
-      remaining,
-      game.round_duration
-    );
+    const existingScan = await db.scan.findFirst({
+      where: {
+        player_id: player.id,
+        index_id: payload!.index_id,
+      },
+    });
+
+    if (existingScan) {
+      return apiError("You have already scanned this index", "ALREADY_SCANNED");
+    }
+
+    // Single-claim model: the first valid scan atomically drains the pool and
+    // depletes the code. updateMany + the ACTIVE status guard make the claim
+    // atomic, so a concurrent scan loses the race and sees QR_DEPLETED.
+    const claimed = await db.qrCode.updateMany({
+      where: { id: qrCode.id, status: "ACTIVE" },
+      data: { status: "DEPLETED", pool_value: 0, first_scanned_at: new Date() },
+    });
+
+    if (claimed.count === 0) {
+      return apiError("This QR code has already been fully claimed", "QR_DEPLETED");
+    }
+
+    const score = qrCode.pool_value;
 
     const scan = await db.scan.create({
       data: {

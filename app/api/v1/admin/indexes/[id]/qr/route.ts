@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { db } from "@/lib/db/postgres";
 import { apiSuccess, apiError, apiInternal } from "@/lib/types/api";
 import { generateQrImage, generateQrSvg } from "@/lib/qr/generator";
 import { requireMentor } from "@/lib/auth/guard";
@@ -19,13 +20,53 @@ export async function POST(
       return apiError("game_id and round_id are required", "VALIDATION_ERROR");
     }
 
-    if (format === "svg") {
-      const svg = await generateQrSvg(id, game_id, round_id);
-      return apiSuccess({ svg, format: "svg" }, "QR code generated");
+    const index = await db.index.findUnique({ where: { id } });
+    if (!index || index.game_id !== game_id) {
+      return apiError("Index not found for this game", "NOT_FOUND", 404);
     }
 
-    const dataUrl = await generateQrImage(id, game_id, round_id);
-    return apiSuccess({ data_url: dataUrl, format: "png" }, "QR code generated");
+    const round = await db.round.findUnique({ where: { id: round_id } });
+    if (!round || round.game_id !== game_id) {
+      return apiError("Round not found for this game", "NOT_FOUND", 404);
+    }
+
+    const qrCode = await db.qrCode.upsert({
+      where: { index_id_round_id: { index_id: id, round_id } },
+      update: {},
+      create: {
+        index_id: id,
+        game_id,
+        round_id,
+        points: index.points,
+        pool_value: index.points,
+      },
+    });
+
+    if (format === "svg") {
+      const svg = await generateQrSvg(id, game_id, round_id, qrCode.id);
+      return apiSuccess(
+        {
+          code_id: qrCode.id,
+          pool_value: qrCode.pool_value,
+          status: qrCode.status,
+          svg,
+          format: "svg",
+        },
+        "QR code generated"
+      );
+    }
+
+    const dataUrl = await generateQrImage(id, game_id, round_id, qrCode.id);
+    return apiSuccess(
+      {
+        code_id: qrCode.id,
+        pool_value: qrCode.pool_value,
+        status: qrCode.status,
+        data_url: dataUrl,
+        format: "png",
+      },
+      "QR code generated"
+    );
   } catch (error) {
     console.error("Generate QR error:", error);
     return apiInternal("Failed to generate QR code");

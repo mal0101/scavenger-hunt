@@ -8,6 +8,7 @@ import {
 } from "@/lib/qr/generator";
 import { validateQrCode } from "@/lib/qr/validator";
 
+const CODE = "00000000-0000-0000-0000-00000000000a";
 const IDX = "00000000-0000-0000-0000-000000000001";
 const GAME = "00000000-0000-0000-0000-000000000001";
 const ROUND = "00000000-0000-0000-0000-000000000002";
@@ -15,23 +16,26 @@ const ROUND = "00000000-0000-0000-0000-000000000002";
 const HOUR = 60 * 60 * 1000;
 
 function buildPayload(
-  overrides: { indexId?: string; gameId?: string; roundId?: string; timestamp?: string } = {}
+  overrides: { codeId?: string; indexId?: string; gameId?: string; roundId?: string; timestamp?: string } = {}
 ) {
   const timestamp = overrides.timestamp ?? new Date().toISOString();
+  const codeId = overrides.codeId ?? CODE;
   const indexId = overrides.indexId ?? IDX;
   const gameId = overrides.gameId ?? GAME;
   const roundId = overrides.roundId ?? ROUND;
   return {
+    code_id: codeId,
     index_id: indexId,
     game_id: gameId,
     round_id: roundId,
     timestamp,
-    signature: hmacSign(indexId, gameId, roundId, timestamp),
+    signature: hmacSign(codeId, indexId, gameId, roundId, timestamp),
   };
 }
 
 test("createQrPayload produces a signed payload", () => {
-  const payload = createQrPayload(IDX, GAME, ROUND);
+  const payload = createQrPayload(IDX, GAME, ROUND, CODE);
+  assert.equal(payload.code_id, CODE);
   assert.equal(payload.index_id, IDX);
   assert.equal(payload.game_id, GAME);
   assert.equal(payload.round_id, ROUND);
@@ -40,7 +44,7 @@ test("createQrPayload produces a signed payload", () => {
 });
 
 test("encode/decode round-trips the payload", () => {
-  const payload = createQrPayload(IDX, GAME, ROUND);
+  const payload = createQrPayload(IDX, GAME, ROUND, CODE);
   const decoded = decodeQrPayload(encodeQrPayload(payload));
   assert.deepEqual(decoded, payload);
 });
@@ -55,14 +59,23 @@ test("decodeQrPayload returns null for garbage", () => {
 });
 
 test("validateQrCode accepts a valid freshly-signed code", () => {
-  const result = validateQrCode(encodeQrPayload(createQrPayload(IDX, GAME, ROUND)), GAME);
+  const result = validateQrCode(encodeQrPayload(createQrPayload(IDX, GAME, ROUND, CODE)), GAME);
   assert.equal(result.valid, true);
   assert.equal(result.payload?.index_id, IDX);
+  assert.equal(result.payload?.code_id, CODE);
 });
 
 test("validateQrCode rejects a tampered signature", () => {
   const payload = buildPayload();
   payload.signature = payload.signature.slice(0, -1) + (payload.signature.endsWith("a") ? "b" : "a");
+  const result = validateQrCode(encodeQrPayload(payload), GAME);
+  assert.equal(result.valid, false);
+  assert.equal(result.error, "QR_SIGNATURE_INVALID");
+});
+
+test("validateQrCode rejects a payload whose code_id was swapped after signing", () => {
+  const payload = buildPayload();
+  payload.code_id = "11111111-1111-1111-1111-111111111111";
   const result = validateQrCode(encodeQrPayload(payload), GAME);
   assert.equal(result.valid, false);
   assert.equal(result.error, "QR_SIGNATURE_INVALID");

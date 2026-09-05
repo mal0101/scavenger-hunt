@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>The Vault Descent - Aether Compass</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=Space+Grotesk:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "outline": "#a38c7c",
+                "secondary-container": "#683f20",
+                "error-container": "#93000a",
+                "secondary-fixed-dim": "#f5ba92",
+                "primary-fixed": "#ffdcc3",
+                "on-secondary-fixed": "#301400",
+                "on-primary-container": "#432100",
+                "primary-container": "#d97707",
+                "surface-bright": "#453630",
+                "on-primary-fixed": "#2f1500",
+                "inverse-primary": "#904d00",
+                "inverse-surface": "#f5ded5",
+                "on-surface-variant": "#dbc2b0",
+                "surface-container-high": "#342721",
+                "secondary-fixed": "#ffdcc5",
+                "surface-container-low": "#251913",
+                "on-background": "#f5ded5",
+                "tertiary-container": "#a88b7a",
+                "secondary": "#f5ba92",
+                "surface": "#1c110c",
+                "on-error-container": "#ffdad6",
+                "on-primary": "#4d2600",
+                "on-primary-fixed-variant": "#6e3900",
+                "background": "#1c110c",
+                "surface-variant": "#40322c",
+                "on-tertiary-fixed-variant": "#594234",
+                "on-tertiary": "#402c1f",
+                "surface-container": "#291d17",
+                "outline-variant": "#554336",
+                "surface-tint": "#ffb77d",
+                "on-tertiary-fixed": "#29170c",
+                "surface-dim": "#1c110c",
+                "inverse-on-surface": "#3b2d27",
+                "primary-fixed-dim": "#ffb77d",
+                "on-secondary-container": "#e5ac85",
+                "on-secondary": "#4b270a",
+                "tertiary-fixed": "#fedcc8",
+                "on-error": "#690005",
+                "surface-container-highest": "#40322c",
+                "tertiary": "#e1c0ad",
+                "error": "#ffb4ab",
+                "surface-container-lowest": "#160c07",
+                "tertiary-fixed-dim": "#e1c0ad",
+                "on-tertiary-container": "#392519",
+                "on-surface": "#f5ded5",
+                "on-secondary-fixed-variant": "#653d1e",
+                "primary": "#ffb77d"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.125rem",
+                "lg": "0.25rem",
+                "xl": "0.5rem",
+                "full": "0.75rem"
+        },
+        "spacing": {
+                "container-max": "1280px",
+                "unit": "8px",
+                "gutter": "24px",
+                "margin-mobile": "20px",
+                "margin-desktop": "64px"
+        },
+        "fontFamily": {
+                "label-sm": [
+                        "JetBrains Mono"
+                ],
+                "body-md": [
+                        "IBM Plex Sans"
+                ],
+                "body-lg": [
+                        "IBM Plex Sans"
+                ],
+                "headline-lg": [
+                        "Space Grotesk"
+                ],
+                "headline-xl": [
+                        "Space Grotesk"
+                ],
+                "headline-lg-mobile": [
+                        "Space Grotesk"
+                ],
+                "label-md": [
+                        "JetBrains Mono"
+                ]
+        },
+        "fontSize": {
+                "label-sm": [
+                        "12px",
+                        {
+                                "lineHeight": "16px",
+                                "letterSpacing": "0.1em",
+                                "fontWeight": "500"
+                        }
+                ],
+                "body-md": [
+                        "16px",
+                        {
+                                "lineHeight": "24px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "body-lg": [
+                        "18px",
+                        {
+                                "lineHeight": "28px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "headline-lg": [
+                        "32px",
+                        {
+                                "lineHeight": "40px",
+                                "fontWeight": "600"
+                        }
+                ],
+                "headline-xl": [
+                        "48px",
+                        {
+                                "lineHeight": "56px",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "700"
+                        }
+                ],
+                "headline-lg-mobile": [
+                        "24px",
+                        {
+                                "lineHeight": "32px",
+                                "fontWeight": "600"
+                        }
+                ],
+                "label-md": [
+                        "14px",
+                        {
+                                "lineHeight": "20px",
+                                "letterSpacing": "0.05em",
+                                "fontWeight": "500"
+                        }
+                ]
+        }
+},
+    },
+  }
+</script>
+<style>
+        .iron-texture {
+            background-color: #1c110c;
+            background-image: url('data:image/svg+xml;utf8,<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><filter id="noise"><feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="4" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23noise)" opacity="0.1"/></svg>');
+        }
+        .brass-glow {
+            box-shadow: inset 0 0 20px rgba(217, 119, 7, 0.1);
+        }
+        .cyan-glow {
+            box-shadow: 0 0 12px rgba(217, 119, 7, 0.5);
+        }
+        .arch-top {
+            border-top-left-radius: 40px;
+            border-top-right-radius: 40px;
+        }
+        .gear-spin {
+            animation: spin 10s linear infinite;
+        }
+        @keyframes spin {
+            100% { transform: rotate(360deg); }
+        }
+        .pulse-cyan {
+            animation: pulse-border 2s infinite;
+        }
+        @keyframes pulse-border {
+            0% { border-color: rgba(217, 119, 7, 0.3); }
+            50% { border-color: rgba(217, 119, 7, 1); }
+            100% { border-color: rgba(217, 119, 7, 0.3); }
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-background text-on-surface font-body-lg min-h-screen iron-texture relative overflow-x-hidden selection:bg-tertiary selection:text-on-tertiary">
+<!-- Ambient Overlay -->
+<div class="fixed inset-0 pointer-events-none bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-transparent via-surface/80 to-surface z-0 mix-blend-multiply"></div>
+<!-- Top Navigation Container -->
+<header class="flex justify-between items-center w-full px-margin-mobile md:px-margin-desktop h-20 pt-4 bg-surface dark:bg-surface border-b-2 border-secondary-container bg-surface-container-highest shadow-[inset_0_2px_4px_rgba(217,119,7,0.2)] docked full-width top-0 rounded-b-full fixed z-50 transition-all duration-300">
+<!-- Leading Icon -->
+<button class="text-on-primary-fixed-variant hover:text-tertiary transition-all duration-300 focus:outline-none">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">explore</span>
+</button>
+<!-- Brand Headline -->
+<img alt="Logo" class="h-12 w-auto object-contain drop-shadow-[0_0_8px_rgba(247,189,72,0.5)]" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAkx3kLVnyPHxcqLIXxGV6h8dvBhukVZcz84NYGF8lwLYjYc2aOOBfJQc2TvjfQm5XqRprKjP7v7k9yVMTe0Iih3dwLNqA-ixTss-nvQ3_nK-qptK55RQ8pzVRySpe_LKmWjFwC355RAdDBf0As6A5qnT7ZazwDHyzUpwPgDOTL2UamWJkh3lvSdc6ePrVZlG7m3MRdwexmNPKorQ2RkWyVsa1i4VvQqPOZD_f61q3_-GSz0uXe_6rPhBwODCW6VCnIog"/>
+<!-- Trailing Icon -->
+<button class="text-on-primary-fixed-variant hover:text-tertiary transition-all duration-300 focus:outline-none">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">settings_suggest</span>
+</button>
+</header>
+<!-- Navigation Drawer (Hidden by default, assumed accessible via a button if implemented) -->
+<!-- Suppressed based on layout rules for this specific view -->
+<!-- Main Content Canvas -->
+<main class="relative z-10 pt-[100px] pb-[120px] max-w-7xl mx-auto px-4 md:px-margin-desktop grid grid-cols-1 md:grid-cols-12 gap-gutter">
+<!-- Left Pipe Structure -->
+<div class="hidden md:flex flex-col items-center col-span-1 border-r border-outline-variant/30 h-full relative">
+<div class="w-4 bg-surface-container-high h-full rounded-full border border-secondary-container/50 relative overflow-hidden">
+<div class="absolute top-0 left-0 w-full bg-tertiary-fixed-dim/40 h-1/4 rounded-b-full"></div>
+</div>
+<span class="material-symbols-outlined text-secondary-container absolute top-[30%] -left-2 gear-spin" style="font-size: 40px;">settings</span>
+<span class="material-symbols-outlined text-secondary-container absolute top-[60%] -right-2 gear-spin" style="font-size: 32px; animation-direction: reverse;">settings</span>
+</div>
+<!-- Center Panel: The Descent & Compass -->
+<div class="col-span-1 md:col-span-8 flex flex-col gap-6 md:gap-8">
+<!-- Objective Banner -->
+<div class="bg-surface-container border-t-2 border-secondary-container border-x border-b border-outline-variant/50 arch-top p-6 brass-glow shadow-lg relative overflow-hidden">
+<div class="absolute inset-0 bg-secondary-container/5 mix-blend-overlay"></div>
+<div class="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+<div>
+<p class="font-label-sm text-label-sm uppercase text-tertiary-fixed-dim mb-2 flex items-center gap-2">
+<span class="material-symbols-outlined text-[16px]">radar</span>
+                            Current Objective
+                        </p>
+<h2 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface">Locate the Smiling Rock and record the Tidal Frequency.</h2>
+</div>
+<div class="px-4 py-2 bg-primary-container border border-tertiary-fixed-dim/30 rounded-full flex items-center gap-2 shadow-[0_0_10px_rgba(217,119,7,0.15)] pulse-cyan">
+<span class="w-2 h-2 rounded-full bg-tertiary-fixed-dim animate-pulse"></span>
+<span class="font-label-sm text-label-sm text-tertiary-fixed-dim">Scanning...</span>
+</div>
+</div>
+</div>
+<!-- Compass & Map Section (Bento Layout) -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+<!-- The Compass -->
+<div class="bg-surface-container-low border border-outline-variant/40 rounded-xl p-8 flex flex-col items-center justify-center relative overflow-hidden brass-glow group">
+<!-- Decorative Background Rings -->
+<div class="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none">
+<div class="w-64 h-64 border border-secondary-container rounded-full border-dashed group-hover:rotate-180 transition-transform duration-[20s] ease-linear"></div>
+<div class="absolute w-48 h-48 border border-tertiary-fixed-dim rounded-full"></div>
+</div>
+<p class="font-label-sm text-label-sm uppercase text-secondary-container absolute top-4 left-4 z-10">Acoustic Resonance</p>
+<!-- Centerpiece Element -->
+<div class="relative z-10 w-40 h-40 rounded-full bg-primary-container border-[4px] border-secondary-container flex items-center justify-center shadow-[0_0_30px_rgba(217,119,7,0.2)] transition-shadow duration-500 hover:shadow-[0_0_50px_rgba(217,119,7,0.5)]">
+<span class="material-symbols-outlined text-[80px] text-tertiary-fixed-dim drop-shadow-[0_0_10px_#e1c0ad]">compass_calibration</span>
+</div>
+<div class="mt-8 text-center z-10">
+<p class="font-body-md text-body-md text-on-surface-variant">Freq: <span class="text-tertiary-fixed-dim font-label-sm">432 Hz</span></p>
+</div>
+</div>
+<!-- Vertical Progress Map -->
+<div class="bg-surface-container-low border border-outline-variant/40 rounded-xl p-6 relative brass-glow">
+<h3 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface mb-6 border-b border-outline-variant/30 pb-2">Descent Log</h3>
+<div class="relative pl-6 before:absolute before:left-[11px] before:top-[12px] before:bottom-[12px] before:w-[2px] before:bg-outline-variant/40">
+<!-- Step 1: Surface (Completed) -->
+<div class="relative mb-8">
+<div class="absolute -left-[30px] top-1 w-4 h-4 rounded-full bg-secondary-container border-[3px] border-surface-container-low z-10"></div>
+<p class="font-label-sm text-label-sm uppercase text-secondary-container">Level 0</p>
+<p class="font-body-lg text-body-lg text-on-surface line-through opacity-50">Surface</p>
+</div>
+<!-- Step 2: Tidal Caves (Current) -->
+<div class="relative mb-8">
+<div class="absolute -left-[31px] top-1 w-5 h-5 rounded-full bg-tertiary-fixed-dim border-[4px] border-surface-container-low z-10 shadow-[0_0_10px_rgba(217,119,7,0.6)] animate-pulse"></div>
+<p class="font-label-sm text-label-sm uppercase text-tertiary-fixed-dim">Level 1 - Active</p>
+<p class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface drop-shadow-[0_0_5px_rgba(217,119,7,0.3)]">Tidal Caves</p>
+<!-- Progress Bar -->
+<div class="mt-3 h-2 w-full bg-surface-container rounded-full overflow-hidden border border-secondary-container/30">
+<div class="h-full bg-tertiary-fixed-dim w-3/4 shadow-[inset_0_0_8px_rgba(255,255,255,0.5)]"></div>
+</div>
+</div>
+<!-- Step 3: Gear Chamber (Locked) -->
+<div class="relative mb-8">
+<div class="absolute -left-[30px] top-1 w-4 h-4 rounded-full bg-surface-container-highest border-[2px] border-outline-variant/50 z-10"></div>
+<p class="font-label-sm text-label-sm uppercase text-on-surface-variant/50">Level 2 - Sealed</p>
+<p class="font-body-lg text-body-lg text-on-surface-variant opacity-70 flex items-center gap-2">
+                                Gear Chamber
+                                <span class="material-symbols-outlined text-[16px]">lock</span>
+</p>
+</div>
+<!-- Step 4: The Vault (Locked) -->
+<div class="relative">
+<div class="absolute -left-[30px] top-1 w-4 h-4 rounded-full bg-surface-container-highest border-[2px] border-outline-variant/50 z-10"></div>
+<p class="font-label-sm text-label-sm uppercase text-on-surface-variant/50">Level 3 - Unknown</p>
+<p class="font-body-lg text-body-lg text-on-surface-variant opacity-70 flex items-center gap-2">
+                                The Vault
+                                <span class="material-symbols-outlined text-[16px]">lock</span>
+</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Collectibles Slots (Silver Cylinders) -->
+<div class="bg-surface-container border-t-2 border-secondary-container border-x border-b border-outline-variant/50 rounded-xl p-6 brass-glow">
+<h3 class="font-label-sm text-label-sm uppercase text-on-surface-variant mb-6 text-center tracking-widest border-b border-outline-variant/20 pb-2 border-dashed">Data Cylinders</h3>
+<div class="flex justify-around items-center">
+<!-- Slot 1 (Filled) -->
+<div class="flex flex-col items-center gap-2">
+<div class="w-12 h-20 bg-gradient-to-b from-primary-container to-surface-container-highest border-2 border-tertiary-fixed-dim rounded-md shadow-[0_0_15px_rgba(217,119,7,0.3)] relative overflow-hidden">
+<div class="absolute inset-0 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent)] w-[200%] animate-[translate_3s_infinite]"></div>
+<div class="absolute bottom-0 w-full h-1/2 bg-tertiary-fixed-dim/20 border-t border-tertiary-fixed-dim/50"></div>
+</div>
+<span class="font-label-sm text-label-sm text-tertiary-fixed-dim">SLOT A</span>
+</div>
+<!-- Slot 2 (Empty) -->
+<div class="flex flex-col items-center gap-2">
+<div class="w-12 h-20 bg-surface-container-highest border-2 border-outline-variant/30 rounded-md relative opacity-50 border-dashed">
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant/50">SLOT B</span>
+</div>
+<!-- Slot 3 (Empty) -->
+<div class="flex flex-col items-center gap-2">
+<div class="w-12 h-20 bg-surface-container-highest border-2 border-outline-variant/30 rounded-md relative opacity-50 border-dashed">
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant/50">SLOT C</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Pipe Structure -->
+<div class="hidden md:flex flex-col items-center col-span-1 border-l border-outline-variant/30 h-full relative">
+<div class="w-6 bg-surface-container-high h-full rounded-full border border-secondary-container/50 relative overflow-hidden flex justify-center">
+<!-- Inner pipe detail -->
+<div class="w-2 bg-surface-container-lowest h-full opacity-50"></div>
+</div>
+<!-- Valve Detail -->
+<div class="absolute top-[45%] -left-4 w-12 h-12 bg-secondary-container rounded-full border-4 border-surface shadow-lg flex items-center justify-center cursor-pointer hover:rotate-90 transition-transform duration-500">
+<span class="material-symbols-outlined text-surface">sync</span>
+</div>
+</div>
+</main>
+<!-- Bottom Navigation Bar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-6 bg-surface-container-high dark:bg-surface-container-high border-t-4 border-secondary-container bg-gradient-to-b from-surface-container-high to-surface-container-lowest shadow-[0_-8px_20px_rgba(0,0,0,0.6)] h-24 rounded-t-full md:hidden">
+<!-- Tab 1: DOCK -->
+<button class="flex flex-col items-center justify-center text-on-primary-fixed-variant opacity-70 p-2 hover:opacity-100 hover:text-secondary transition-opacity focus:outline-none">
+<span class="material-symbols-outlined text-[24px]">anchor</span>
+<span class="font-label-sm text-label-sm uppercase mt-1">DOCK</span>
+</button>
+<!-- Tab 2: LOGS -->
+<button class="flex flex-col items-center justify-center text-on-primary-fixed-variant opacity-70 p-2 hover:opacity-100 hover:text-secondary transition-opacity focus:outline-none">
+<span class="material-symbols-outlined text-[24px]">history_edu</span>
+<span class="font-label-sm text-label-sm uppercase mt-1">LOGS</span>
+</button>
+<!-- Tab 3: MAPS (Active State mapped semantically to 'The Vault Descent' / Map) -->
+<button class="flex flex-col items-center justify-center bg-secondary-container text-on-secondary-container rounded-full p-3 shadow-[0_0_15px_rgba(186,136,15,0.4)] hover:opacity-100 transition-opacity focus:outline-none ring-2 ring-tertiary ring-offset-2 ring-offset-background">
+<span class="material-symbols-outlined text-[24px]">map</span>
+<span class="font-label-sm text-label-sm uppercase mt-1">MAPS</span>
+</button>
+<!-- Tab 4: VAULT -->
+<button class="flex flex-col items-center justify-center text-on-primary-fixed-variant opacity-70 p-2 hover:opacity-100 hover:text-secondary transition-opacity focus:outline-none">
+<span class="material-symbols-outlined text-[24px]">lock_open</span>
+<span class="font-label-sm text-label-sm uppercase mt-1">VAULT</span>
+</button>
+</nav>
+<!-- Desktop Navigation Cluster (Visible only on md+) -->
+<div class="hidden md:flex fixed top-20 left-0 w-full z-40 bg-surface-container-low border-b border-outline-variant/30 justify-center gap-8 py-2">
+<a class="font-label-sm text-label-sm uppercase text-on-surface-variant hover:text-tertiary-fixed-dim transition-colors" href="#">DOCK</a>
+<a class="font-label-sm text-label-sm uppercase text-on-surface-variant hover:text-tertiary-fixed-dim transition-colors" href="#">LOGS</a>
+<a class="font-label-sm text-label-sm uppercase text-tertiary-fixed-dim font-bold border-b-2 border-tertiary-fixed-dim pb-1" href="#">MAPS</a>
+<a class="font-label-sm text-label-sm uppercase text-on-surface-variant hover:text-tertiary-fixed-dim transition-colors" href="#">VAULT</a>
+</div>
+</body></html>

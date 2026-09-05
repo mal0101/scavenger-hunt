@@ -4,7 +4,7 @@ import crypto from "crypto";
 export interface TokenPayload extends JWTPayload {
   sub: string;
   role: "PLAYER" | "MENTOR";
-  phone: string;
+  username: string;
 }
 
 if (!process.env.JWT_SECRET) {
@@ -23,9 +23,9 @@ const REFRESH_EXPIRY = process.env.JWT_REFRESH_EXPIRY ?? "604800";
 export async function signAccessToken(
   userId: string,
   role: "PLAYER" | "MENTOR",
-  phone: string
+  username: string
 ): Promise<string> {
-  return new SignJWT({ sub: userId, role, phone })
+  return new SignJWT({ sub: userId, role, username })
     .setProtectedHeader({ alg: "HS256" })
     .setJti(crypto.randomUUID())
     .setIssuedAt()
@@ -38,9 +38,9 @@ export async function signAccessToken(
 export async function signRefreshToken(
   userId: string,
   role: "PLAYER" | "MENTOR",
-  phone: string
+  username: string
 ): Promise<string> {
-  return new SignJWT({ sub: userId, role, phone })
+  return new SignJWT({ sub: userId, role, username })
     .setProtectedHeader({ alg: "HS256" })
     .setJti(crypto.randomUUID())
     .setIssuedAt()

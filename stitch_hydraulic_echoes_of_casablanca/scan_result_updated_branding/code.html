@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>QR Scan Result - Aether Compass</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=JetBrains+Mono:wght@400;500;700&amp;family=Space+Grotesk:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "outline": "#a38c7c",
+                "secondary-container": "#683f20",
+                "error-container": "#93000a",
+                "secondary-fixed-dim": "#f5ba92",
+                "primary-fixed": "#ffdcc3",
+                "on-secondary-fixed": "#301400",
+                "on-primary-container": "#432100",
+                "primary-container": "#d97707",
+                "surface-bright": "#453630",
+                "on-primary-fixed": "#2f1500",
+                "inverse-primary": "#904d00",
+                "inverse-surface": "#f5ded5",
+                "on-surface-variant": "#dbc2b0",
+                "surface-container-high": "#342721",
+                "secondary-fixed": "#ffdcc5",
+                "surface-container-low": "#251913",
+                "on-background": "#f5ded5",
+                "tertiary-container": "#a88b7a",
+                "secondary": "#f5ba92",
+                "surface": "#1c110c",
+                "on-error-container": "#ffdad6",
+                "on-primary": "#4d2600",
+                "on-primary-fixed-variant": "#6e3900",
+                "background": "#1c110c",
+                "surface-variant": "#40322c",
+                "on-tertiary-fixed-variant": "#594234",
+                "on-tertiary": "#402c1f",
+                "surface-container": "#291d17",
+                "outline-variant": "#554336",
+                "surface-tint": "#ffb77d",
+                "on-tertiary-fixed": "#29170c",
+                "surface-dim": "#1c110c",
+                "inverse-on-surface": "#3b2d27",
+                "primary-fixed-dim": "#ffb77d",
+                "on-secondary-container": "#e5ac85",
+                "on-secondary": "#4b270a",
+                "tertiary-fixed": "#fedcc8",
+                "on-error": "#690005",
+                "surface-container-highest": "#40322c",
+                "tertiary": "#e1c0ad",
+                "error": "#ffb4ab",
+                "surface-container-lowest": "#160c07",
+                "tertiary-fixed-dim": "#e1c0ad",
+                "on-tertiary-container": "#392519",
+                "on-surface": "#f5ded5",
+                "on-secondary-fixed-variant": "#653d1e",
+                "primary": "#ffb77d"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.125rem",
+                "lg": "0.25rem",
+                "xl": "0.5rem",
+                "full": "0.75rem"
+        },
+        "spacing": {
+                "container-max": "1280px",
+                "unit": "8px",
+                "gutter": "24px",
+                "margin-mobile": "20px",
+                "margin-desktop": "64px"
+        },
+        "fontFamily": {
+                "label-sm": [
+                        "JetBrains Mono"
+                ],
+                "body-md": [
+                        "IBM Plex Sans"
+                ],
+                "body-lg": [
+                        "IBM Plex Sans"
+                ],
+                "headline-lg": [
+                        "Space Grotesk"
+                ],
+                "headline-xl": [
+                        "Space Grotesk"
+                ],
+                "headline-lg-mobile": [
+                        "Space Grotesk"
+                ],
+                "label-md": [
+                        "JetBrains Mono"
+                ]
+        },
+        "fontSize": {
+                "label-sm": [
+                        "12px",
+                        {
+                                "lineHeight": "16px",
+                                "letterSpacing": "0.1em",
+                                "fontWeight": "500"
+                        }
+                ],
+                "body-md": [
+                        "16px",
+                        {
+                                "lineHeight": "24px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "body-lg": [
+                        "18px",
+                        {
+                                "lineHeight": "28px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "headline-lg": [
+                        "32px",
+                        {
+                                "lineHeight": "40px",
+                                "fontWeight": "600"
+                        }
+                ],
+                "headline-xl": [
+                        "48px",
+                        {
+                                "lineHeight": "56px",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "700"
+                        }
+                ],
+                "headline-lg-mobile": [
+                        "24px",
+                        {
+                                "lineHeight": "32px",
+                                "fontWeight": "600"
+                        }
+                ],
+                "label-md": [
+                        "14px",
+                        {
+                                "lineHeight": "20px",
+                                "letterSpacing": "0.05em",
+                                "fontWeight": "500"
+                        }
+                ]
+        }
+},
+    },
+  }
+</script>
+<style>
+        body {
+            background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100' height='100' filter='url(%23noise)' opacity='0.05'/%3E%3C/svg%3E");
+            background-color: #1c110c;
+        }
+        
+        .arch-top {
+            clip-path: path('M 0,40 Q 50,-10 100,40 L 100,100 L 0,100 Z');
+        }
+        
+        @media (min-width: 768px) {
+            .arch-top-lg {
+                clip-path: path('M 0,80 Q 500,-20 1000,80 L 1000,1000 L 0,1000 Z'); /* Approximated for flex sizing */
+            }
+        }
+
+        .heat-pipe-glow {
+            box-shadow: 0 0 15px rgba(217, 119, 7, 0.5);
+            animation: pulse-glow 2s infinite alternate;
+        }
+        
+        @keyframes pulse-glow {
+            0% { box-shadow: 0 0 10px rgba(217, 119, 7, 0.3); }
+            100% { box-shadow: 0 0 25px rgba(217, 119, 7, 0.7); }
+        }
+
+        .shimmer-bg {
+            background: linear-gradient(90deg, rgba(217, 119, 7, 1) 0%, rgba(255, 183, 125, 1) 50%, rgba(217, 119, 7, 1) 100%);
+            background-size: 200% 100%;
+            animation: shimmer 2s infinite linear;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 100% 0; }
+            100% { background-position: -100% 0; }
+        }
+
+        /* Submarine porthole styling */
+        .porthole-container {
+            position: relative;
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            border: 8px solid #554336;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8), 0 0 15px rgba(0,0,0,0.5);
+            overflow: hidden;
+            background: #251913;
+        }
+        
+        .porthole-rivet {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background: #d97707;
+            border-radius: 50%;
+            box-shadow: inset -1px -1px 2px rgba(0,0,0,0.5);
+        }
+
+        /* For the Trap side */
+        .trap-glow {
+            box-shadow: 0 0 20px rgba(147, 0, 10, 0.6);
+            animation: trap-pulse 1s infinite alternate;
+        }
+
+        @keyframes trap-pulse {
+            0% { box-shadow: 0 0 10px rgba(147, 0, 10, 0.3); border-color: #93000a; }
+            100% { box-shadow: 0 0 30px rgba(255, 180, 171, 0.6); border-color: #ffb4ab; }
+        }
+
+        .glitch-text {
+            position: relative;
+            display: inline-block;
+        }
+
+        .glitch-text::before,
+        .glitch-text::after {
+            content: attr(data-text);
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .glitch-text::before {
+            left: 2px;
+            text-shadow: -1px 0 red;
+            clip: rect(24px, 550px, 90px, 0);
+            animation: glitch-anim-2 3s infinite linear alternate-reverse;
+        }
+
+        .glitch-text::after {
+            left: -2px;
+            text-shadow: -1px 0 blue;
+            clip: rect(85px, 550px, 140px, 0);
+            animation: glitch-anim 2.5s infinite linear alternate-reverse;
+        }
+
+        @keyframes glitch-anim {
+            0% { clip: rect(41px, 9999px, 86px, 0); }
+            20% { clip: rect(6px, 9999px, 8px, 0); }
+            40% { clip: rect(15px, 9999px, 90px, 0); }
+            60% { clip: rect(100px, 9999px, 120px, 0); }
+            80% { clip: rect(2px, 9999px, 45px, 0); }
+            100% { clip: rect(33px, 9999px, 88px, 0); }
+        }
+
+        @keyframes glitch-anim-2 {
+            0% { clip: rect(65px, 9999px, 100px, 0); }
+            20% { clip: rect(89px, 9999px, 20px, 0); }
+            40% { clip: rect(10px, 9999px, 40px, 0); }
+            60% { clip: rect(120px, 9999px, 140px, 0); }
+            80% { clip: rect(45px, 9999px, 60px, 0); }
+            100% { clip: rect(15px, 9999px, 30px, 0); }
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="bg-background text-on-background min-h-screen flex flex-col font-body-md overflow-x-hidden selection:bg-primary-container selection:text-on-primary-container">
+<!-- Nav shell is suppressed for this transitional/result screen as per semantic shell mandate -->
+<!-- Content wrapper taking full height -->
+<main class="flex-1 flex flex-col w-full h-full relative z-10 px-margin-mobile md:px-gutter py-margin-mobile pb-24 md:pb-margin-desktop">
+<!-- Header / Navigation Back -->
+<header class="flex justify-center items-center w-full mb-8">
+<img alt="Logo" class="h-24 w-auto drop-shadow-md" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD6OvIDnH_n60_yijBlQ5jYS8Fa2MIr61wC8GQm_IUioxG5eqbiv8inBiZmbeZzMU_mMYVd7CaPHHDkWyN3BHDbcW7JimdYq1kSHL5AVcVRhbmK7Ms-SP6z26sHu2vJhAmV21JZggAkRMJShnMwpVNmlri4YAhIpfjf5upzPeO4R7GE9rCLvPu8YsmrtuA_U8gmU7HrsyQ4GhD-woPnzGRrjTf8YWrOrvXZFsE6dTkr8WElWwewjGPmeJK5MrFj1mI4TQ"/>
+</header>
+<!-- Split Interface Container (Responsive) -->
+<div class="flex-1 w-full max-w-[1280px] mx-auto flex flex-col md:flex-row gap-gutter relative">
+<!-- ENIGMA UNLOCKED SIDE (AMBER) -->
+<div class="flex-1 flex flex-col relative group transition-transform duration-500 hover:scale-[1.02] cursor-pointer" onclick="selectSide('enigma')">
+<!-- Arch Top Decorator -->
+<div class="h-16 w-full bg-surface-container-high border-t-2 border-primary-container arch-top hidden md:block"></div>
+<div class="flex-1 bg-surface-container-high border-l border-r border-b border-outline-variant md:border-t-0 border-t-2 md:rounded-b-xl rounded-xl md:rounded-t-none relative overflow-hidden flex flex-col p-6 lg:p-8">
+<!-- Subtle inner glow -->
+<div class="absolute inset-0 shadow-[inset_0_0_40px_rgba(217,119,7,0.05)] pointer-events-none"></div>
+<!-- Porthole Graphic -->
+<div class="flex justify-center mb-8">
+<div class="porthole-container group-hover:shadow-[0_0_30px_rgba(217,119,7,0.3)] transition-shadow duration-500">
+<!-- Rivets -->
+<div class="porthole-rivet top-2 left-1/2 -translate-x-1/2"></div>
+<div class="porthole-rivet bottom-2 left-1/2 -translate-x-1/2"></div>
+<div class="porthole-rivet left-2 top-1/2 -translate-y-1/2"></div>
+<div class="porthole-rivet right-2 top-1/2 -translate-y-1/2"></div>
+<!-- Inner Content -->
+<div class="absolute inset-2 rounded-full border-2 border-primary-container/30 bg-surface flex items-center justify-center overflow-hidden">
+<span class="material-symbols-outlined text-5xl text-primary-container animate-pulse" style="font-variation-settings: 'FILL' 0;">key</span>
+<!-- Simulated glass reflection -->
+<div class="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent rounded-full rotate-45 pointer-events-none"></div>
+</div>
+</div>
+</div>
+<!-- Header -->
+<div class="text-center mb-8 relative z-10">
+<h2 class="font-headline-xl text-headline-xl text-primary mb-2 group-hover:text-primary-container transition-colors">ENIGMA UNLOCKED</h2>
+<div class="flex items-center justify-center gap-4">
+<div class="h-px w-12 bg-primary-container/50"></div>
+<p class="font-label-sm text-label-sm text-on-surface-variant uppercase tracking-widest">Hydraulic Puzzle Found</p>
+<div class="h-px w-12 bg-primary-container/50"></div>
+</div>
+</div>
+<!-- Mechanical Instructions -->
+<div class="bg-surface/50 border border-outline-variant rounded-lg p-6 mb-8 flex-1">
+<h3 class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface mb-4 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary-container">settings</span>
+                            Valve Alignment Required
+                        </h3>
+<p class="font-body-md text-body-md text-on-surface-variant mb-6">
+                            The primary steam conduit has been isolated. To proceed, balance the hydraulic pressure across all three auxiliary tanks before the boiler overloads.
+                        </p>
+<!-- Mini Gauge Display -->
+<div class="flex justify-between items-end gap-2 px-4">
+<div class="flex flex-col items-center gap-2">
+<div class="w-12 h-32 border border-primary-container rounded-t-full rounded-b-sm p-1 flex flex-col justify-end bg-surface-container-low relative overflow-hidden">
+<div class="w-full h-1/3 bg-primary-container/80 rounded-b-sm shimmer-bg transition-all duration-1000" id="gauge1"></div>
+<div class="absolute top-1/2 w-full h-px bg-error/50 border-t border-dashed border-error"></div>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">TNK-A</span>
+</div>
+<div class="flex flex-col items-center gap-2">
+<div class="w-12 h-32 border border-outline-variant rounded-t-full rounded-b-sm p-1 flex flex-col justify-end bg-surface-container-low relative overflow-hidden">
+<div class="w-full h-2/3 bg-outline-variant/50 rounded-b-sm transition-all duration-1000" id="gauge2"></div>
+<div class="absolute top-1/2 w-full h-px bg-error/50 border-t border-dashed border-error"></div>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">TNK-B</span>
+</div>
+<div class="flex flex-col items-center gap-2">
+<div class="w-12 h-32 border border-outline-variant rounded-t-full rounded-b-sm p-1 flex flex-col justify-end bg-surface-container-low relative overflow-hidden">
+<div class="w-full h-[15%] bg-outline-variant/50 rounded-b-sm transition-all duration-1000" id="gauge3"></div>
+<div class="absolute top-1/2 w-full h-px bg-error/50 border-t border-dashed border-error"></div>
+</div>
+<span class="font-label-sm text-label-sm text-on-surface-variant">TNK-C</span>
+</div>
+</div>
+</div>
+<!-- Action Button -->
+<button class="w-full bg-primary-container text-on-primary-container font-label-sm text-label-sm font-bold py-4 px-6 uppercase tracking-widest flex items-center justify-center gap-3 hover:shadow-[0_0_20px_rgba(217,119,7,0.4)] transition-all duration-300 relative overflow-hidden group/btn rounded-sm">
+<span class="relative z-10">Initiate Sequence</span>
+<span class="material-symbols-outlined relative z-10 group-hover/btn:translate-x-1 transition-transform">arrow_forward</span>
+<!-- Shimmer effect on hover -->
+<div class="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent group-hover/btn:animate-[shimmer_1.5s_infinite]"></div>
+</button>
+<!-- Selection Indicator (Hidden by default, shown via JS) -->
+<div class="absolute top-4 right-4 bg-primary-container text-on-primary-container rounded-full p-1 opacity-0 transition-opacity" id="enigma-selected">
+<span class="material-symbols-outlined text-xl font-bold">check</span>
+</div>
+</div>
+</div>
+<!-- Divider Line (Desktop) -->
+<div class="hidden md:flex flex-col items-center justify-center relative">
+<div class="w-px h-full bg-outline-variant absolute"></div>
+<div class="bg-background border border-outline-variant rounded-full p-3 z-10 shadow-lg">
+<span class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface-variant uppercase italic">Or</span>
+</div>
+</div>
+<!-- Divider Line (Mobile) -->
+<div class="md:hidden flex items-center justify-center relative py-4">
+<div class="h-px w-full bg-outline-variant absolute"></div>
+<div class="bg-background border border-outline-variant rounded-full px-4 py-2 z-10 shadow-lg">
+<span class="font-headline-lg-mobile text-headline-lg-mobile text-on-surface-variant uppercase italic">Or</span>
+</div>
+</div>
+<!-- TRAP TRIGGERED SIDE (SOOTY RED) -->
+<div class="flex-1 flex flex-col relative group transition-transform duration-500 hover:scale-[1.02] cursor-pointer" onclick="selectSide('trap')">
+<!-- Arch Top Decorator - Modified for Trap -->
+<div class="h-16 w-full bg-surface-container-highest border-t-2 border-error arch-top hidden md:block opacity-80"></div>
+<div class="flex-1 bg-surface-container-highest border-l border-r border-b border-outline-variant md:border-t-0 border-t-2 border-t-error md:rounded-b-xl rounded-xl md:rounded-t-none relative overflow-hidden flex flex-col p-6 lg:p-8">
+<!-- Warning stripes background -->
+<div class="absolute inset-0 opacity-5 pointer-events-none" style="background: repeating-linear-gradient(45deg, #000, #000 10px, #ffb4ab 10px, #ffb4ab 20px);"></div>
+<!-- Subtle inner glow red -->
+<div class="absolute inset-0 shadow-[inset_0_0_60px_rgba(147,0,10,0.1)] pointer-events-none"></div>
+<!-- Porthole Graphic (Cracked/Warning) -->
+<div class="flex justify-center mb-8 relative">
+<div class="porthole-container border-error-container group-hover:trap-glow transition-shadow duration-500 bg-surface-container-lowest">
+<!-- Rivets -->
+<div class="porthole-rivet bg-on-surface-variant top-2 left-1/2 -translate-x-1/2"></div>
+<div class="porthole-rivet bg-on-surface-variant bottom-2 left-1/2 -translate-x-1/2"></div>
+<div class="porthole-rivet bg-on-surface-variant left-2 top-1/2 -translate-y-1/2"></div>
+<div class="porthole-rivet bg-on-surface-variant right-2 top-1/2 -translate-y-1/2"></div>
+<!-- Inner Content -->
+<div class="absolute inset-2 rounded-full border-2 border-error/50 bg-error-container/20 flex items-center justify-center overflow-hidden">
+<span class="material-symbols-outlined text-5xl text-error animate-pulse">warning</span>
+<!-- Simulated glass crack -->
+<svg class="absolute inset-0 w-full h-full stroke-on-surface-variant/40" fill="none" viewbox="0 0 100 100">
+<path d="M 20,20 L 50,50 L 80,30 M 50,50 L 60,90 M 50,50 L 10,70" stroke-width="1.5"></path>
+</svg>
+<!-- Simulated glass reflection -->
+<div class="absolute inset-0 bg-gradient-to-tr from-transparent via-white/5 to-transparent rounded-full rotate-45 pointer-events-none"></div>
+</div>
+</div>
+</div>
+<!-- Header -->
+<div class="text-center mb-8 relative z-10">
+<h2 class="font-headline-xl text-headline-xl text-error mb-2 glitch-text" data-text="TRAP TRIGGERED">TRAP TRIGGERED</h2>
+<div class="flex items-center justify-center gap-4">
+<div class="h-px w-12 bg-error/50"></div>
+<p class="font-label-sm text-label-sm text-error uppercase tracking-widest animate-pulse">Critical Pressure Loss</p>
+<div class="h-px w-12 bg-error/50"></div>
+</div>
+</div>
+<!-- Emergency Instructions -->
+<div class="bg-error-container/20 border border-error/30 rounded-lg p-6 mb-8 flex-1 relative overflow-hidden">
+<div class="flex justify-between items-start mb-6">
+<h3 class="font-headline-lg-mobile text-headline-lg-mobile text-on-error-container flex items-center gap-2">
+<span class="material-symbols-outlined text-error">crisis_alert</span>
+                                Seal Breach Detected
+                            </h3>
+<!-- Timer -->
+<div class="bg-surface-container-lowest border border-error/50 px-3 py-1 rounded-sm flex items-center gap-2">
+<span class="material-symbols-outlined text-error text-sm">timer</span>
+<span class="font-label-sm text-label-sm text-error font-bold" id="countdown">02:45</span>
+</div>
+</div>
+<p class="font-body-md text-body-md text-on-surface-variant mb-6">
+                            Hull integrity compromised in Sector 7G. Bypass the primary manifold controls and engage manual overrides to seal the bulkhead before complete depressurization.
+                        </p>
+<!-- Manual Override Switches Display -->
+<div class="grid grid-cols-2 gap-4">
+<div class="bg-surface-container-lowest border border-outline-variant p-3 rounded flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-on-surface-variant">VLV-01</span>
+<div class="w-8 h-4 bg-error-container rounded-full relative">
+<div class="absolute left-0 top-0 w-4 h-4 bg-on-surface-variant rounded-full"></div>
+</div>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant p-3 rounded flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-on-surface-variant">VLV-02</span>
+<div class="w-8 h-4 bg-error-container rounded-full relative">
+<div class="absolute left-0 top-0 w-4 h-4 bg-on-surface-variant rounded-full"></div>
+</div>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant p-3 rounded flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-on-surface-variant">MN-PWR</span>
+<div class="w-8 h-4 bg-error-container rounded-full relative">
+<div class="absolute left-0 top-0 w-4 h-4 bg-on-surface-variant rounded-full"></div>
+</div>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant p-3 rounded flex items-center justify-between">
+<span class="font-label-sm text-label-sm text-on-surface-variant">AUX-PWR</span>
+<div class="w-8 h-4 bg-error-container rounded-full relative">
+<div class="absolute left-0 top-0 w-4 h-4 bg-on-surface-variant rounded-full"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Action Button -->
+<button class="w-full bg-surface-container-lowest border border-error text-error font-label-sm text-label-sm font-bold py-4 px-6 uppercase tracking-widest flex items-center justify-center gap-3 hover:bg-error/10 hover:shadow-[0_0_15px_rgba(255,180,171,0.2)] transition-all duration-300 rounded-sm">
+<span>Engage Manual Override</span>
+<span class="material-symbols-outlined text-xl">build</span>
+</button>
+<!-- Selection Indicator (Hidden by default, shown via JS) -->
+<div class="absolute top-4 right-4 bg-error text-on-error rounded-full p-1 opacity-0 transition-opacity" id="trap-selected">
+<span class="material-symbols-outlined text-xl font-bold">check</span>
+</div>
+</div>
+</div>
+</div>
+</main>
+<script>
+        // Simple countdown logic for the trap side
+        let time = 165; // 2:45 in seconds
+        const countdownEl = document.getElementById('countdown');
+        
+        setInterval(() => {
+            if (time <= 0) return;
+            time--;
+            const minutes = Math.floor(time / 60);
+            const seconds = time % 60;
+            countdownEl.textContent = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            
+            // Pulse effect when time is low
+            if (time < 30) {
+                countdownEl.classList.add('animate-pulse');
+            }
+        }, 1000);
+
+        // Selection interaction
+        function selectSide(side) {
+            const enigmaIndicator = document.getElementById('enigma-selected');
+            const trapIndicator = document.getElementById('trap-selected');
+            
+            // Reset both
+            enigmaIndicator.classList.remove('opacity-100');
+            enigmaIndicator.classList.add('opacity-0');
+            trapIndicator.classList.remove('opacity-100');
+            trapIndicator.classList.add('opacity-0');
+            
+            // Set selected
+            if (side === 'enigma') {
+                enigmaIndicator.classList.remove('opacity-0');
+                enigmaIndicator.classList.add('opacity-100');
+                
+                // Animate gauges slightly to show activation
+                document.getElementById('gauge2').style.height = '50%';
+                document.getElementById('gauge2').classList.add('border', 'border-primary-container', 'shimmer-bg', 'bg-primary-container/80');
+                 document.getElementById('gauge2').parentElement.classList.add('border-primary-container');
+                 document.getElementById('gauge2').parentElement.classList.remove('border-outline-variant');
+
+                 setTimeout(() => {
+                    document.getElementById('gauge3').style.height = '50%';
+                    document.getElementById('gauge3').classList.add('border', 'border-primary-container', 'shimmer-bg', 'bg-primary-container/80');
+                    document.getElementById('gauge3').parentElement.classList.add('border-primary-container');
+                    document.getElementById('gauge3').parentElement.classList.remove('border-outline-variant');
+                 }, 500);
+
+            } else if (side === 'trap') {
+                trapIndicator.classList.remove('opacity-0');
+                trapIndicator.classList.add('opacity-100');
+            }
+        }
+    </script>
+</body></html>

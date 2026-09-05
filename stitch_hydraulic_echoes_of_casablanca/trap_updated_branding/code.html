@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Tidal Trap - Critical Event</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600;700&amp;family=Hanken+Grotesk:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+          darkMode: "class",
+          theme: {
+            extend: {
+              "colors": {
+                      "tertiary": "#f5dece",
+                      "on-tertiary-fixed": "#25190f",
+                      "tertiary-container": "#d8c2b3",
+                      "secondary-fixed": "#d6e3ff",
+                      "secondary": "#b9c7e4",
+                      "inverse-on-surface": "#3b2e24",
+                      "outline": "#9c8f7b",
+                      "primary-fixed": "#ffdea7",
+                      "on-error": "#690005",
+                      "on-secondary": "#233148",
+                      "surface-container-low": "#251910",
+                      "outline-variant": "#4f4535",
+                      "background": "#1c1109",
+                      "secondary-container": "#3c4962",
+                      "on-surface": "#f5decf",
+                      "on-primary-container": "#6d4d00",
+                      "error": "#ffb4ab",
+                      "primary-container": "#f7bd48",
+                      "surface-tint": "#f7bd48",
+                      "primary-fixed-dim": "#f7bd48",
+                      "deep-ocean": "#0a192f",
+                      "on-tertiary": "#3b2e23",
+                      "surface-container-lowest": "#160c05",
+                      "rusty-iron": "#1c1108",
+                      "amber-glow": "#f7bd48",
+                      "on-primary-fixed": "#271900",
+                      "on-error-container": "#ffdad6",
+                      "secondary-fixed-dim": "#b9c7e4",
+                      "tertiary-fixed-dim": "#d9c2b3",
+                      "surface-container": "#291d14",
+                      "surface-dim": "#1c1109",
+                      "inverse-primary": "#7c5800",
+                      "surface": "#1c1109",
+                      "on-secondary-container": "#abb9d6",
+                      "surface-bright": "#45362c",
+                      "surface-container-high": "#34271e",
+                      "on-secondary-fixed-variant": "#39475f",
+                      "error-container": "#93000a",
+                      "on-primary-fixed-variant": "#5e4200",
+                      "on-secondary-fixed": "#0d1c32",
+                      "on-tertiary-container": "#5f4f43",
+                      "on-background": "#f5decf",
+                      "surface-container-highest": "#403228",
+                      "on-tertiary-fixed-variant": "#534438",
+                      "on-primary": "#412d00",
+                      "surface-variant": "#403228",
+                      "primary": "#ffdea6",
+                      "inverse-surface": "#f5decf",
+                      "on-surface-variant": "#d3c4af",
+                      "tertiary-fixed": "#f6dece"
+              },
+              "borderRadius": {
+                      "DEFAULT": "0.125rem",
+                      "lg": "0.25rem",
+                      "xl": "0.5rem",
+                      "full": "0.75rem"
+              },
+              "spacing": {
+                      "margin": "32px",
+                      "panel-gap": "48px",
+                      "gutter": "24px",
+                      "unit": "8px"
+              },
+              "fontFamily": {
+                      "body-md": [
+                              "Hanken Grotesk"
+                      ],
+                      "headline-lg-mobile": [
+                              "EB Garamond"
+                      ],
+                      "headline-lg": [
+                              "EB Garamond"
+                      ],
+                      "label-sm": [
+                              "JetBrains Mono"
+                      ],
+                      "title-md": [
+                              "EB Garamond"
+                      ],
+                      "body-lg": [
+                              "Hanken Grotesk"
+                      ],
+                      "technical-sm": [
+                              "JetBrains Mono"
+                      ],
+                      "display-lg": [
+                              "EB Garamond"
+                      ]
+              },
+              "fontSize": {
+                      "body-md": [
+                              "16px",
+                              {
+                                      "lineHeight": "24px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "headline-lg-mobile": [
+                              "28px",
+                              {
+                                      "lineHeight": "36px",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "headline-lg": [
+                              "32px",
+                              {
+                                      "lineHeight": "40px",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "label-sm": [
+                              "12px",
+                              {
+                                      "lineHeight": "16px",
+                                      "letterSpacing": "0.08em",
+                                      "fontWeight": "500"
+                              }
+                      ],
+                      "title-md": [
+                              "20px",
+                              {
+                                      "lineHeight": "28px",
+                                      "letterSpacing": "0.1em",
+                                      "fontWeight": "600"
+                              }
+                      ],
+                      "body-lg": [
+                              "18px",
+                              {
+                                      "lineHeight": "28px",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "technical-sm": [
+                              "11px",
+                              {
+                                      "lineHeight": "14px",
+                                      "letterSpacing": "0.1em",
+                                      "fontWeight": "400"
+                              }
+                      ],
+                      "display-lg": [
+                              "48px",
+                              {
+                                      "lineHeight": "56px",
+                                      "letterSpacing": "-0.02em",
+                                      "fontWeight": "600"
+                              }
+                      ]
+              }
+            }
+          }
+        }
+    </script>
+<style>
+        body {
+            background-image: url('data:image/svg+xml;utf8,<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><filter id="noiseFilter"><feTurbulence type="fractalNoise" baseFrequency="0.65" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(%23noiseFilter)" opacity="0.05"/></svg>');
+            background-color: theme('colors.background');
+        }
+        
+        .arch-top {
+            clip-path: path('M 0 40 Q 50 0 100 0 T 200 40 L 200 200 L 0 200 Z');
+        }
+
+        @keyframes flicker {
+            0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% { opacity: 1; }
+            20%, 22%, 24%, 55% { opacity: 0.3; }
+        }
+        .flicker-alert {
+            animation: flicker 2s infinite;
+        }
+
+        .heat-pipe-fill {
+            background: linear-gradient(90deg, theme('colors.error') 0%, theme('colors.primary-container') 50%, theme('colors.error') 100%);
+            background-size: 200% 100%;
+            animation: shimmer 2s infinite linear;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 100% 0; }
+            100% { background-position: -100% 0; }
+        }
+
+        .glass-panel {
+            backdrop-filter: blur(12px);
+            background: rgba(10, 25, 47, 0.6);
+            border-top: 2px solid theme('colors.primary-container');
+            border-left: 1px solid theme('colors.outline-variant');
+            border-right: 1px solid theme('colors.outline-variant');
+            border-bottom: 1px solid theme('colors.outline-variant');
+            box-shadow: inset 0 0 20px rgba(247, 189, 72, 0.05);
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="text-on-surface font-body-md min-h-screen flex flex-col relative overflow-hidden">
+<!-- Ambient Overlay for heat -->
+<div class="pointer-events-none fixed inset-0 bg-error/5 mix-blend-overlay z-0"></div>
+<!-- MAIN CONTENT CANVAS -->
+<main class="flex-1 flex flex-col relative z-10 px-4 md:px-margin pt-6 pb-24 gap-6 max-w-md mx-auto w-full">
+<!-- Header / Warning -->
+<div class="flex flex-col items-center text-center gap-2 mt-4"><div class="w-24 h-24 mb-4 mix-blend-luminosity">
+<img alt="ADE Logo" class="w-full h-full object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD2g0dkiLpG2HcAqv0UmFk-VkBujMuP36skXXOkxigBDfDA8NHMnBaTklx9PpsQiH9ON7LWVgrdMGY_WCYLtWO-0RJx-WcVLWrxVpuhS9fBwWsLSxrcfLqWHFk4ZRbNm31Ud52Rt3u23uLsXTF91HML103GI49tDAYwvlL34pGxbRxwwG0KwPeYaYc1cyrH_4u-DvHdi9eAV4aoOKxW6fzGFsOZzZlkrGuuEfe3i3of2gXVs6nteLX8RClY5SWMb0G2mQ"/>
+</div>
+<div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-error-container border border-error/50 flicker-alert shadow-[0_0_15px_rgba(255,180,171,0.3)]">
+<span class="material-symbols-outlined text-on-error-container font-variation-settings: 'FILL' 1;">warning</span>
+<span class="font-label-sm text-label-sm text-on-error-container tracking-widest">CRITICAL PRESSURE BREACH</span>
+</div>
+<h1 class="font-headline-xl text-headline-xl text-on-surface mt-2 drop-shadow-md">Tidal Trap</h1>
+<div class="font-label-md text-label-md text-outline flex items-center gap-2">
+<span>SECTOR 4</span>
+<span class="w-1 h-1 rounded-full bg-outline"></span>
+<span>VAULT SECURE</span>
+</div></div>
+<!-- Timer -->
+<div class="flex justify-center my-4">
+<div class="glass-panel px-8 py-4 rounded-xl flex flex-col items-center justify-center border-t-error"><span class="font-label-sm text-label-sm text-error uppercase mb-1">Time Remaining</span>
+<span class="font-headline-xl text-6xl text-error font-bold tracking-widest drop-shadow-[0_0_8px_rgba(255,180,171,0.5)]">02:00</span></div>
+</div>
+<!-- Visualization -->
+<div class="relative w-full aspect-square rounded-2xl overflow-hidden glass-panel border-t-2 border-t-error p-1">
+<div class="absolute inset-1 rounded-xl overflow-hidden bg-surface-container-lowest">
+<!-- Background texture -->
+<div class="absolute inset-0 bg-[url('placeholder')] bg-cover bg-center opacity-40 mix-blend-luminosity" data-alt="A dark, industrial cross-section of a submerged coastal vault, heavily textured with oxidized rusty iron. The space is claustrophobic, illuminated by harsh, flickering amber and red emergency lighting. Water is visibly rising, creating a tense, high-pressure mechanical atmosphere. Victorian brass pipes line the walls."></div>
+<!-- Water Level -->
+<div class="absolute bottom-0 left-0 right-0 h-[60%] bg-deep-ocean/80 backdrop-blur-sm border-t border-secondary-fixed-dim transition-all duration-1000 ease-in-out relative flex items-start justify-center pt-4">
+<!-- Water surface distortion -->
+<div class="absolute top-0 left-0 right-0 h-4 bg-gradient-to-b from-secondary/20 to-transparent"></div>
+<!-- Submerged elements hint -->
+<span class="material-symbols-outlined text-secondary/30 text-6xl mt-8">water_drop</span>
+</div>
+<!-- Overlay Gauges -->
+<div class="absolute top-4 left-4 flex flex-col gap-2">
+<div class="bg-surface/80 border border-outline-variant rounded px-2 py-1 flex items-center gap-2">
+<span class="material-symbols-outlined text-error text-sm font-variation-settings: 'FILL' 1;">speed</span>
+<span class="font-technical-sm text-technical-sm text-error">98% CAP</span>
+</div>
+</div>
+<div class="absolute top-4 right-4 flex flex-col gap-2">
+<div class="bg-surface/80 border border-outline-variant rounded px-2 py-1 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary-container text-sm">thermostat</span>
+<span class="font-technical-sm text-technical-sm text-primary-container">TEMP HI</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Controls Area -->
+<div class="glass-panel p-4 rounded-xl flex flex-col gap-6 mt-2 relative">
+<!-- Decor rivets -->
+<div class="absolute top-2 left-2 w-2 h-2 rounded-full bg-surface-container-highest border border-outline-variant"></div>
+<div class="absolute top-2 right-2 w-2 h-2 rounded-full bg-surface-container-highest border border-outline-variant"></div>
+<div class="absolute bottom-2 left-2 w-2 h-2 rounded-full bg-surface-container-highest border border-outline-variant"></div>
+<div class="absolute bottom-2 right-2 w-2 h-2 rounded-full bg-surface-container-highest border border-outline-variant"></div>
+<div class="flex items-center justify-between px-2 pt-2">
+<span class="font-headline-lg text-headline-lg text-primary">HYDRAULIC RELAYS</span>
+<span class="font-technical-sm text-technical-sm text-outline-variant">SEQ REQ</span>
+</div>
+<!-- Toggles Grid -->
+<div class="grid grid-cols-4 gap-3">
+<!-- Toggle 1 -->
+<button class="flex flex-col items-center gap-3 group">
+<div class="font-technical-sm text-technical-sm text-outline-variant mb-1">LVL-01</div>
+<div class="w-8 h-16 bg-surface-container-low border border-outline-variant rounded-full relative shadow-inner">
+<div class="absolute bottom-1 left-1 right-1 h-7 bg-surface-variant rounded-full border border-outline transition-all duration-300 group-hover:bg-primary-container group-hover:border-primary-container group-hover:shadow-[0_0_10px_rgba(247,189,72,0.5)]"></div>
+</div>
+</button>
+<!-- Toggle 2 -->
+<button class="flex flex-col items-center gap-3 group">
+<div class="font-technical-sm text-technical-sm text-outline-variant mb-1">LVL-02</div>
+<div class="w-8 h-16 bg-surface-container-low border border-outline-variant rounded-full relative shadow-inner">
+<div class="absolute top-1 left-1 right-1 h-7 bg-primary-container rounded-full border border-primary-container shadow-[0_0_10px_rgba(247,189,72,0.5)] transition-all duration-300"></div>
+</div>
+</button>
+<!-- Toggle 3 -->
+<button class="flex flex-col items-center gap-3 group">
+<div class="font-technical-sm text-technical-sm text-outline-variant mb-1">LVL-03</div>
+<div class="w-8 h-16 bg-surface-container-low border border-outline-variant rounded-full relative shadow-inner">
+<div class="absolute bottom-1 left-1 right-1 h-7 bg-surface-variant rounded-full border border-outline transition-all duration-300 group-hover:bg-primary-container group-hover:border-primary-container group-hover:shadow-[0_0_10px_rgba(247,189,72,0.5)]"></div>
+</div>
+</button>
+<!-- Toggle 4 -->
+<button class="flex flex-col items-center gap-3 group">
+<div class="font-technical-sm text-technical-sm text-outline-variant mb-1">LVL-04</div>
+<div class="w-8 h-16 bg-surface-container-low border border-outline-variant rounded-full relative shadow-inner">
+<div class="absolute bottom-1 left-1 right-1 h-7 bg-surface-variant rounded-full border border-outline transition-all duration-300 group-hover:bg-primary-container group-hover:border-primary-container group-hover:shadow-[0_0_10px_rgba(247,189,72,0.5)]"></div>
+</div>
+</button>
+</div>
+<!-- Action Button -->
+<button class="w-full py-4 rounded-lg bg-deep-ocean border border-error text-error text-label-sm flex items-center justify-center gap-2 hover:bg-error hover:text-on-error transition-colors duration-300 group shadow-[0_0_15px_rgba(255,180,171,0.1)] hover:shadow-[0_0_20px_rgba(255,180,171,0.4)] font-label-md">
+<span class="material-symbols-outlined font-variation-settings: 'FILL' 1; group-hover:animate-pulse">valve</span>
+                MANUAL PUMP PURGE
+            </button>
+</div>
+</main>
+</body></html>

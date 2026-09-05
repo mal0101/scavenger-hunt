@@ -46,26 +46,34 @@ export async function POST(request: NextRequest) {
       const activeRound = round_id ?? index.round_id;
       if (!activeRound) continue;
 
+      const qrCode = await db.qrCode.upsert({
+        where: { index_id_round_id: { index_id: index.id, round_id: activeRound } },
+        update: {},
+        create: {
+          index_id: index.id,
+          game_id,
+          round_id: activeRound,
+          points: index.points,
+          pool_value: index.points,
+        },
+      });
+
+      const base = {
+        index_id: index.id,
+        code_id: qrCode.id,
+        label: index.label,
+        points: index.points,
+        pool_value: qrCode.pool_value,
+        status: qrCode.status,
+        location_name: index.location_name,
+      };
+
       if (format === "svg") {
-        const svg = await generateQrSvg(index.id, game_id, activeRound);
-        generated.push({
-          index_id: index.id,
-          label: index.label,
-          points: index.points,
-          location_name: index.location_name,
-          format: "svg",
-          svg,
-        });
+        const svg = await generateQrSvg(index.id, game_id, activeRound, qrCode.id);
+        generated.push({ ...base, format: "svg", svg });
       } else {
-        const dataUrl = await generateQrImage(index.id, game_id, activeRound);
-        generated.push({
-          index_id: index.id,
-          label: index.label,
-          points: index.points,
-          location_name: index.location_name,
-          format: "png",
-          data_url: dataUrl,
-        });
+        const dataUrl = await generateQrImage(index.id, game_id, activeRound, qrCode.id);
+        generated.push({ ...base, format: "png", data_url: dataUrl });
       }
     }
 

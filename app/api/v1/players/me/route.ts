@@ -11,8 +11,18 @@ export async function GET(request: NextRequest) {
     const player = await db.player.findUnique({
       where: { user_id: auth.sub },
       include: {
-        user: { select: { id: true, nickname: true, role: true } },
-        team: { select: { id: true, name: true, invite_code: true, total_score: true } },
+        user: { select: { id: true, username: true, nickname: true, role: true } },
+        team: {
+          select: {
+            id: true,
+            name: true,
+            invite_code: true,
+            total_score: true,
+            eliminated: true,
+            captain_id: true,
+            game_id: true,
+          },
+        },
       },
     });
 
@@ -21,10 +31,14 @@ export async function GET(request: NextRequest) {
     }
 
     return apiSuccess({
-      id: player.user.id,
+      id: player.id,
+      user_id: player.user.id,
+      username: player.user.username,
       nickname: player.user.nickname,
       role: player.user.role,
+      game_id: player.game_id,
       total_score: player.total_score,
+      status: player.status,
       team: player.team,
     });
   } catch (error) {

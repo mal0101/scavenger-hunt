@@ -32,32 +32,26 @@ enum PlayerStatus {
   ELIMINATED
 }
 
+enum QrStatus {
+  ACTIVE
+  DEPLETED
+}
+
 // ── Tables ─────────────────────────────────────────────
 
 model User {
-  id           String   @id @default(uuid())
-  phone_number String   @unique
-  nickname     String?
-  role         UserRole @default(PLAYER)
-  created_at   DateTime @default(now())
-  updated_at   DateTime @updatedAt
+  id            String   @id @default(uuid())
+  username      String   @unique
+  password_hash String
+  phone_number  String?
+  nickname      String?
+  role          UserRole @default(PLAYER)
+  created_at    DateTime @default(now())
+  updated_at    DateTime @updatedAt
 
   player Player?
 
   @@map("users")
-}
-
-model OTP {
-  id           String   @id @default(uuid())
-  phone_number String
-  code         String
-  expires_at   DateTime
-  used         Boolean  @default(false)
-  attempts     Int      @default(0)
-  created_at   DateTime @default(now())
-
-  @@index([phone_number, used])
-  @@map("otps")
 }
 
 model Game {
@@ -79,6 +73,7 @@ model Game {
   players Player[]
   teams   Team[]
   indexes Index[]
+  qrCodes QrCode[]
 
   @@index([status])
   @@map("games")
@@ -94,6 +89,7 @@ model Round {
 
   game    Game    @relation(fields: [game_id], references: [id], onDelete: Cascade)
   indexes Index[]
+  qrCodes QrCode[]
 
   @@unique([game_id, round_number])
   @@index([game_id, status])
@@ -113,9 +109,10 @@ model Index {
   enigma_type   String?
   created_at    DateTime @default(now())
 
-  game   Game    @relation(fields: [game_id], references: [id], onDelete: Cascade)
-  round  Round?  @relation(fields: [round_id], references: [id], onDelete: SetNull)
-  scans  Scan[]
+  game    Game     @relation(fields: [game_id], references: [id], onDelete: Cascade)
+  round   Round?   @relation(fields: [round_id], references: [id], onDelete: SetNull)
+  scans   Scan[]
+  qrCodes QrCode[]
 
   @@index([game_id])
   @@map("indexes")
@@ -127,14 +124,14 @@ model Player {
   game_id     String
   team_id     String?
   total_score Int          @default(0)
-  rank        Int?
   status      PlayerStatus @default(ACTIVE)
   joined_at   DateTime     @default(now())
 
-  user   User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  game   Game   @relation(fields: [game_id], references: [id], onDelete: Cascade)
-  team   Team?  @relation(fields: [team_id], references: [id], onDelete: SetNull)
-  scans  Scan[]
+  user        User   @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  game        Game   @relation(fields: [game_id], references: [id], onDelete: Cascade)
+  team        Team?  @relation("TeamMembers", fields: [team_id], references: [id], onDelete: SetNull)
+  captainTeams Team[] @relation("TeamCaptain")
+  scans       Scan[]
 
   @@map("players")
 }
@@ -146,14 +143,37 @@ model Team {
   game_id     String
   total_score Int      @default(0)
   eliminated  Boolean  @default(false)
+  captain_id  String?  @unique
   created_at  DateTime @default(now())
 
   game    Game     @relation(fields: [game_id], references: [id], onDelete: Cascade)
-  players Player[]
+  players Player[] @relation("TeamMembers")
   scans   Scan[]
+  captain Player?  @relation("TeamCaptain", fields: [captain_id], references: [id], onDelete: SetNull)
 
   @@index([game_id])
   @@map("teams")
+}
+
+model QrCode {
+  id               String    @id @default(uuid())
+  index_id         String
+  game_id          String
+  round_id         String
+  points           Int
+  pool_value       Int
+  status           QrStatus  @default(ACTIVE)
+  first_scanned_at DateTime?
+  created_at       DateTime  @default(now())
+
+  index Index @relation(fields: [index_id], references: [id], onDelete: Cascade)
+  game  Game  @relation(fields: [game_id], references: [id], onDelete: Cascade)
+  round Round @relation(fields: [round_id], references: [id], onDelete: Cascade)
+
+  @@unique([index_id, round_id])
+  @@index([game_id])
+  @@index([round_id])
+  @@map("qr_codes")
 }
 
 model Scan {

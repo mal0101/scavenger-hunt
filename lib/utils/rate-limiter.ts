@@ -21,18 +21,11 @@ export const generalLimiter = new Ratelimit({
   prefix: "ratelimit:general",
 });
 
-export const otpLimiter = new Ratelimit({
+export const loginLimiter = new Ratelimit({
   redis,
-  limiter: Ratelimit.slidingWindow(5, "1 h"),
+  limiter: Ratelimit.slidingWindow(10, "5 m"),
   analytics: !isDev,
-  prefix: "ratelimit:otp",
-});
-
-export const otpVerifyLimiter = new Ratelimit({
-  redis,
-  limiter: Ratelimit.slidingWindow(5, "5 m"),
-  analytics: !isDev,
-  prefix: "ratelimit:otp-verify",
+  prefix: "ratelimit:login",
 });
 
 export const scanLimiter = new Ratelimit({

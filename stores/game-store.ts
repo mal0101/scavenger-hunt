@@ -10,7 +10,7 @@ interface Team {
 
 interface Player {
   id: string;
-  phone_number: string;
+  username: string;
   nickname: string | null;
   role: "PLAYER" | "MENTOR";
   team: Team | null;

@@ -1,21 +1,31 @@
 import { expect, type Page } from "@playwright/test";
 import { test } from "../fixtures/base";
 import { loginAs, api } from "../helpers/auth";
+import { createUser } from "../helpers/db";
 import {
   getActiveGame,
   getRoundForGame,
   getIndexesForGame,
+  getQrCodeForIndex,
   resetActiveRoundClock,
 } from "../helpers/db";
 import { createQrPayload, encodeQrPayload } from "../helpers/qr";
 
+const SUF = Date.now().toString(36);
+const PW = "TestPass_2026!";
 // Two distinct players in two distinct teams, one per browser context/session.
-const A = "+212699910021";
-const B = "+212699910022";
+const A = `qa_sse_a_${SUF}`;
+const B = `qa_sse_b_${SUF}`;
 const TEAM_A = `QA-SSE-Alpha-${Date.now()}`;
 const TEAM_B = `QA-SSE-Beta-${Date.now()}`;
 
-let createdPhones: string[] = [];
+let createdUsernames: string[] = [];
+
+async function authPlayer(page: Page, username: string): Promise<void> {
+  await createUser(username, PW);
+  await loginAs(page, username, PW);
+  createdUsernames.push(username);
+}
 
 async function joinTeam(page: Page, name: string): Promise<void> {
   const res = await api<{ success: boolean }>(page, "/api/v1/players/me/team", {
@@ -42,10 +52,10 @@ async function teamScore(page: Page, teamName: string): Promise<number> {
 }
 
 test.afterAll(async () => {
-  if (createdPhones.length === 0) return;
+  if (createdUsernames.length === 0) return;
   const mod = await import("../helpers/db");
-  await mod.cleanupUsers(createdPhones);
-  createdPhones = [];
+  await mod.cleanupUsers(createdUsernames);
+  createdUsernames = [];
 });
 
 test.describe("SSE live updates", () => {
@@ -64,12 +74,12 @@ test.describe("SSE live updates", () => {
     const game = await getActiveGame();
     const round = await getRoundForGame(game.id, game.current_round);
     const indexes = await getIndexesForGame(game.id, round.id);
-    const index = indexes[0];
+    // Single-claim seeded codes: index 0/1 are reserved by scan.spec.
+    const index = indexes[2];
+    const qrCode = await getQrCodeForIndex(index.id, round.id);
 
-    await loginAs(pageA, A);
-    createdPhones.push(A);
-    await loginAs(pageB, B);
-    createdPhones.push(B);
+    await authPlayer(pageA, A);
+    await authPlayer(pageB, B);
     await joinTeam(pageA, TEAM_A);
     await joinTeam(pageB, TEAM_B);
 
@@ -90,7 +100,7 @@ test.describe("SSE live updates", () => {
     // Use A's session (cookies in ctxA) to scan a checkpoint: this awards
     // points to team A and, on the very next leaderboard SSE poll, B's board
     // must show the higher score — with no reload/navigation.
-    const payload = encodeQrPayload(createQrPayload(index.id, game.id, round.id));
+    const payload = encodeQrPayload(createQrPayload(index.id, game.id, round.id, qrCode.id));
     const res = await api<{ success: boolean; data?: { points_earned: number } }>(
       pageA,
       `/api/v1/games/${game.id}/scan`,
@@ -126,8 +136,7 @@ test.describe("SSE live updates", () => {
     collect(page);
     await ctxB.newPage();
 
-    await loginAs(page, A);
-    createdPhones.push(A);
+    await authPlayer(page, A);
 
     await page.goto("/leaderboard");
     await expect(page.getByRole("heading", { name: "Live Leaderboard" })).toBeVisible();

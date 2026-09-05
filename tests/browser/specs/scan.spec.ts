@@ -1,19 +1,38 @@
 import { expect, type Page } from "@playwright/test";
 import { test } from "../fixtures/base";
 import { loginAs, api } from "../helpers/auth";
-import { getActiveGame, getRoundForGame, getIndexesForGame } from "../helpers/db";
+import {
+  getActiveGame,
+  getRoundForGame,
+  getIndexesForGame,
+  getQrCodeForIndex,
+  createUser,
+} from "../helpers/db";
 import { createQrPayload, encodeQrPayload, qrDataUrl } from "../helpers/qr";
 import { syntheticCameraInitScript } from "../helpers/camera";
 
-const P1 = "+212699910010";
-const P2 = "+212699910011";
-let createdPhones: string[] = [];
+const SUF = Date.now().toString(36);
+const PW = "TestPass_2026!";
+const P1 = `qa_scan_p1_${SUF}`;
+const P2 = `qa_scan_p2_${SUF}`;
+let createdUsernames: string[] = [];
+
+// The seeded game's QR codes are single-claim, so every scan test grabs a
+// distinct index to never collide with a sibling spec's claim.
+const INDEX_FULL_SCAN = 0;
+const INDEX_DEPLETED = 1;
+
+async function authPlayer(page: Page, username: string): Promise<void> {
+  await createUser(username, PW);
+  await loginAs(page, username, PW);
+  createdUsernames.push(username);
+}
 
 test.afterAll(async () => {
-  if (createdPhones.length === 0) return;
+  if (createdUsernames.length === 0) return;
   const mod = await import("../helpers/db");
-  await mod.cleanupUsers(createdPhones);
-  createdPhones = [];
+  await mod.cleanupUsers(createdUsernames);
+  createdUsernames = [];
 });
 
 interface IndexRow {
@@ -26,13 +45,19 @@ interface ScanFixture {
   gameId: string;
   roundId: string;
   index: IndexRow;
+  codeId: string;
 }
 
-async function setup(): Promise<ScanFixture> {
+async function setup(indexOffset: number): Promise<ScanFixture> {
   const game = await getActiveGame();
   const round = await getRoundForGame(game.id, game.current_round);
   const indexes = await getIndexesForGame(game.id, round.id);
-  return { gameId: game.id, roundId: round.id, index: indexes[0] };
+  if (indexes.length <= indexOffset) {
+    throw new Error(`Seeded game has no index at offset ${indexOffset}`);
+  }
+  const index = indexes[indexOffset];
+  const qrCode = await getQrCodeForIndex(index.id, round.id);
+  return { gameId: game.id, roundId: round.id, index, codeId: qrCode.id };
 }
 
 /** Verify + team so the scanner has a team to award points to. */
@@ -52,13 +77,12 @@ test.describe("QR camera scan", () => {
     page,
     context,
   }) => {
-    const { gameId, roundId, index } = await setup();
-    await loginAs(page, P1);
-    createdPhones.push(P1);
+    const { gameId, roundId, index, codeId } = await setup(INDEX_FULL_SCAN);
+    await authPlayer(page, P1);
     await joinTeam(page);
 
     // Forge a valid signed payload and render it in the synthetic camera.
-    const encoded = encodeQrPayload(createQrPayload(index.id, gameId, roundId));
+    const encoded = encodeQrPayload(createQrPayload(index.id, gameId, roundId, codeId));
     const url = await qrDataUrl(encoded);
     await context.addInitScript(syntheticCameraInitScript(url));
 
@@ -81,7 +105,7 @@ test.describe("QR camera scan", () => {
       scan_id: string;
     };
     expect(result.index_label).toBe(index.label);
-    expect(Number(result.points_earned)).toBeGreaterThan(0);
+    expect(Number(result.points_earned)).toBe(index.points);
 
     // Result page UI carries the index label.
     await expect(page.getByText(index.label).first()).toBeVisible();
@@ -103,14 +127,13 @@ test.describe("QR camera scan", () => {
   });
 
   test("tampered QR shows an error banner and stays on the scanner", async ({ page, context }) => {
-    const { gameId, roundId, index } = await setup();
-    await loginAs(page, P2);
-    createdPhones.push(P2);
+    const { gameId, roundId, index, codeId } = await setup(INDEX_FULL_SCAN);
+    await authPlayer(page, P2);
     await joinTeam(page);
 
-    const badOtp = createQrPayload(index.id, gameId, roundId);
-    badOtp.signature = "0".repeat(64);
-    const encoded = encodeQrPayload(badOtp);
+    const badPayload = createQrPayload(index.id, gameId, roundId, codeId);
+    badPayload.signature = "0".repeat(64);
+    const encoded = encodeQrPayload(badPayload);
     const url = await qrDataUrl(encoded);
     await context.addInitScript(syntheticCameraInitScript(url));
 
@@ -123,8 +146,7 @@ test.describe("QR camera scan", () => {
   });
 
   test("unavailable camera surfaces actionable UX and does not crash", async ({ page }) => {
-    await loginAs(page, P1);
-    createdPhones.push(P1);
+    await authPlayer(page, P1);
     await page.goto("/scan");
 
     // No fake-stream injection: the real (permissionless/device-less) camera
@@ -135,5 +157,32 @@ test.describe("QR camera scan", () => {
       timeout: 15000,
     });
     expect(new URL(page.url()).pathname).toBe("/scan");
+  });
+
+  test("a re-scanned (depleted) QR is rejected as already claimed", async ({
+    page,
+    context,
+  }) => {
+    const { gameId, roundId, index, codeId } = await setup(INDEX_DEPLETED);
+    await authPlayer(page, P1);
+    await joinTeam(page);
+
+    const encoded = encodeQrPayload(createQrPayload(index.id, gameId, roundId, codeId));
+    const url = await qrDataUrl(encoded);
+    await context.addInitScript(syntheticCameraInitScript(url));
+
+    // First scan claims the code and awards full points.
+    await page.goto("/scan");
+    await page.getByRole("button", { name: "Start Scanner" }).click();
+    await page.waitForURL("**/scan-result?type=*&data=*", { timeout: 45000 });
+
+    // Second scan of the same code: the server must report it as fully claimed.
+    const res = await api<{ success: boolean; error?: string }>(
+      page,
+      `/api/v1/games/${gameId}/scan`,
+      { method: "POST", body: { qr_data: encoded } }
+    );
+    expect(res.json.success).toBe(false);
+    expect(res.json.error).toBe("QR_DEPLETED");
   });
 });

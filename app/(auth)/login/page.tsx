@@ -1,140 +1,129 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense } from "react";
 import { apiFetch } from "@/lib/api-client";
-
-const PHONE_REGEX = /^\+?[0-9]{10,15}$/;
 
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirect = searchParams.get("redirect") || "/dock";
-  const [phoneNumber, setPhoneNumber] = useState("");
+  const redirect = searchParams.get("redirect") ?? "/dock";
+
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
-  async function handleSendOtp(e: React.FormEvent) {
+  async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
+    setError(null);
 
-    if (!PHONE_REGEX.test(phoneNumber.replace(/[\s-]/g, ""))) {
-      setError("Enter a valid phone number (digits only, 10-15 characters, optional + prefix).");
+    if (username.trim().length < 3) {
+      setError("Username must be at least 3 characters.");
+      return;
+    }
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
       return;
     }
 
     setLoading(true);
-    setError("");
-
     try {
-      const j = await apiFetch<{ success: boolean; message?: string }>("/api/v1/auth/send-otp", {
+      const res = await apiFetch<{
+        success: boolean;
+        message: string;
+        data?: { user?: { role?: string } };
+      }>("/api/v1/auth/login", {
         method: "POST",
-        body: { phone_number: phoneNumber.replace(/[\s-]/g, "") },
+        body: { username: username.trim(), password },
       });
 
-      if (!j.success) {
-        setError(j.message || "Failed to send OTP");
+      if (!res.success || !res.data?.user) {
+        setError(res.message || "Invalid username or password.");
         return;
       }
 
-      router.push(
-        `/verify?phone=${encodeURIComponent(phoneNumber.replace(/[\s-]/g, ""))}&redirect=${encodeURIComponent(redirect)}`
-      );
+      const role = res.data.user.role;
+      router.push(role === "MENTOR" ? "/mentor/dashboard" : redirect);
+      router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Network error. Please try again.");
+      console.error("Login error:", err);
+      setError("Unable to sign in. Check your credentials and try again.");
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <div className="space-y-8">
-      {/* Logo */}
-      <div className="flex flex-col items-center space-y-4">
-        <div className="w-20 h-20 rounded-full bg-primary-container border-4 border-secondary-container flex items-center justify-center shadow-[0_0_30px_rgba(217,119,7,0.3)]">
-          <span
-            className="material-symbols-outlined text-on-primary-container text-4xl"
-            style={{ fontVariationSettings: "'FILL' 1" }}
-          >
-            compass_calibration
-          </span>
-        </div>
-        <div className="text-center">
-          <h1 className="font-headline text-headline-lg-mobile text-on-surface">
-            Aether Compass
-          </h1>
-          <p className="font-label text-label-sm text-on-surface-variant uppercase tracking-widest mt-1">
-            Scavenger Hunt Platform
-          </p>
-        </div>
+    <div className="glass-panel rounded-2xl p-8 border border-outline-variant/40 shadow-xl">
+      <div className="mb-6 text-center">
+        <span className="material-symbols-outlined text-primary text-5xl animate-flicker-amber inline-block">
+          explore
+        </span>
+        <h1 className="font-headline text-headline-xl text-on-surface mt-3">
+          Aether Compass
+        </h1>
+        <p className="font-label text-label-sm text-on-surface-variant uppercase tracking-widest mt-2">
+          Begin Descent
+        </p>
       </div>
 
-      {/* Login Card */}
-      <div className="glass-panel arch-top rounded-xl p-8 space-y-6">
-        <div className="text-center space-y-1">
-          <h2 className="font-headline text-headline-lg-mobile text-on-surface">
-            Begin Descent
-          </h2>
-          <p className="font-body text-body-md text-on-surface-variant">
-            Enter your phone number to receive a verification code
-          </p>
+      <form onSubmit={handleLogin} className="space-y-4">
+        <div>
+          <label
+            htmlFor="username"
+            className="font-label text-label-sm text-on-surface-variant uppercase tracking-widest"
+          >
+            Username
+          </label>
+          <input
+            id="username"
+            type="text"
+            autoComplete="username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            placeholder="Your callsign"
+            className="mt-1 w-full bg-surface-container-low border border-outline-variant/50 rounded-lg px-4 py-3 font-body text-body-md text-on-surface focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/40"
+          />
         </div>
 
-        <form onSubmit={handleSendOtp} className="space-y-4">
-          <div className="space-y-2">
-            <label
-              htmlFor="phone"
-              className="font-label text-label-sm text-primary uppercase tracking-widest block"
-            >
-              Phone Number
-            </label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant text-xl">
-                phone
-              </span>
-              <input
-                id="phone"
-                type="tel"
-                placeholder="+212 6XX XXX XXX"
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                required
-                className="w-full pl-12 pr-4 py-3 bg-surface-container-low border border-outline-variant rounded-lg font-label text-body-md text-on-surface placeholder:text-outline focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all"
-              />
-            </div>
+        <div>
+          <label
+            htmlFor="password"
+            className="font-label text-label-sm text-on-surface-variant uppercase tracking-widest"
+          >
+            Password
+          </label>
+          <input
+            id="password"
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            className="mt-1 w-full bg-surface-container-low border border-outline-variant/50 rounded-lg px-4 py-3 font-body text-body-md text-on-surface focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/40"
+          />
+        </div>
+
+        {error && (
+          <div
+            role="alert"
+            className="bg-error-container/20 border border-error/40 text-error font-body text-body-sm rounded-lg px-3 py-2"
+          >
+            {error}
           </div>
+        )}
 
-          {error && (
-            <div className="bg-error-container/20 border border-error/30 rounded-lg p-3">
-              <p className="font-label text-label-sm text-error">{error}</p>
-            </div>
-          )}
+        <button
+          type="submit"
+          disabled={loading}
+          className="w-full px-4 py-3 bg-primary rounded-lg font-label text-label-md font-bold uppercase tracking-widest text-on-primary hover:bg-primary-container hover:text-primary transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_20px_rgba(217,119,7,0.25)]"
+        >
+          {loading ? "Signing in..." : "Sign In"}
+        </button>
+      </form>
 
-          <button
-            type="submit"
-            disabled={loading || !phoneNumber}
-            className="w-full py-3 bg-primary-container text-on-primary-container font-label text-label-sm font-bold uppercase tracking-widest rounded-lg hover:shadow-[0_0_20px_rgba(217,119,7,0.4)] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-          >
-            {loading ? (
-              <>
-                <span className="material-symbols-outlined text-lg animate-spin">
-                  progress_activity
-                </span>
-                Transmitting...
-              </>
-            ) : (
-              <>
-                <span className="material-symbols-outlined text-lg">
-                  send
-                </span>
-                Send Verification Code
-              </>
-            )}
-          </button>
-        </form>
-      </div>
-
-      <p className="text-center font-label text-label-sm text-outline">
+      <p className="font-label text-label-sm text-on-surface-variant text-center mt-6">
         ENSAM Casablanca — Kick-Off Week 2026
       </p>
     </div>
@@ -143,15 +132,7 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="flex items-center justify-center min-h-dvh">
-          <span className="material-symbols-outlined text-primary text-4xl animate-spin">
-            progress_activity
-          </span>
-        </div>
-      }
-    >
+    <Suspense fallback={null}>
       <LoginForm />
     </Suspense>
   );

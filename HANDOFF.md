@@ -1,8 +1,13 @@
-# Scavenger-Hunt — Handoff: Test Suite Status, Fixes & How to Run Everything
+# Scavenger-Hunt — Handoff: Milestone 1 (Credentials Auth + Single-Claim QR)
 
-This document is the complete operational handoff for reproducing, understanding, and
-extending the test surface (unit, integration, and Playwright browser) of this app.
-Every number below was **verified live** on `main` at HEAD `bc02d3c` (this session).
+This document is the operational handoff for the **Milestone 1** work on branch
+`feat/credentials-teams-dashboard-qr-value`. It replaces OTP/phone auth with
+**username + password** credentials, adds the **single-claim QR** model (a code is
+fully depleted the first time it is scanned), and re-anchors the entire test surface
+(unit, integration, Playwright browser) on that model.
+
+Everything below was **verified live** this session (unit, typecheck, lint, build,
+migration reset + seed).
 
 ---
 
@@ -10,36 +15,41 @@ Every number below was **verified live** on `main` at HEAD `bc02d3c` (this sessi
 
 | Tier | Command | Result |
 |---|---|---|
-| Browser (Playwright) | `npm run test:browser` | **31 / 31** |
-| Unit | `npm test` | **44 / 44** |
-| Integration | `npm run test:integration` (server on 3000, or `BASE_URL=…`) | **79 / 79** |
+| Unit | `npm test` | **43 / 43** |
 | TypeScript | `npx tsc --noEmit` | clean (exit 0) |
 | Lint | `npm run lint` | 0 errors; 3 pre-existing warnings (see §8) |
+| Build | `npm run build` | success (pages include `/login` only; `/verify` removed) |
+| Migration | `prisma migrate reset --force` + seed | applied clean, reseeded |
 
-There are **no known failing tests** once the prerequisites in §2 are met.
+Browser (`npm run test:browser`) and integration (`npm run test:integration`) require a
+running dev server — see §2 and §3.
 
 ---
 
 ## 2. Runtime prerequisites (read this before running anything)
 
-### `.env.local` (at repo root) — required for unit + integration + the app
-Key names present (values are local; do not commit):
+### `.env.local` (at repo root) — required for the app + all tiers
+Key names:
 
 ```
 DATABASE_URL  UPSTASH_REDIS_REST_URL  UPSTASH_REDIS_REST_TOKEN
 JWT_SECRET  JWT_REFRESH_SECRET  JWT_EXPIRY  JWT_REFRESH_EXPIRY
-HMAC_SECRET  OTP_MOCK  TWILIO_SID  TWILIO_AUTH_TOKEN  TWILIO_PHONE
+HMAC_SECRET  CREDENTIALS_SEED_ADMIN_PASSWORD  CREDENTIALS_SEED_PLAYER_PASSWORD
 NEXT_PUBLIC_APP_URL  NODE_ENV
 ```
 
 Critical flags:
-- `OTP_MOCK=true` → the code is always `000000`. **All** browser `loginAs` helpers and the
-  integration suite use `000000`. In **production** builds, OTP mocking throws — so never
-  run these suites against a `next start` build; use `next dev` only.
+- **Auth is now credentials-based.** OTP/Twilio env vars (`OTP_MOCK`, `TWILIO_SID`,
+  `TWILIO_AUTH_TOKEN`, `TWILIO_PHONE`) were removed from `.env.example`. `HMAC_SECRET`
+  and the QR-section vars are kept.
 - `NODE_ENV="development"`.
-- `HMAC_SECRET` — the test QR helper mirrors `lib/utils/crypto.ts` (fallback
-  `dev_hmac_secret_change_in_production`) and reads this env, so test-signed QR payloads
+- `HMAC_SECRET` — the test QR helpers mirror `lib/utils/crypto.ts` (fallback
+  `dev_hmac_secret_change_in_production`) and read this env, so test-signed QR payloads
   match what the app validates. Keep `.env.local`'s `HMAC_SECRET` intact for the suite.
+- Seed credentials (env-overridable):
+  - admin `mentor` / `CREDENTIALS_SEED_ADMIN_PASSWORD` (default `ChangeMe_Admin_2026!`)
+  - dev players `player1`–`player4` / `CREDENTIALS_SEED_PLAYER_PASSWORD`
+    (default `DevPass_2026!`)
 
 ### Two different dev servers (do not mix ports)
 - **Browser suite** expects a dev server on **3100**.
@@ -47,19 +57,29 @@ Critical flags:
 
 Start the browser-tier server like this (from repo root):
 ```bash
-UPSTASH_REDIS_REST_URL= UPSTASH_REDIS_REST_TOKEN= PORT=3100 && npm run dev
+UPSTASH_REDIS_REST_URL= UPSTASH_REDIS_REST_TOKEN= PORT=3100 npm run dev
 ```
 (Intentionally blanking the Upstash vars keeps Redis-backed rate-limiting off in dev.)
-There is **no `webServer` block** in `playwright.config.ts` — the server is managed
-manually. Playwright will just fail with `ECONNREFUSED` if the server is down, so start it
-first.
 
 ### Seed data the suites depend on
 - Seed game `00000000-0000-0000-0000-000000000001` must be **ACTIVE**, `current_round = 1`,
-  with **5 indexes** on that round. `tests/browser/global-setup.ts` restores this at the
-  start of every browser run (resets status/round, re-points indexes at round 1, deletes
-  `+21269991*` QA users and `QA-Browser-*` games).
-- Mentor account: `+212600000001`.
+  with **5 indexes** on that round. Each index has one **QrCode** row (`qr_codes` table,
+  `@@unique([index_id, round_id])`). `tests/browser/global-setup.ts` restores this at the
+  start of every browser run: resets status/round, re-points round-1 indexes, **re-arms
+  all seed QR codes to `ACTIVE` with a full pool**, deletes `qa_*` users and `QA-Browser-*`
+  games, and sweeps orphan teams.
+
+**Important:** because each seed QR is single-claim, the browser specs intentionally
+partition the seed indexes so no two spec tests fight over the same code:
+- `scan.spec.ts` claims **index offset 0** (full-scan + tampered) and **index offset 1**
+  (depleted/claim).
+- `sse.spec.ts` claims **index offset 2** for its live-fan-out scan.
+
+### Prisma note
+The Prisma CLI does not auto-load `.env.local`. Prefix any `prisma`/`seed` command with:
+```bash
+set -a; source ./.env.local; set +a
+```
 
 ### Playwright install
 ```bash
@@ -72,7 +92,7 @@ Needs one-time browser download.
 ## 3. How to run each tier (from repo root)
 
 ```bash
-# Unit — self-loads .env.local (see the fix in §5 #2)
+# Unit — self-loads .env.local
 npm test
 
 # Integration — needs a server on 3000 (start one first), or point at a running one:
@@ -80,109 +100,100 @@ BASE_URL=http://localhost:3100 npm run test:integration
 
 # Browser — server must already be live on 3100 (see §2)
 npm run test:browser        # headless, both projects
-npm run test:browser:headed # headed (great for the real-camera manual check, §6)
+npm run test:browser:headed # headed
 ```
 
-You can also target a single spec:
+You can also target a single spec (from `tests/browser`):
 ```bash
-# from tests/browser
 npx playwright test scan --project=player-mobile
 npx playwright test sse --project=player-mobile
 ```
 
 ---
 
-## 4. What the Playwright browser suite covers (31 tests)
+## 4. What the Playwright browser suite covers
 
 `tests/browser/` is self-contained (own `playwright.config.ts`, `fixtures/`, `helpers/`,
 `global-setup.ts`). Two projects run serially (`workers=1`, no parallelism):
 
 - `player-mobile` (Pixel 7, 390×844, touch, camera+geolocation permissions):
-  - `auth.spec.ts` — unauthenticated guard/redirect, public pages, full OTP UI flow
-    (invalid phone, wrong code, resend → correct code → `/dock`), mentor routing,
-    player-can't-reach-mentor, logout clearing session.
+  - `auth.spec.ts` — unauthenticated guard/redirect, public pages, **credentials UI
+    login flow** (short-username client error, unknown-account server error, valid login
+    → `/dock`), mentor routing, player-can't-reach-mentor, logout clearing session.
   - `shell.spec.ts` — every player page renders while authenticated.
   - `scan.spec.ts` — **full camera pipeline** (synthetic canvas stream → decode →
-    verify → score → result page), tampered-QR error banner, camera-denied UX.
-  - `sse.spec.ts` — leaderboard fan-out across two sessions with **no reload**; live
-    timer countdown ticking.
-  - `mentor.spec.ts` (also desktop) — game detail state controls/services config, full
-    state machine, batch QR generation.
+    verify → **full-pool** score → result page), tampered-QR error banner, camera-denied
+    UX, and a **depleted-code injection** (re-scanned QR → `QR_DEPLETED`).
+  - `sse.spec.ts` — leaderboard fan-out across two sessions with no reload; live timer
+    countdown ticking.
+  - `mentor.spec.ts` (also desktop) — game detail state controls/config, full state
+    machine, batch QR generation.
   - `security.spec.ts` (also desktop) — headers, Permissions-Policy, CSP-clean journey.
   - `pwa.spec.ts` (also desktop) — SW serves/registers, static asset caching, offline nav.
-- `mentor-desktop` (Desktop Chrome, 1440×900) — matches `testMatch:
-  /(mentor|security|pwa)\.spec\.ts/` (those three run in BOTH projects).
+- `mentor-desktop` (Desktop Chrome, 1440×900) — `testMatch: /(mentor|security|pwa)\.spec\.ts/`.
 
-### The error-collector fixture (`fixtures/base.ts`)
-Every test fails if any of these occur on a collected page: uncaught page errors, console
-`error` messages (outside an allowlist), HTTP responses ≥ 500, or failed requests
-(outside SSE-reconnect / `net::ERR_ABORTED`). A `collect(page)` fixture helper attaches the
-same collectors to any **extra** page a test creates (e.g. the second context in the SSE
-specs), so errors on secondary pages fail the test too. The allowlist covers dev-only noise:
-`[HMR]`, React DevTools download hint, `manifest.json`/`favicon`, and the two `unsafe-eval`
-messages (React's dev `eval()` probe + the corresponding CSP refusal). **All four are
-expected in dev only** — production builds never emit them.
+The error-collector fixture (`fixtures/base.ts`) fails a test on any uncaught page error,
+console `error` (outside the dev allowlist), HTTP ≥ 500, or failed request. `collect(page)`
+attaches the same collectors to extra pages (e.g. the second SSE context).
 
 ---
 
-## 5. Real bugs found & fixed (this session)
+## 5. Milestone 1 changes
 
-1. **`hooks/use-camera.ts` — camera previewed but never decoded (production bug).**
-   `html5QrCode.start()` was being called while `#qr-reader` was `display:none`; the
-   user-facing `setScanning(true)` only ran *after* `start()` resolved. With the container
-   hidden, html5-qrcode sized its decode canvas / QR region at **0×0**, so `foreverScan`
-   computed `videoWidth / 0 = Infinity` ratios and never detected a QR — the viewfinder
-   showed a live feed that would never scan. Fix: `setScanning(true)` moved to the very
-   top of `startScanning` (before the dynamic import + `start()`); the `catch` still
-   reverts to `setScanning(false)`. Proven by the 3/3 `scan.spec.ts` pipeline tests.
+### Credentials auth
+- `User.username @unique` + `password_hash` (`bcryptjs`, cost 10); `phone_number String?`
+  kept but no longer an identifier; OTP model/table dropped.
+- New `lib/auth/passwords.ts` (hash/verify) and `lib/auth/session.ts` (issueSession).
+  `lib/auth/jwt.ts` + `guard.ts` now carry `{ sub, role, username }`; middleware sets
+  `x-user-username`. Removed `lib/auth/otp.ts` and `lib/sms/`.
+- New `POST /api/v1/auth/login` (rate-limited, auto-provisions a PLAYER into the active
+  game), `GET/POST /api/v1/admin/users`, and
+  `POST /api/v1/admin/users/[id]/reset-password` (revokes the refresh family).
+  Deleted `send-otp` / `verify-otp`.
+- Login UI (`app/(auth)/login/page.tsx`) rewritten; `/verify` deleted. PUBLIC_ROUTES are
+  now `["/login","/role-select"]`. Rate limiters: `loginLimiter` 10/5m, `scanLimiter` 10/1m,
+  `refreshLimiter` 10/1m, `generalLimiter` 100/1m.
 
-2. **`package.json` `"test"` script — unit suite could not run as documented.**
-   `"test": "tsx --test tests/unit/*.test.ts"` **omitted `--env-file=.env.local`**, so the
-   DB-backed OTP unit tests aborted with `DATABASE_URL is required …`. The integration
-   script already had the flag. Fix: `"tsx --env-file=.env.local --test tests/unit/*.test.ts"`.
-   Verified: `npm test` → 44/44 with no manual flag.
+### Single-claim QR (M4 core)
+- New `QrCode` model (`id`, `index_id`, `game_id`, `round_id`, `points`, `pool_value`,
+  `status ACTIVE|DEPLETED`, `first_scanned_at`, `created_at`;
+  `@@unique([index_id, round_id])`).
+- The QR payload now embeds `code_id`: `{ code_id, index_id, game_id, round_id, timestamp,
+  signature }`, and the signature is HMAC over
+  `${codeId}:${indexId}:${gameId}:${roundId}:${timestamp}` (`lib/utils/crypto.ts`).
+- `generateQrImage`/`generateQrSvg` from the admin `indexes/[id]/qr` and `indexes/generate`
+  routes **provision** a QrCode row (upsert) and embed its `code_id`; the response returns
+  `code_id`, `pool_value`, and `status`.
+- The scan route (`app/api/v1/games/[id]/scan`) looks up the QrCode by `code_id`, rejects
+  unknown/depleted codes (`QR_UNKNOWN_CODE` / `QR_DEPLETED`), and **atomically claims** the
+  code via `updateMany({ status: "ACTIVE" }) → status DEPLETED, pool_value 0,
+  first_scanned_at`. It awards the full `pool_value` (no time-based multiplier) and
+  increments player + team scores and Redis/SSE as before.
+- `tests/browser/global-setup.ts` re-arms all seed QR codes to ACTIVE + full pool each run.
 
-3. **`tests/browser/specs/sse.spec.ts` — leaderboard score locator (deterministic fail).**
-   `teamScore()` used `ancestor::div[contains(@class, 'flex')][1]` on the team name, which
-   resolved to the inner `div.flex-1` name column — that column holds `p.font-headline
-   .text-sm`, not the score. The score (`p.font-headline.text-lg`) is in the row’s sibling
-   `div.text-right`. Fix: scope the row via `div.flex.items-center` with `hasText:
-   <unique team name>`, then read the sole `.text-lg` inside it. This was the **only**
-   failing browser test; now 31/31.
+### Teams
+- `Team.captain_id` (created player becomes captain); the `players/me/team` create route
+  sets it. A full separate M2 (captain manages up-to-4 members) is **not yet** implemented;
+  this milestone only wires the creator as captain and keeps the existing
+  create/join-by-invite flow.
 
-4. **`tests/browser/fixtures/base.ts` — error collectors missed secondary pages (coverage
-   gap).** Only the default `page` was collected; `pageA`/`pageB` in the SSE specs were
-   separate contexts with no error collection, so console errors / 5xx there were silent.
-   Fix: added a `collect(page)` fixture that routes any page’s collectors into the same
-   assertion buffer. SSE specs now attach collectors to both boards.
-
-Minor hygiene:
-- `scan.spec.ts:38` stray comment typo cleaned.
-- `.gitignore` — kept `test-results/`, `playwright-report/`, `blob-report/`; removed an
-  inert `playwright/.cache/` entry (no such dir is created; Playwright’s real browser cache
-  lives in `~/.cache/ms-playwright`, outside the repo).
+### Remarks / dead code
+- `calculateScanScore` (time bonus) is no longer used by the scan route (QR value is now a
+  fixed pool). It remains in `lib/game/engine.ts` and is still unit-tested; it is harmless
+  legacy until the windowed-decay idea is definitively retired.
 
 ---
 
 ## 6. QR camera testing — how it works & the real-camera checkpoint
 
-- Browser tests do **not** need a physical camera. `helpers/camera.ts` injects a synthetic
-  canvas stream (via `getUserMedia` override + `addInitScript`) that paints the **real
-  signed QR** payload on every frame at 640×480; html5-qrcode decodes it exactly as it
-  would a printed code.
-- The QR is drawn **300×300 centered** on the 640×480 video so it sits fully inside the
-  decoder’s sampled ~448×336 crop (html5-qrcode centers `qrbox = min(client) * 0.7` scaled
-  to the video) — every finder pattern stays visible.
-- QR helper (`helpers/qr.ts`) mirrors `lib/qr/generator.ts` + `lib/utils/crypto.ts`:
-  same payload shape, same `base64url` encoding, same HMAC payload
-  `${indexId}:${gameId}:${roundId}:${timestamp}`, same secret source. Data-URL QR images
-  avoid canvas tainting (`SecurityError: Canvas is not origin-clean` with cross-origin URLs).
-- **Manual real-camera checkpoint (optional):** run `npm run test:browser:headed`, open
-  `/scan` on a device/emulator with a camera, point at a printed scan QR from the mentor
-  “Generate QR Codes” flow, and confirm decode → result page. The automation proves the
-  pipeline; this is the only human step left.
-- html5-qrcode v2.3.8 decodes only from a live `<video>`; `scanFileV2` exists but is not
-  wired into the UI, so don’t add UI that depends on canvas-image decoding.
+- Browser tests do not need a physical camera. `helpers/camera.ts` injects a synthetic
+  canvas stream that paints the real signed QR each frame; html5-qrcode decodes it.
+- `helpers/qr.ts` mirrors the new `lib/utils/crypto.ts` (HMAC payload includes `code_id`)
+  and `lib/qr/generator.ts` (payload includes `code_id`). Tests obtain a valid `code_id`
+  via `helpers/db.ts` → `getQrCodeForIndex(indexId, roundId)`.
+- **Manual real-camera checkpoint (optional):** `npm run test:browser:headed`, open `/scan`,
+  point at a freshly generated mentor QR. Note each code is single-claim — after one scan
+  it is `DEPLETED` and any further scan reports `QR_DEPLETED`.
 
 ---
 
@@ -190,13 +201,14 @@ Minor hygiene:
 
 - Valid mentor transitions: `PENDING→ACTIVE (start)`, `ACTIVE→ELIMINATING (eliminate)`,
   `ELIMINATING→ACTIVE (next_round) / FINISHED (finish)`, `FINISHED→PENDING (reset)`.
-  `game_id × round_number` is **unique** — do not pre-create a round that the `start`
-  action will recreate. The browser suite creates an isolated `QA-…` PENDING game with a
-  **roundless** index for the state-machine test, then deletes it in `afterAll`.
-- Scan scoring uses `calculateScanScore`; tests assert `points_earned > 0`, **never exact**
-  equality. A tampered QR yields message `"QR code invalid: QR_SIGNATURE_INVALID"`.
+  `game_id × round_number` is unique — do not pre-create a round the `start` action will
+  recreate. The browser suite creates an isolated `QA-…` PENDING game with a roundless
+  index for the state-machine test, then deletes it in `afterAll`.
+- Scan scoring is now the **full `pool_value`** of the QR; tests assert **exact** equality
+  with `index.points` (no time multiplier). A tampered QR yields
+  `"QR code invalid: QR_SIGNATURE_INVALID"`.
 - `/scan-result?type=*&data=*` carries JSON `{ index_label, points_earned, team_total,
-  scan_id }`; the specs parse `data` from the URL.
+  scan_id }`; specs parse `data` from the URL.
 - Leaderboard row structure (for locators): each team is `div.flex.items-center` (row) →
   `div.flex-1` (name) + `div.text-right` (score `p.font-headline.text-lg` + `pts`).
 
@@ -205,41 +217,40 @@ Minor hygiene:
 ## 8. Known non-issues (leave them alone)
 
 - `tsc --noEmit` clean.
-- Lint: 0 errors, **3 pre-existing warnings** (not from browser code, don’t “fix” casually):
-  - `app/layout.tsx:41,45` `@next/next/no-page-custom-font` (custom fonts in `<head>`).
-  - `lib/api-client.ts:57` `@next/next/no-location-assign-relative-destination`
-    (`window.location.assign` used to navigate client-side; intentional for a non-router
-    after-login hand-off).
-- The dev-only CSP `script-src` violations from React/Next `eval()` probes are **expected**
-  in dev; the strict CSP intentionally omits `unsafe-eval`. `security.spec.ts` allows
-  violations whose `violatedDirective === "script-src"` and fails on any *other* directive.
+- Lint: 0 errors, **3 pre-existing warnings**:
+  - `app/layout.tsx:41,45` `@next/next/no-page-custom-font`.
+  - `lib/api-client.ts:57` `@next/next/no-location-assign-relative-destination`.
+- The dev-only CSP `script-src` violations from React/Next `eval()` probes are expected;
+  `security.spec.ts` allows `script-src` and fails on any other directive.
 
 ---
 
 ## 9. Coordination / sequencing caveats
 
-- **Browser (3100) and integration (3000) are separate servers.** Don’t point them at each
-  other’s port. Integration succeeds against `next dev` only (needs OTP mock), not a prod build.
-- **Integration mutates the shared seed game**: its scan-matrix adds real scores to
-  seed-game teams. This is safe for the browser suite (which asserts `> 0`, never exact),
-  but to keep seed scores clean, run **sequentially, not in parallel** with browser tests.
-- Integration self-cleans its QA fixtures (deletes `QA-*` games/teams and created phones)
-  in a `finally` block; the browser `global-setup` + per-spec `afterAll` likewise clean
-  `+21269991*`/`QA-Browser-*`/orphan teams.
-- The browser suite is deterministic at `workers=1`, `retries=0`, `timeout=90s`. If you
-  parallelize, expect flakiness from the shared seed game and from SSE timing.
+- **Browser (3100) and integration (3000) are separate servers.** Don’t mix ports.
+  Integration succeeds against `next dev` only (mock Redis), not a prod build.
+- **Both suites mutate the shared seed game.** Because seed QRs are single-claim, run them
+  **sequentially, not in parallel** — otherwise the scan specs and the integration scan
+  matrix can exhaust the same scarce codes. The browser `global-setup` re-arms codes at
+  the start of each browser run, but a parallel integration run would race it.
+- Integration self-cleans its `qa_int_*` users, `QA-*` games/teams, and the transition game
+  in a `finally` block; the browser `global-setup` + per-spec `afterAll` clean `qa_*` users,
+  `QA-Browser-*` games, and orphan teams.
+- The browser suite is deterministic at `workers=1`, `retries=0`, `timeout=90s`.
 
 ---
 
-## 10. Committed scope (this handoff)
+## 10. Committed scope / next up
 
-A single commit on `main` contains:
-- `tests/browser/` (entire Playwright suite: config, global-setup, fixtures, helpers, specs)
-- `hooks/use-camera.ts` (the decode fix above)
-- `.gitignore` (test-output ignores)
-- `package.json` + `package-lock.json` (Playwright/`@types/qrcode` devDeps, the `test` script
-  fix, `test:browser` / `test:browser:headed` scripts)
+This milestone commits the **M1 + the single-claim QR core (M4)** end-to-end:
+credentials auth (schema, libs, admin user routes, login UI), the `QrCode` single-claim
+model through generator/validator/scan route, the rewritten unit/integration/browser test
+surface, and the updated HANDOFF.
 
-**Not committed (never stage):** the user’s personal repository files
-`PLAN.md`, `scavenger_hunt.pdf`, `stitch_hydraulic_echoes_of_casablanca.zip`, and the
-`stitch_hydraulic_echoes_of_casablanca/` directory. `main` is otherwise untouched.
+**Not yet implemented (next milestones):**
+- **M2** — captain manages up to 4 members (separate captain routes, team page UI).
+- **M3** — player dashboard (team rank + passed challenges) + leaderboard DB fallback for
+  `getTeamRank` + admin SSE leaderboard page.
+- **Not committed (never stage):** the user’s personal repo files `PLAN.md`,
+  `scavenger_hunt.pdf`, `stitch_hydraulic_echoes_of_casablanca.zip`, and the
+  `stitch_hydraulic_echoes_of_casablanca/` directory.

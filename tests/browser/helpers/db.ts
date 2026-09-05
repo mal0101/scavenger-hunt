@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 import { loadEnvLocal } from "./env";
 
 loadEnvLocal();
@@ -10,11 +11,74 @@ function dbInstance(): PrismaClient {
   return prisma;
 }
 
-export async function cleanupUsers(phones: string[]): Promise<void> {
-  if (phones.length === 0) return;
+/** Creates a credential user directly in the DB (browser tests bypass the
+ *  admin API for isolation). PLAYER users get an ACTIVE player row bound to
+ *  the active game. Idempotent by username. */
+export async function createUser(
+  username: string,
+  password: string,
+  role: "PLAYER" | "MENTOR" = "PLAYER"
+): Promise<string> {
+  const db = dbInstance();
+  const existing = await db.user.findUnique({
+    where: { username },
+    select: { id: true },
+  });
+  if (existing) return existing.id;
+
+  const hash = bcrypt.hashSync(password, 10);
+  const user = await db.user.create({
+    data: {
+      username,
+      password_hash: hash,
+      role,
+      nickname: username,
+    },
+    select: { id: true },
+  });
+
+  if (role === "PLAYER") {
+    const game = await db.game.findFirst({
+      where: { status: "ACTIVE" },
+      orderBy: { created_at: "desc" },
+      select: { id: true },
+    });
+    if (game) {
+      await db.player.create({
+        data: {
+          user_id: user.id,
+          game_id: game.id,
+          team_id: null,
+          total_score: 0,
+          status: "ACTIVE",
+        },
+      });
+    }
+  }
+  return user.id;
+}
+
+/** The QrCode row that backs a scan for (index, round). */
+export async function getQrCodeForIndex(
+  indexId: string,
+  roundId: string
+): Promise<{ id: string; status: string; pool_value: number }> {
+  const db = dbInstance();
+  const code = await db.qrCode.findUnique({
+    where: { index_id_round_id: { index_id: indexId, round_id: roundId } },
+    select: { id: true, status: true, pool_value: true },
+  });
+  if (!code) {
+    throw new Error(`No QrCode for index ${indexId} / round ${roundId}`);
+  }
+  return code;
+}
+
+export async function cleanupUsers(usernames: string[]): Promise<void> {
+  if (usernames.length === 0) return;
   const db = dbInstance();
   const users = await db.user.findMany({
-    where: { phone_number: { in: phones } },
+    where: { username: { in: usernames } },
     select: { id: true },
   });
   if (users.length > 0) {

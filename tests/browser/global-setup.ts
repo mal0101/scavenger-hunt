@@ -6,7 +6,7 @@ loadEnvLocal();
 const db = new PrismaClient();
 
 const SEED_GAME_ID = "00000000-0000-0000-0000-000000000001";
-const QA_PHONE_PREFIX = "+21269991";
+const QA_USERNAME_PREFIX = "qa_";
 const QA_GAME_TITLE_PREFIX = "QA-Browser-";
 
 export default async function globalSetup(): Promise<void> {
@@ -29,17 +29,42 @@ export default async function globalSetup(): Promise<void> {
       },
       data: { round_id: round.id },
     });
+
+    // Re-arm the seeded game's QR codes so every scan spec starts from a
+    // fully-charged, active pool.
+    await db.qrCode.updateMany({
+      where: { game_id: SEED_GAME_ID, round_id: round.id },
+      data: { status: "ACTIVE", first_scanned_at: null },
+    });
+    const codes = await db.qrCode.findMany({
+      where: { game_id: SEED_GAME_ID },
+      select: { id: true },
+    });
+    for (const code of codes) {
+      await db.$executeRawUnsafe(
+        `UPDATE qr_codes SET pool_value = qr_codes.points WHERE id = '${code.id}'`
+      );
+    }
   }
 
   // Clean up any QA artifacts from a previous browser run.
   const qaUsers = await db.user.findMany({
-    where: { phone_number: { startsWith: QA_PHONE_PREFIX } },
+    where: { username: { startsWith: QA_USERNAME_PREFIX } },
     select: { id: true },
   });
   if (qaUsers.length > 0) {
     await db.user.deleteMany({ where: { id: { in: qaUsers.map((u) => u.id) } } });
   }
   await db.game.deleteMany({ where: { title: { startsWith: QA_GAME_TITLE_PREFIX } } });
+
+  // Remove teams orphaned by the QA user sweep.
+  const orphaned = await db.team.findMany({
+    where: { players: { none: {} } },
+    select: { id: true },
+  });
+  if (orphaned.length > 0) {
+    await db.team.deleteMany({ where: { id: { in: orphaned.map((t) => t.id) } } });
+  }
 
   await db.$disconnect();
 }

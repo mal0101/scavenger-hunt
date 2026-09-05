@@ -1,4 +1,5 @@
 export interface QrPayload {
+  code_id: string;
   index_id: string;
   game_id: string;
   round_id: string;

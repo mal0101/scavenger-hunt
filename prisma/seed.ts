@@ -1,20 +1,29 @@
 import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcryptjs";
 
 const db = new PrismaClient();
+
+const ADMIN_USERNAME = "mentor";
+const ADMIN_PASSWORD =
+  process.env.CREDENTIALS_SEED_ADMIN_PASSWORD ?? "ChangeMe_Admin_2026!";
+const PLAYER_PASSWORD =
+  process.env.CREDENTIALS_SEED_PLAYER_PASSWORD ?? "DevPass_2026!";
 
 async function main() {
   console.log("Seeding database...");
 
+  const adminHash = await bcrypt.hash(ADMIN_PASSWORD, 10);
   const mentor = await db.user.upsert({
-    where: { phone_number: "+212600000001" },
-    update: {},
+    where: { username: ADMIN_USERNAME },
+    update: { password_hash: adminHash, nickname: "Admin Mentor", role: "MENTOR" },
     create: {
-      phone_number: "+212600000001",
+      username: ADMIN_USERNAME,
+      password_hash: adminHash,
       nickname: "Admin Mentor",
       role: "MENTOR",
     },
   });
-  console.log(`Mentor: ${mentor.id} (${mentor.phone_number})`);
+  console.log(`Mentor: ${mentor.username} (${mentor.id})`);
 
   const game = await db.game.upsert({
     where: { id: "00000000-0000-0000-0000-000000000001" },
@@ -54,14 +63,17 @@ async function main() {
     { label: "The Enigma Vault", points: 75, location_name: "Library corner", enigma_type: "logic" },
   ];
 
-  for (const idx of indexes) {
+  const playerHash = await bcrypt.hash(PLAYER_PASSWORD, 10);
+
+  for (let i = 0; i < indexes.length; i++) {
+    const idx = indexes[i];
     const created = await db.index.upsert({
       where: {
-        id: `00000000-0000-0000-0000-${String(indexes.indexOf(idx) + 1).padStart(12, "0")}`,
+        id: `00000000-0000-0000-0000-${String(i + 1).padStart(12, "0")}`,
       },
       update: {},
       create: {
-        id: `00000000-0000-0000-0000-${String(indexes.indexOf(idx) + 1).padStart(12, "0")}`,
+        id: `00000000-0000-0000-0000-${String(i + 1).padStart(12, "0")}`,
         game_id: game.id,
         round_id: round1.id,
         label: idx.label,
@@ -71,6 +83,52 @@ async function main() {
       },
     });
     console.log(`Index: ${created.label} (${created.points} pts)`);
+
+    await db.qrCode.upsert({
+      where: { index_id_round_id: { index_id: created.id, round_id: round1.id } },
+      update: { points: created.points, pool_value: created.points },
+      create: {
+        index_id: created.id,
+        game_id: game.id,
+        round_id: round1.id,
+        points: created.points,
+        pool_value: created.points,
+        status: "ACTIVE",
+      },
+    });
+  }
+
+  const devPlayers = [
+    { username: "player1", nickname: "Player One" },
+    { username: "player2", nickname: "Player Two" },
+    { username: "player3", nickname: "Player Three" },
+    { username: "player4", nickname: "Player Four" },
+  ];
+
+  for (const dp of devPlayers) {
+    const user = await db.user.upsert({
+      where: { username: dp.username },
+      update: { password_hash: playerHash, nickname: dp.nickname, role: "PLAYER" },
+      create: {
+        username: dp.username,
+        password_hash: playerHash,
+        nickname: dp.nickname,
+        role: "PLAYER",
+      },
+    });
+
+    await db.player.upsert({
+      where: { user_id: user.id },
+      update: { game_id: game.id },
+      create: {
+        user_id: user.id,
+        game_id: game.id,
+        team_id: null,
+        total_score: 0,
+        status: "ACTIVE",
+      },
+    });
+    console.log(`Dev player: ${dp.username} (${user.id})`);
   }
 
   console.log("Seed complete!");

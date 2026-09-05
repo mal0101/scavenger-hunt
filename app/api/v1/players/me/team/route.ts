@@ -107,6 +107,7 @@ export async function POST(request: NextRequest) {
         name: team_name,
         invite_code: code,
         game_id: existingPlayer.game_id,
+        captain_id: existingPlayer.id,
       },
     });
 

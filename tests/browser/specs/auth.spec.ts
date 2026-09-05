@@ -1,17 +1,25 @@
 import { expect } from "@playwright/test";
 import { test } from "../fixtures/base";
-import { loginAs, api } from "../helpers/auth";
+import { loginAs, api, SEED_ADMIN_USERNAME, SEED_ADMIN_PASSWORD } from "../helpers/auth";
+import { createUser } from "../helpers/db";
 
-const P1 = "+212699910001";
-const P2 = "+212699910002";
-const MENTOR = "+212600000001";
+const SUF = Date.now().toString(36);
+const P1 = `qa_auth_p1_${SUF}`;
+const P2 = `qa_auth_p2_${SUF}`;
+const PW = "TestPass_2026!";
 
-let createdPhones: string[] = [];
+let createdUsernames: string[] = [];
+
+async function authPlayer(page: Parameters<typeof loginAs>[0], username: string): Promise<void> {
+  await createUser(username, PW);
+  await loginAs(page, username, PW);
+  createdUsernames.push(username);
+}
 
 async function deleteTestUsers(): Promise<void> {
   const mod = await import("../helpers/db");
-  await mod.cleanupUsers(createdPhones);
-  createdPhones = [];
+  await mod.cleanupUsers(createdUsernames);
+  createdUsernames = [];
 }
 
 function loginRedirectUrl(target: string): (url: URL) => boolean {
@@ -37,7 +45,7 @@ test.describe("auth guards", () => {
   });
 
   test("public pages load without auth", async ({ page }) => {
-    for (const p of ["/login", "/verify?phone=%2B212699910001", "/role-select"]) {
+    for (const p of ["/login", "/role-select"]) {
       const res = await page.goto(p);
       expect(res?.status()).toBeLessThan(400);
     }
@@ -46,38 +54,27 @@ test.describe("auth guards", () => {
 
 test.describe("player sign-in", () => {
   test("full login flow from the UI forms", async ({ page }) => {
-    // 1. Invalid phone shows inline error, stays put.
+    // 1. Too-short username shows a client-side error, stays put.
     await page.goto("/login");
-    await page.getByLabel("Phone Number").fill("abc");
-    await page.getByRole("button", { name: "Send Verification Code" }).click();
-    await expect(page.getByText("Enter a valid phone number")).toBeVisible();
+    await page.getByLabel("Username").fill("ab");
+    await page.getByLabel("Password").fill(PW);
+    await page.getByRole("button", { name: "Sign In" }).click();
+    await expect(page.getByText("Username must be at least 3 characters.")).toBeVisible();
     expect(page.url()).toContain("/login");
 
-    // 2. Valid phone proceeds to verification.
-    await page.getByLabel("Phone Number").fill(P1);
-    await page.getByRole("button", { name: "Send Verification Code" }).click();
-    await page.waitForURL("**/verify?phone=*");
-    createdPhones.push(P1);
+    // 2. Valid format but unknown account shows the server error.
+    await page.getByLabel("Username").fill(`no_such_user_${SUF}`);
+    await page.getByLabel("Password").fill(PW);
+    await page.getByRole("button", { name: "Sign In" }).click();
+    await expect(page.getByText("Invalid username or password")).toBeVisible();
+    expect(page.url()).toContain("/login");
 
-    // 3. Wrong code shows an error.
-    await page.locator('input[aria-label^="OTP digit"]').nth(0).fill("1");
-    await page.locator('input[aria-label^="OTP digit"]').nth(1).fill("1");
-    await page.locator('input[aria-label^="OTP digit"]').nth(2).fill("1");
-    await page.locator('input[aria-label^="OTP digit"]').nth(3).fill("1");
-    await page.locator('input[aria-label^="OTP digit"]').nth(4).fill("1");
-    await page.locator('input[aria-label^="OTP digit"]').nth(5).fill("1");
-    await page.getByRole("button", { name: "Verify Code" }).click();
-    await expect(page.getByText("Invalid or expired OTP code")).toBeVisible();
-
-    // 4. Resend, then correct code lands on /dock as PLAYER.
-    await page.getByRole("button", { name: "Resend Code" }).click();
-    await page.locator('input[aria-label^="OTP digit"]').nth(0).fill("0");
-    await page.locator('input[aria-label^="OTP digit"]').nth(1).fill("0");
-    await page.locator('input[aria-label^="OTP digit"]').nth(2).fill("0");
-    await page.locator('input[aria-label^="OTP digit"]').nth(3).fill("0");
-    await page.locator('input[aria-label^="OTP digit"]').nth(4).fill("0");
-    await page.locator('input[aria-label^="OTP digit"]').nth(5).fill("0");
-    await page.getByRole("button", { name: "Verify Code" }).click();
+    // 3. Correct credentials land on /dock as PLAYER.
+    await createUser(P1, PW);
+    createdUsernames.push(P1);
+    await page.getByLabel("Username").fill(P1);
+    await page.getByLabel("Password").fill(PW);
+    await page.getByRole("button", { name: "Sign In" }).click();
     await page.waitForURL("**/dock");
 
     const cookies = await page.context().cookies();
@@ -86,26 +83,25 @@ test.describe("player sign-in", () => {
     expect(names).toContain("refresh_token");
   });
 
-  test("verified player persisted and dashboard displays profile", async ({ page }) => {
-    await loginAs(page, P2);
-    createdPhones.push(P2);
+  test("authenticated player dashboard displays profile", async ({ page }) => {
+    await authPlayer(page, P2);
     await page.goto("/dock");
     await expect(page.getByText("Your Status")).toBeVisible();
     await expect(page.getByText("No team")).toBeVisible();
 
-    // Player profile endpoint agrees.
-    const me = await api<{ success: boolean; data: { nickname: string | null; team: null } }>(
+    const me = await api<{ success: boolean; data: { username: string | null; team: null } }>(
       page,
       "/api/v1/players/me"
     );
     expect(me.status).toBe(200);
     expect(me.json.success).toBe(true);
+    expect(me.json.data.username).toBe(P2);
   });
 });
 
 test.describe("mentor sign-in", () => {
   test("mentor role routing", async ({ page }) => {
-    await loginAs(page, MENTOR);
+    await loginAs(page, SEED_ADMIN_USERNAME, SEED_ADMIN_PASSWORD);
     await page.goto("/mentor/dashboard");
     await page.waitForURL("**/mentor/dashboard");
 
@@ -115,8 +111,7 @@ test.describe("mentor sign-in", () => {
   });
 
   test("player cannot reach mentor area", async ({ page }) => {
-    await loginAs(page, P1);
-    createdPhones.push(P1);
+    await authPlayer(page, P1);
     await page.goto("/mentor/games");
     await page.waitForURL("**/dock");
 
@@ -127,8 +122,7 @@ test.describe("mentor sign-in", () => {
 
 test.describe("logout", () => {
   test("logging out clears session and re-guards protected pages", async ({ page }) => {
-    await loginAs(page, P1);
-    createdPhones.push(P1);
+    await authPlayer(page, P1);
     await page.goto("/dock");
 
     const logout = page.getByRole("button", { name: /sign ?out/i });

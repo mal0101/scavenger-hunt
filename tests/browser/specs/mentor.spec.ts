@@ -1,6 +1,6 @@
 import { expect } from "@playwright/test";
 import { test } from "../fixtures/base";
-import { loginAs } from "../helpers/auth";
+import { loginAs, SEED_ADMIN_USERNAME, SEED_ADMIN_PASSWORD } from "../helpers/auth";
 import {
   createQaGame,
   getActiveGame,
@@ -8,7 +8,6 @@ import {
   getIndexesForGame,
 } from "../helpers/db";
 
-const MENTOR = "+212600000001";
 let createdGameId: string | null = null;
 let gameId: string;
 
@@ -25,9 +24,13 @@ test.afterAll(async () => {
   }
 });
 
+async function signIn(page: Parameters<typeof loginAs>[0]): Promise<void> {
+  await loginAs(page, SEED_ADMIN_USERNAME, SEED_ADMIN_PASSWORD);
+}
+
 test.describe("mentor admin UI", () => {
   test("game detail renders current state controls and config", async ({ page }) => {
-    await loginAs(page, MENTOR);
+    await signIn(page);
     await page.goto(`/mentor/games/${gameId}`);
     await page.waitForURL(`**/mentor/games/${gameId}`);
 
@@ -47,7 +50,7 @@ test.describe("mentor admin UI", () => {
   test("full state machine drives through START → ELIMINATE → FINISH → RESET", async ({
     page,
   }) => {
-    await loginAs(page, MENTOR);
+    await signIn(page);
 
     // Provision an isolated game so the sequence never touches the shared game.
     createdGameId = (await createQaGame(`QA-Browser-Mentor-${Date.now()}`)).id;
@@ -78,7 +81,7 @@ test.describe("mentor admin UI", () => {
   test("generate QR codes for a game produces one render per index", async ({
     page,
   }) => {
-    await loginAs(page, MENTOR);
+    await signIn(page);
     await page.goto("/mentor/indexes");
     await page.waitForURL("**/mentor/indexes");
 

@@ -1,8 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 
-const PUBLIC_ROUTES = ["/login", "/verify", "/role-select"];
-const AUTH_ROUTES = ["/login", "/verify", "/role-select", "/"];
+const PUBLIC_ROUTES = ["/login", "/role-select"];
+const AUTH_ROUTES = ["/login", "/role-select", "/"];
 const PLAYER_PREFIXES = [
   "/dock",
   "/scan",
@@ -87,7 +87,7 @@ export async function middleware(request: NextRequest) {
       const response = NextResponse.next();
       response.headers.set("x-user-id", payload.sub);
       response.headers.set("x-user-role", payload.role);
-      response.headers.set("x-user-phone", payload.phone);
+      response.headers.set("x-user-username", payload.username);
       return response;
     } catch {
       return NextResponse.json(
@@ -129,7 +129,7 @@ export async function middleware(request: NextRequest) {
     const response = NextResponse.next();
     response.headers.set("x-user-id", payload.sub);
     response.headers.set("x-user-role", payload.role);
-    response.headers.set("x-user-phone", payload.phone);
+    response.headers.set("x-user-username", payload.username);
     return response;
   } catch {
     if (isPublicRoute(pathname)) {

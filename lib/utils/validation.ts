@@ -32,7 +32,7 @@ export const resetPasswordSchema = z.object({
 });
 
 export const teamSchema = z.object({
-  team_name: z.string().min(1).max(50),
+  team_name: z.string().min(1).max(50).optional(),
   invite_code: z.string().length(6).optional(),
 });
 

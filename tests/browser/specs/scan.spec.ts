@@ -125,6 +125,15 @@ test.describe("QR camera scan", () => {
       "/api/v1/players/me/scans"
     );
     expect(Number(scans.json?.data?.total)).toBeGreaterThanOrEqual(1);
+
+    // Dashboard stats: the dock reflects the scan — a concrete team rank and 1
+    // passed challenge. Tiles render in a fixed order: Score, Team Rank, Passed,
+    // Team (see app/(player)/dock/page.tsx).
+    await page.goto("/dock");
+    await expect(page.getByText("Your Status")).toBeVisible();
+    const statValues = page.locator("div.brass-plate p.font-headline");
+    await expect(statValues.nth(1)).toHaveText(/#\d+/);
+    await expect(statValues.nth(2)).toHaveText("1");
   });
 
   test("tampered QR shows an error banner and stays on the scanner", async ({ page, context }) => {

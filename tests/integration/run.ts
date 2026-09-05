@@ -535,6 +535,12 @@ async function s4ScanMatrix(): Promise<string[]> {
   check(res.status === 200 && res.json?.data?.points_earned === index.points, `scan awards full pool (${index.points} pts)`);
   check(res.json?.data?.index?.label === index.label, "scan response identifies the index");
 
+  // Dashboard stats reflect the scan: passed challenges increment and the team
+  // gets a concrete rank from the DB fallback (mock Redis is empty in dev).
+  res = await api("/api/v1/players/me", { jar: jars[0] });
+  check(res.status === 200 && res.json?.data?.passed_challenges === 1, "dashboard reports 1 passed challenge after scan");
+  check(typeof res.json?.data?.team_rank === "number" && res.json?.data?.team_rank >= 1, "dashboard reports a numeric team rank (DB fallback)");
+
   // The code is now depleted: re-scanning it is rejected outright.
   res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: happy }, jar: jars[0] });
   check(res.status === 400 && res.json?.error === "QR_DEPLETED", "second scan of a claimed code rejected (QR_DEPLETED)");
@@ -556,16 +562,20 @@ async function s4ScanMatrix(): Promise<string[]> {
   res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: signedQr(index2.id, SEED_GAME_ID, otherRound, qr2.id) }, jar: jars[0] });
   check(res.status === 400 && res.json?.error === "QR_ROUND_MISMATCH", "QR for another round rejected");
 
-  // Invalid signature (corrupt the signed signature field, keep base64 valid)
+  // Invalid signature (corrupt the signed signature field, keep base64 valid).
+  // XOR the first hex digit so the corruption is guaranteed to change the
+  // value even when the HMAC already starts with "0".
   const stamp = new Date().toISOString();
   const signature = hmacSign(qr2.id, index2.id, SEED_GAME_ID, round.id, stamp);
+  const taintedFirst =
+    (Number.parseInt(signature[0]!, 16) ^ 1).toString(16);
   const corrupted = encodeQrPayload({
     code_id: qr2.id,
     index_id: index2.id,
     game_id: SEED_GAME_ID,
     round_id: round.id,
     timestamp: stamp,
-    signature: `0${signature.slice(1)}`,
+    signature: taintedFirst + signature.slice(1),
   });
   res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: corrupted }, jar: jars[0] });
   check(res.status === 400 && String(res.json?.message).includes("QR_SIGNATURE_INVALID"), "tampered signature rejected");

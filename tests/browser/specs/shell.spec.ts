@@ -1,6 +1,6 @@
 import { expect } from "@playwright/test";
 import { test } from "../fixtures/base";
-import { loginAs } from "../helpers/auth";
+import { loginAs, api } from "../helpers/auth";
 import { createUser } from "../helpers/db";
 
 const SUF = Date.now().toString(36);
@@ -21,6 +21,14 @@ test.afterAll(async () => {
 test.describe("player shell pages", () => {
   test("all player pages render without errors while authenticated", async ({ page }) => {
     await loginAs(page, P1, PW);
+
+    // M5 sends team-less players away from /dock, so give the shell user a crew
+    // to exercise the full player shell. The user + team are cleaned up together.
+    const team = await api<{ success: boolean }>(page, "/api/v1/players/me/team", {
+      method: "POST",
+      body: { team_name: `QA-Shell-Crew-${SUF}` },
+    });
+    expect(team.json.success).toBe(true);
 
     const pages = [
       { path: "/dock", heading: "Current Objective" },

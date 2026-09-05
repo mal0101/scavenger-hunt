@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { db } from "@/lib/db/postgres";
 import { apiSuccess, apiError, apiInternal } from "@/lib/types/api";
 import { requireAuth } from "@/lib/auth/guard";
+import { getTeamRank } from "@/lib/game/leaderboard";
 
 export async function GET(request: NextRequest) {
   try {
@@ -30,6 +31,13 @@ export async function GET(request: NextRequest) {
       return apiError("Player profile not found", "NOT_FOUND", 404);
     }
 
+    const [passedChallenges, teamRank] = await Promise.all([
+      db.scan.count({ where: { player_id: player.id } }),
+      player.team
+        ? getTeamRank(player.team.game_id, player.team.id)
+        : Promise.resolve(null),
+    ]);
+
     return apiSuccess({
       id: player.id,
       user_id: player.user.id,
@@ -39,6 +47,8 @@ export async function GET(request: NextRequest) {
       game_id: player.game_id,
       total_score: player.total_score,
       status: player.status,
+      passed_challenges: passedChallenges,
+      team_rank: teamRank,
       team: player.team,
     });
   } catch (error) {

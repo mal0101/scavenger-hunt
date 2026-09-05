@@ -69,13 +69,14 @@ test.describe("player sign-in", () => {
     await expect(page.getByText("Invalid username or password")).toBeVisible();
     expect(page.url()).toContain("/login");
 
-    // 3. Correct credentials land on /dock as PLAYER.
+    // 3. Correct credentials land as PLAYER on the no-team join screen (M5
+    //    routes team-less players to /team), with a session established.
     await createUser(P1, PW);
     createdUsernames.push(P1);
     await page.getByLabel("Username").fill(P1);
     await page.getByLabel("Password").fill(PW);
     await page.getByRole("button", { name: "Sign In" }).click();
-    await page.waitForURL("**/dock");
+    await page.waitForURL("**/team");
 
     const cookies = await page.context().cookies();
     const names = cookies.map((c) => c.name);
@@ -85,17 +86,33 @@ test.describe("player sign-in", () => {
 
   test("authenticated player dashboard displays profile", async ({ page }) => {
     await authPlayer(page, P2);
+
+    // A player with a crew renders the dashboard directly (M5 only redirects
+    // team-less players; verified in team.spec).
+    const team = await api<{ success: boolean }>(page, "/api/v1/players/me/team", {
+      method: "POST",
+      body: { team_name: "QA-Auth-Crew" },
+    });
+    expect(team.status).toBe(200);
+    expect(team.json.success).toBe(true);
+
     await page.goto("/dock");
     await expect(page.getByText("Your Status")).toBeVisible();
-    await expect(page.getByText("No team")).toBeVisible();
+    await expect(page.getByText("QA-Auth-Crew")).toBeVisible();
 
-    const me = await api<{ success: boolean; data: { username: string | null; team: null } }>(
+    const me = await api<{
+      success: boolean;
+      data: { username: string | null; team: { name: string } | null };
+    }>(
       page,
       "/api/v1/players/me"
     );
     expect(me.status).toBe(200);
     expect(me.json.success).toBe(true);
     expect(me.json.data.username).toBe(P2);
+    expect(me.json.data.team?.name).toBe("QA-Auth-Crew");
+
+    await api(page, "/api/v1/players/me/team", { method: "DELETE" });
   });
 });
 
@@ -112,6 +129,14 @@ test.describe("mentor sign-in", () => {
 
   test("player cannot reach mentor area", async ({ page }) => {
     await authPlayer(page, P1);
+
+    // Give P1 a crew so the middleware bounce lands on the dock (a team-less
+    // player would be further redirected to /team by the M5 flow).
+    await api(page, "/api/v1/players/me/team", {
+      method: "POST",
+      body: { team_name: `QA-Auth-Mentor-Redirect-${SUF}` },
+    });
+
     await page.goto("/mentor/games");
     await page.waitForURL("**/dock");
 

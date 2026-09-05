@@ -188,6 +188,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!team_name) {
+      return apiError("Team name is required", "VALIDATION_ERROR");
+    }
+
     const teamCount = await db.team.count({
       where: { game_id: existingPlayer.game_id },
     });

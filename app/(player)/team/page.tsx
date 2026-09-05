@@ -46,6 +46,8 @@ export default function TeamPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [teamName, setTeamName] = useState("");
+  const [invite, setInvite] = useState("");
 
   async function fetchTeam() {
     try {
@@ -69,6 +71,52 @@ export default function TeamPage() {
     }
     load();
   }, []);
+
+  async function handleCreateTeam(e: React.FormEvent) {
+    e.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await apiFetch<ApiResult & { data?: { id: string } }>(
+        "/api/v1/players/me/team",
+        { method: "POST", body: { team_name: teamName.trim() } }
+      );
+      if (res.success) {
+        setTeamName("");
+        await fetchTeam();
+      } else {
+        setError(res.error?.message ?? "Failed to create team");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create team");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleJoinTeam(e: React.FormEvent) {
+    e.preventDefault();
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await apiFetch<ApiResult & { data?: { id: string } }>(
+        "/api/v1/players/me/team",
+        { method: "POST", body: { invite_code: invite.trim().toUpperCase() } }
+      );
+      if (res.success) {
+        setInvite("");
+        await fetchTeam();
+      } else {
+        setError(res.error?.message ?? "Failed to join team");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to join team");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function handleLeave() {
     if (!team || busy) return;
@@ -189,17 +237,79 @@ export default function TeamPage() {
         )}
 
         {!loading && !team && !error && (
-          <div className="space-y-3 pt-1">
+          <div className="space-y-4 pt-1">
             <p className="font-body text-sm text-on-surface-variant">
-              You are not part of a team yet. Join one with a 6-character invite code.
+              You are not part of a team yet. Start your own crew or join one with a
+              6-character invite code.
             </p>
-            <a
-              href="/dock"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-primary-container/20 border border-primary/50 rounded-full text-primary font-label text-label-sm uppercase tracking-widest hover:bg-primary hover:text-on-primary-container transition-all"
+
+            <form
+              onSubmit={handleCreateTeam}
+              className="space-y-2 bg-surface-container/50 border border-outline-variant/50 rounded-lg p-3"
             >
-              <span className="material-symbols-outlined text-lg" aria-hidden="true">anchor</span>
-              Back to Dock
-            </a>
+              <label
+                htmlFor="team-name"
+                className="font-label text-label-sm text-on-surface-variant uppercase tracking-widest"
+              >
+                Name your crew
+              </label>
+              <div className="flex gap-2">
+                <input
+                  id="team-name"
+                  type="text"
+                  value={teamName}
+                  onChange={(e) => setTeamName(e.target.value)}
+                  placeholder="Crew name"
+                  maxLength={50}
+                  className="flex-1 min-w-0 px-3 py-2 bg-surface-container-high border border-outline-variant/60 rounded-lg font-body text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:border-primary/60"
+                />
+                <button
+                  type="submit"
+                  disabled={busy || teamName.trim().length === 0}
+                  className="shrink-0 px-4 py-2 bg-primary-container text-on-primary-container font-label text-label-sm font-bold uppercase tracking-widest rounded-lg hover:shadow-[0_0_15px_rgba(217,119,7,0.4)] transition-all disabled:opacity-50"
+                >
+                  Create
+                </button>
+              </div>
+            </form>
+
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-outline-variant/40" />
+              <span className="font-label text-label-sm text-on-surface-variant uppercase">
+                or
+              </span>
+              <div className="flex-1 h-px bg-outline-variant/40" />
+            </div>
+
+            <form
+              onSubmit={handleJoinTeam}
+              className="space-y-2 bg-surface-container/50 border border-outline-variant/50 rounded-lg p-3"
+            >
+              <label
+                htmlFor="invite-code"
+                className="font-label text-label-sm text-on-surface-variant uppercase tracking-widest"
+              >
+                Join with invite code
+              </label>
+              <div className="flex gap-2">
+                <input
+                  id="invite-code"
+                  type="text"
+                  value={invite}
+                  onChange={(e) => setInvite(e.target.value.toUpperCase())}
+                  placeholder="XXXXXX"
+                  maxLength={6}
+                  className="flex-1 min-w-0 px-3 py-2 bg-surface-container-high border border-outline-variant/60 rounded-lg font-body text-sm text-on-surface placeholder:text-on-surface-variant focus:outline-none focus:border-primary/60 uppercase tracking-widest"
+                />
+                <button
+                  type="submit"
+                  disabled={busy || invite.trim().length !== 6}
+                  className="shrink-0 px-4 py-2 bg-primary-container text-on-primary-container font-label text-label-sm font-bold uppercase tracking-widest rounded-lg hover:shadow-[0_0_15px_rgba(217,119,7,0.4)] transition-all disabled:opacity-50"
+                >
+                  Join
+                </button>
+              </div>
+            </form>
           </div>
         )}
 

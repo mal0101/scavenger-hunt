@@ -150,9 +150,28 @@ export async function getTeamRank(
   gameId: string,
   teamId: string
 ): Promise<number | null> {
-  const key = getLeaderboardKey(gameId);
-  const rank = await redis.zrevrank(key, teamId);
-  return rank !== null ? rank + 1 : null;
+  if (REAL_REDIS) {
+    try {
+      const key = getLeaderboardKey(gameId);
+      const rank = await redis.zrevrank(key, teamId);
+      // A team that has never scored is absent from the zset; fall back to the
+      // DB ordering so the player dashboard still shows a concrete rank.
+      if (rank !== null) return rank + 1;
+    } catch (error) {
+      console.warn(
+        `[Leaderboard] Redis rank read failed for team ${teamId}, falling back to DB:`,
+        error instanceof Error ? error.message : "unknown"
+      );
+    }
+  }
+
+  const teams = await db.team.findMany({
+    where: { game_id: gameId },
+    orderBy: [{ total_score: "desc" }, { created_at: "asc" }],
+    select: { id: true },
+  });
+  const idx = teams.findIndex((t) => t.id === teamId);
+  return idx >= 0 ? idx + 1 : null;
 }
 
 export async function removeTeamFromLeaderboard(

@@ -78,6 +78,19 @@ test.describe("mentor admin UI", () => {
     await expect(page.getByRole("button", { name: "Start Game" })).toBeVisible();
   });
 
+  test("dashboard hero streams the live leaderboard over SSE", async ({ page }) => {
+    await signIn(page);
+    await page.goto("/mentor/dashboard");
+    await page.waitForURL("**/mentor/dashboard");
+
+    await expect(page.getByRole("heading", { name: "Command Center" })).toBeVisible();
+
+    // The seeded game is ACTIVE, so the hero panel subscribes to the leaderboard
+    // SSE. Once connected its subtitle reads "Live Leaderboard".
+    await expect(page.getByText("Live Leaderboard")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole("link", { name: "Manage Hunt" })).toBeVisible();
+  });
+
   test("generate QR codes for a game produces one render per index", async ({
     page,
   }) => {

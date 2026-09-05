@@ -1,13 +1,15 @@
-# Scavenger-Hunt — Handoff: Milestone 1 (Credentials Auth + Single-Claim QR)
+# Scavenger-Hunt — Handoff: Credentials Auth + Single-Claim QR + Teams + Dashboard
 
-This document is the operational handoff for the **Milestone 1** work on branch
-`feat/credentials-teams-dashboard-qr-value`. It replaces OTP/phone auth with
-**username + password** credentials, adds the **single-claim QR** model (a code is
-fully depleted the first time it is scanned), and re-anchors the entire test surface
-(unit, integration, Playwright browser) on that model.
+This document is the operational handoff for the coordinated milestone work on branch
+`feat/credentials-teams-dashboard-qr-value`: **M1** credentials auth (username + password),
+**M4** single-claim QR (a code is fully depleted the first time it is scanned),
+**M2** captain-managed teams, **M3** player dashboard (team rank + passed challenges) with
+a leaderboard DB fallback and an admin SSE-driven leaderboard dashboard, and **M5** the
+no-team join flow. All five pieces land on one re-anchored unit/integration/browser test
+surface.
 
-Everything below was **verified live** this session (unit, typecheck, lint, build,
-migration reset + seed).
+Everything below was **verified live** (unit, typecheck, lint, build, integration,
+Playwright browser) in this session.
 
 ---
 
@@ -19,9 +21,9 @@ migration reset + seed).
 | TypeScript | `npx tsc --noEmit` | clean (exit 0) |
 | Lint | `npm run lint` | 0 errors; 3 pre-existing warnings (see §8) |
 | Build | `npm run build` | success (exit 0) |
-| Migration | `prisma migrate reset --force` + seed | applied clean, reseeded |
-| Integration | `npm run test:integration` (dev server on 3000) | **105 assertions PASSED** |
-| Browser | `npm run test:browser` (dev server on 3100) | **34 / 34 PASSED** |
+| Migration | `prisma migrate reset --force` + seed | applied clean, reseeded (M1) |
+| Integration | `BASE_URL=… npm run test:integration` | **107 assertions PASSED** |
+| Browser | `npm run test:browser` (dev server on 3100) | **38 / 38 PASSED** |
 
 ---
 
@@ -118,15 +120,21 @@ npx playwright test sse --project=player-mobile
 - `player-mobile` (Pixel 7, 390×844, touch, camera+geolocation permissions):
   - `auth.spec.ts` — unauthenticated guard/redirect, public pages, **credentials UI
     login flow** (short-username client error, unknown-account server error, valid login
-    → `/dock`), mentor routing, player-can't-reach-mentor, logout clearing session.
-  - `shell.spec.ts` — every player page renders while authenticated.
+    → no-team join screen `/team` per M5), crewed dashboard profile display, mentor
+    routing, player-can't-reach-mentor, logout clearing session.
+  - `shell.spec.ts` — every player page renders while authenticated (user is crewed so
+    the dock is reachable).
+  - `team.spec.ts` — captain crew/invite/controls view, team-less prompt with inline
+    **create + join-by-invite forms**, and the `/dock` → `/team` redirect for team-less
+    players.
   - `scan.spec.ts` — **full camera pipeline** (synthetic canvas stream → decode →
     verify → **full-pool** score → result page), tampered-QR error banner, camera-denied
     UX, and a **depleted-code injection** (re-scanned QR → `QR_DEPLETED`).
   - `sse.spec.ts` — leaderboard fan-out across two sessions with no reload; live timer
     countdown ticking.
   - `mentor.spec.ts` (also desktop) — game detail state controls/config, full state
-    machine, batch QR generation.
+    machine, **dashboard hero streaming the live leaderboard over SSE**, batch QR
+    generation.
   - `security.spec.ts` (also desktop) — headers, Permissions-Policy, CSP-clean journey.
   - `pwa.spec.ts` (also desktop) — SW serves/registers, static asset caching, offline nav.
 - `mentor-desktop` (Desktop Chrome, 1440×900) — `testMatch: /(mentor|security|pwa)\.spec\.ts/`.
@@ -187,7 +195,37 @@ attaches the same collectors to extra pages (e.g. the second SSE context).
   4-item shell).
 - Integration S3 covers the full matrix (kick/403, rejoin, captain-blocked-leave,
   transfer, promote-then-leave, lone-captain disband). Browser `team.spec.ts` covers
-  the captain view and the team-less prompt; `/team` renders in `shell.spec.ts`.
+  the captain view, the team-less prompt + inline create, join-by-invite-code, and the
+  /dock → /team redirect; `/team` renders in `shell.spec.ts`.
+
+### Player dashboard + leaderboard robustness (M3)
+- `lib/game/leaderboard.ts` `getTeamRank` now falls back to the **DB ordering**
+  (`total_score desc, created_at asc`) when Redis is mock/absent/empty, so a team that
+  has never scored (or a dev with blank Upstash vars) still gets a concrete rank. The
+  zset path stays first when real Redis is configured; a missing member falls through.
+- `GET /api/v1/players/me` now also returns `passed_challenges` (scan count —
+  `Scan @@unique([player_id, index_id])` makes each passed index count once) and
+  `team_rank` (`null` when not in a team).
+- Player dock (`app/(player)/dock/page.tsx`) "Your Status" is now a 4-tile grid:
+  Score, Team Rank (`#n`), Passed, Team.
+- Mentor dashboard (`app/(mentor)/mentor/dashboard/page.tsx`) hero leaderboard is now
+  **SSE-driven** via `useLeaderboard`, with a LIVE/POLLING badge and a
+  "Waiting for teams to scan…" empty state; the REST 15s detail poll remains as fallback.
+  `useLeaderboard`'s entry type gained the optional `member_count` the SSE emits.
+- Browser `scan.spec.ts` asserts the dock tiles after a real scan (rank `#n`, Passed 1);
+  `mentor.spec.ts` asserts the dashboard hero subscribes ("Live Leaderboard" + Manage Hunt).
+
+### No-team join flow (M5)
+- `app/(player)/dock/page.tsx` redirects a team-less player to `/team` after loading
+  (`router.replace`, guarded so it never loops).
+- `app/(player)/team/page.tsx` team-less state now has **inline create-crew** (name input)
+  and **join-by-invite-code** (6-char input) forms; success refetches the crew view.
+- `teamSchema.invite_code` stays optional, but `team_name` is now **optional** so a
+  join-by-code POST needs no dummy name; the create branch rejects a missing name with
+  `VALIDATION_ERROR`.
+- Browser `team.spec.ts` adds join-by-invite UI + dock-redirect tests; `auth.spec.ts` and
+  `shell.spec.ts` were realigned (the shell/auth users now get a crew because the dock is
+  no longer reachable team-less; the fresh-login flow asserts it lands on `/team`).
 
 ### Remarks / dead code
 - `calculateScanScore` (time bonus) is no longer used by the scan route (QR value is now a
@@ -267,23 +305,26 @@ attaches the same collectors to extra pages (e.g. the second SSE context).
 
 ## 10. Committed scope / next up
 
-This handoff covers **two commits** on `feat/credentials-teams-dashboard-qr-value`:
+This handoff covers **three commits** on `feat/credentials-teams-dashboard-qr-value`:
 
 1. **M1 + M4 core** — credentials auth (schema, libs, admin user routes, login UI), the
    `QrCode` single-claim model through generator/validator/scan route, rewritten
-   unit/integration/browser tests, test-suite invocation fixes, and this handoff.
-2. **M2 (current)** — captain-managed teams: `GET/DELETE players/me/team` + captain-only
+   unit/integration/browser tests, test-suite invocation fixes, and the base handoff.
+2. **M2** — captain-managed teams: `GET/DELETE players/me/team` + captain-only
    `DELETE/PATCH players/me/team/members/[playerId]`, the `/team` player UI, integration
-   S3 captain matrix, browser `team.spec.ts`, plus fixes surfaced by running the browser
-   and integration tiers for real (login plain-fetch, `test:browser` config path,
-   integration QR re-arm + scan-team setup, `scan.spec` user-isolation, QR re-arm on
-   generate).
+   S3 captain matrix, browser `team.spec.ts`, plus fixes surfaced by running the real
+   tiers (login plain-fetch, `test:browser` config path, integration QR re-arm + scan-team
+   setup, `scan.spec` user-isolation, QR re-arm on generate).
+3. **M3 + M5 (current)** — dashboard stats (pass challenge count + team rank via DB-fallback
+   `getTeamRank`), 4-tile player dock, SSE-driven mentor dashboard hero, inline
+   create/join forms on `/team`, and the team-less dock → `/team` redirect; integration M3
+   checks, browser dashboard/team/auth/shell realignments, and a deterministic
+   tampered-signature fix (XOR-tainted first hex digit instead of a no-op `"0"` prefix).
 
-**Not yet implemented (next milestones):**
-- **M3** — player dashboard (team rank + passed challenges) + leaderboard DB fallback for
-  `getTeamRank` + admin SSE leaderboard page.
-- **M5** — no-team join flow (user with no team is taken to team creation/join instead of
-  hitting the dock directly).
-- **Not committed (never stage):** the user’s personal repo files `PLAN.md`,
-  `scavenger_hunt.pdf`, `stitch_hydraulic_echoes_of_casablanca.zip`, and the
-  `stitch_hydraulic_echoes_of_casablanca/` directory.
+The five coordinated milestones (M1 credentials auth, M4 single-claim QR, M2 captain
+teams, M3 player dashboard + leaderboard, M5 no-team join) are all implemented and
+verified. No milestone work remains pending.
+
+**Not committed (never stage):** the user’s personal repo files `PLAN.md`,
+`scavenger_hunt.pdf`, `stitch_hydraulic_echoes_of_casablanca.zip`, and the
+`stitch_hydraulic_echoes_of_casablanca/` directory.

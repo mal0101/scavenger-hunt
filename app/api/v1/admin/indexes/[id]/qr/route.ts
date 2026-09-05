@@ -32,7 +32,12 @@ export async function POST(
 
     const qrCode = await db.qrCode.upsert({
       where: { index_id_round_id: { index_id: id, round_id } },
-      update: {},
+      update: {
+        points: index.points,
+        pool_value: index.points,
+        status: "ACTIVE",
+        first_scanned_at: null,
+      },
       create: {
         index_id: id,
         game_id,

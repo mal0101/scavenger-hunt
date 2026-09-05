@@ -15,6 +15,7 @@ const SUF = Date.now().toString(36);
 const PW = "TestPass_2026!";
 const P1 = `qa_scan_p1_${SUF}`;
 const P2 = `qa_scan_p2_${SUF}`;
+const P3 = `qa_scan_p3_${SUF}`;
 let createdUsernames: string[] = [];
 
 // The seeded game's QR codes are single-claim, so every scan test grabs a
@@ -164,7 +165,7 @@ test.describe("QR camera scan", () => {
     context,
   }) => {
     const { gameId, roundId, index, codeId } = await setup(INDEX_DEPLETED);
-    await authPlayer(page, P1);
+    await authPlayer(page, P3);
     await joinTeam(page);
 
     const encoded = encodeQrPayload(createQrPayload(index.id, gameId, roundId, codeId));

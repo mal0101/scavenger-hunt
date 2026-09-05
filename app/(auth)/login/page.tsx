@@ -2,7 +2,6 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { apiFetch } from "@/lib/api-client";
 
 function LoginForm() {
   const router = useRouter();
@@ -29,21 +28,28 @@ function LoginForm() {
 
     setLoading(true);
     try {
-      const res = await apiFetch<{
+      // Plain fetch, not apiFetch: a 401 here is an *expected* login failure
+      // that must surface the friendly error, not trigger the token-refresh
+      // path (which would try to reload /login and wipe the message).
+      const res = await fetch("/api/v1/auth/login", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: username.trim(), password }),
+      });
+
+      const body = (await res.json()) as {
         success: boolean;
         message: string;
         data?: { user?: { role?: string } };
-      }>("/api/v1/auth/login", {
-        method: "POST",
-        body: { username: username.trim(), password },
-      });
+      };
 
-      if (!res.success || !res.data?.user) {
-        setError(res.message || "Invalid username or password.");
+      if (!res.ok || !body.success || !body.data?.user) {
+        setError(body.message || "Invalid username or password.");
         return;
       }
 
-      const role = res.data.user.role;
+      const role = body.data.user.role;
       router.push(role === "MENTOR" ? "/mentor/dashboard" : redirect);
       router.refresh();
     } catch (err) {

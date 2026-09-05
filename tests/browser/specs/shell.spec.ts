@@ -31,6 +31,7 @@ test.describe("player shell pages", () => {
       { path: "/enigma", heading: null },
       { path: "/trap", heading: null },
       { path: "/scan-result", heading: null },
+      { path: "/team", heading: "Your Crew" },
     ];
 
     for (const p of pages) {

@@ -18,11 +18,10 @@ migration reset + seed).
 | Unit | `npm test` | **43 / 43** |
 | TypeScript | `npx tsc --noEmit` | clean (exit 0) |
 | Lint | `npm run lint` | 0 errors; 3 pre-existing warnings (see §8) |
-| Build | `npm run build` | success (pages include `/login` only; `/verify` removed) |
+| Build | `npm run build` | success (exit 0) |
 | Migration | `prisma migrate reset --force` + seed | applied clean, reseeded |
-
-Browser (`npm run test:browser`) and integration (`npm run test:integration`) require a
-running dev server — see §2 and §3.
+| Integration | `npm run test:integration` (dev server on 3000) | **105 assertions PASSED** |
+| Browser | `npm run test:browser` (dev server on 3100) | **34 / 34 PASSED** |
 
 ---
 
@@ -171,16 +170,35 @@ attaches the same collectors to extra pages (e.g. the second SSE context).
   increments player + team scores and Redis/SSE as before.
 - `tests/browser/global-setup.ts` re-arms all seed QR codes to ACTIVE + full pool each run.
 
-### Teams
-- `Team.captain_id` (created player becomes captain); the `players/me/team` create route
-  sets it. A full separate M2 (captain manages up-to-4 members) is **not yet** implemented;
-  this milestone only wires the creator as captain and keeps the existing
-  create/join-by-invite flow.
+### Teams (M2)
+- `Team.captain_id` (created player becomes captain). **M2 added the full captain
+  management surface**:
+  - `GET /api/v1/players/me/team` — team detail including `members` (username/nickname/
+    score/status), `is_captain` (requester view), `member_count`, and captain membership
+    flags; returns `{ team: null }` when the player is not in a team.
+  - `DELETE /api/v1/players/me/team` — leave team. The captain cannot leave while
+    crewmates remain (`CAPTAIN_CANNOT_LEAVE`); a sole member's leave disbands the team.
+  - `DELETE /api/v1/players/me/team/members/[playerId]` — captain-only kick (403 for
+    non-captains, `NOT_YOUR_TEAM` cross-team, captains cannot self-kick).
+  - `PATCH /api/v1/players/me/team/members/[playerId]` — captain-only leadership
+    transfer.
+- Player UI: new `/team` page (crew list, invite code copy, kick/transfer/leave
+  controls) reachable from the dock Quick Actions. No new player nav item (kept the
+  4-item shell).
+- Integration S3 covers the full matrix (kick/403, rejoin, captain-blocked-leave,
+  transfer, promote-then-leave, lone-captain disband). Browser `team.spec.ts` covers
+  the captain view and the team-less prompt; `/team` renders in `shell.spec.ts`.
 
 ### Remarks / dead code
 - `calculateScanScore` (time bonus) is no longer used by the scan route (QR value is now a
   fixed pool). It remains in `lib/game/engine.ts` and is still unit-tested; it is harmless
   legacy until the windowed-decay idea is definitively retired.
+- The login page uses **plain `fetch`** (not `apiFetch`) because a 401 there is an expected
+  login failure that must render the friendly error — routing it through `apiFetch` made it
+  try the refresh path and reload `/login`, wiping the message.
+- Both QR routes (`indexes/generate` batch and `indexes/[id]/qr`) **re-arm** a QrCode on
+  upsert (ACTIVE, full pool, `first_scanned_at: null`) — generating is the mentor's
+  explicit re-provision action, matching the browser `global-setup`.
 
 ---
 
@@ -228,11 +246,18 @@ attaches the same collectors to extra pages (e.g. the second SSE context).
 ## 9. Coordination / sequencing caveats
 
 - **Browser (3100) and integration (3000) are separate servers.** Don’t mix ports.
-  Integration succeeds against `next dev` only (mock Redis), not a prod build.
-- **Both suites mutate the shared seed game.** Because seed QRs are single-claim, run them
-  **sequentially, not in parallel** — otherwise the scan specs and the integration scan
-  matrix can exhaust the same scarce codes. The browser `global-setup` re-arms codes at
-  the start of each browser run, but a parallel integration run would race it.
+  Integration succeeds against `next dev` only (mock Redis), not a prod build. Only one
+  `next dev` process may run per repo dir (Next 16 refuses a second), so run the two
+  suites **sequentially**, restarting the server on the new port between tiers — or just
+  re-point `PW_BASE_URL`/`BASE_URL` at whichever port is live.
+- **Both suites mutate the shared seed game.** Both **re-arm the seed QR codes** at the
+  start of their run (integration in `createFixtures()`, browser in `global-setup`), so
+  each suite is idempotent and can be re-run repeatedly. Run them sequentially regardless
+  (single-claim codes + the Next-16 single-server constraint).
+- **`npm run test:browser` must point at the browser config** (it now does):
+  `playwright test --config=tests/browser/playwright.config.ts`. Running plain
+  `playwright test` from the repo root never loads `tests/browser/playwright.config.ts`,
+  so `baseURL`/global-setup silently don’t run (failures: “Cannot navigate to invalid URL”).
 - Integration self-cleans its `qa_int_*` users, `QA-*` games/teams, and the transition game
   in a `finally` block; the browser `global-setup` + per-spec `afterAll` clean `qa_*` users,
   `QA-Browser-*` games, and orphan teams.
@@ -242,15 +267,23 @@ attaches the same collectors to extra pages (e.g. the second SSE context).
 
 ## 10. Committed scope / next up
 
-This milestone commits the **M1 + the single-claim QR core (M4)** end-to-end:
-credentials auth (schema, libs, admin user routes, login UI), the `QrCode` single-claim
-model through generator/validator/scan route, the rewritten unit/integration/browser test
-surface, and the updated HANDOFF.
+This handoff covers **two commits** on `feat/credentials-teams-dashboard-qr-value`:
+
+1. **M1 + M4 core** — credentials auth (schema, libs, admin user routes, login UI), the
+   `QrCode` single-claim model through generator/validator/scan route, rewritten
+   unit/integration/browser tests, test-suite invocation fixes, and this handoff.
+2. **M2 (current)** — captain-managed teams: `GET/DELETE players/me/team` + captain-only
+   `DELETE/PATCH players/me/team/members/[playerId]`, the `/team` player UI, integration
+   S3 captain matrix, browser `team.spec.ts`, plus fixes surfaced by running the browser
+   and integration tiers for real (login plain-fetch, `test:browser` config path,
+   integration QR re-arm + scan-team setup, `scan.spec` user-isolation, QR re-arm on
+   generate).
 
 **Not yet implemented (next milestones):**
-- **M2** — captain manages up to 4 members (separate captain routes, team page UI).
 - **M3** — player dashboard (team rank + passed challenges) + leaderboard DB fallback for
   `getTeamRank` + admin SSE leaderboard page.
+- **M5** — no-team join flow (user with no team is taken to team creation/join instead of
+  hitting the dock directly).
 - **Not committed (never stage):** the user’s personal repo files `PLAN.md`,
   `scavenger_hunt.pdf`, `stitch_hydraulic_echoes_of_casablanca.zip`, and the
   `stitch_hydraulic_echoes_of_casablanca/` directory.

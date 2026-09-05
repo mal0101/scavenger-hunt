@@ -152,6 +152,17 @@ export default function DockPage() {
             </span>
           </a>
           <a
+            href="/team"
+            className="flex flex-col items-center gap-2 p-4 brass-plate rounded-lg hover:bg-surface-container-highest transition-all group"
+          >
+            <span className="material-symbols-outlined text-on-surface-variant text-2xl group-hover:text-primary transition-colors">
+              groups
+            </span>
+            <span className="font-label text-label-sm text-on-surface-variant font-bold uppercase group-hover:text-primary transition-colors">
+              Team
+            </span>
+          </a>
+          <a
             href="/leaderboard"
             className="flex flex-col items-center gap-2 p-4 brass-plate rounded-lg hover:bg-surface-container-highest transition-all group"
           >

@@ -221,6 +221,16 @@ async function createFixtures(): Promise<void> {
   await db.game.deleteMany({ where: { title: { startsWith: "QA-" } } });
   await db.team.deleteMany({ where: { name: { startsWith: "QA-" } } });
 
+  // Re-arm every QR code for the seeded game so the single-claim scan matrix
+  // starts from a clean slate on every run (previous runs deplete them).
+  await db.qrCode.updateMany({
+    where: { game_id: SEED_GAME_ID },
+    data: { status: "ACTIVE", first_scanned_at: null },
+  });
+  await db.$executeRawUnsafe(
+    `UPDATE qr_codes SET pool_value = points WHERE game_id = '${SEED_GAME_ID}'`
+  );
+
   const mentor = await db.user.findUnique({ where: { username: SEED_MENTOR_USERNAME } });
   const createdBy = mentor?.id ?? "unknown";
 
@@ -421,7 +431,67 @@ async function s3Teams(): Promise<string[]> {
   res = await api("/api/v1/players/me/team", { method: "POST", body: { team_name: "QA-Overflow" }, jar: fullJar });
   check(res.status === 409 && res.json?.error === "MAX_TEAMS_REACHED", "team create blocked at MAX_TEAMS_PER_GAME");
 
-  return usernames;
+  // ── M2: captain management (GET detail, kick, leave, transfer, disband) ──
+  const capUsers = Array.from({ length: 3 }, (_, i) => uniqueUsername(`cap${i + 1}`).slice(0, 28));
+  const capJars = capUsers.map(() => new Map() as Jar);
+  await Promise.all(
+    capUsers.map(async (u, i) => {
+      await provisionUser(u, SEED_PLAYER_PASSWORD);
+      return signIn(capJars[i], u, SEED_PLAYER_PASSWORD);
+    })
+  );
+
+  res = await api("/api/v1/players/me/team", { jar: capJars[0] });
+  check(res.status === 200 && res.json?.data?.team === null, "GET team returns null when not in a team");
+
+  res = await api("/api/v1/players/me/team", { method: "POST", body: { team_name: "QA-Captain" }, jar: capJars[0] });
+  check(res.status === 200 && res.json?.data?.invite_code, "captain creates a fresh team");
+  const capCode = res.json?.data?.invite_code as string;
+
+  res = await api("/api/v1/players/me/team", { method: "POST", body: { team_name: "x", invite_code: capCode }, jar: capJars[1] });
+  check(res.status === 200, "member joins the captain team");
+
+  res = await api("/api/v1/players/me/team", { jar: capJars[0] });
+  const capTeam = res.json?.data?.team as { members: Array<{ id: string; username: string; is_captain: boolean; is_me: boolean }> } | null;
+  check(Boolean(capTeam) && capTeam?.members.length === 2, "GET team lists members");
+  const captainLookup = capTeam?.members.find((m) => m.is_captain);
+  check(Boolean(captainLookup) && captainLookup?.is_me === true, "GET team exposes is_captain flag");
+  const memberId = (capTeam?.members.find((m) => !m.is_captain)?.id ?? "") as string;
+
+  res = await api(`/api/v1/players/me/team/members/${memberId}`, { method: "DELETE", jar: capJars[1] });
+  check(res.status === 403, "non-captain cannot kick a crewmate (403)");
+
+  res = await api(`/api/v1/players/me/team/members/${memberId}`, { method: "DELETE", jar: capJars[0] });
+  check(res.status === 200, "captain kicks a member (200)");
+
+  res = await api("/api/v1/players/me/team", { jar: capJars[1] });
+  check(res.json?.data?.team === null, "kicked member is no longer on the team");
+
+  res = await api("/api/v1/players/me/team", { method: "POST", body: { team_name: "x", invite_code: capCode }, jar: capJars[1] });
+  check(res.status === 200, "kicked member can rejoin by invite");
+
+  res = await api("/api/v1/players/me/team", { method: "DELETE", jar: capJars[0] });
+  check(res.status === 409 && res.json?.error === "CAPTAIN_CANNOT_LEAVE", "captain cannot leave while crewmates remain");
+
+  res = await api(`/api/v1/players/me/team/members/${memberId}`, { method: "PATCH", jar: capJars[0] });
+  check(res.status === 200 && res.json?.data?.captain_id === memberId, "captain transfers leadership");
+
+  res = await api(`/api/v1/players/me/team/members/${memberId}`, { method: "PATCH", jar: capJars[0] });
+  check(res.status === 403, "former captain cannot transfer again (403)");
+
+  res = await api("/api/v1/players/me/team", { method: "DELETE", jar: capJars[0] });
+  check(res.status === 200, "former captain can leave after transfer");
+
+  res = await api("/api/v1/players/me/team", { jar: capJars[0] });
+  check(res.json?.data?.team === null, "former captain is team-less after leaving");
+
+  res = await api("/api/v1/players/me/team", { method: "DELETE", jar: capJars[1] });
+  check(res.status === 200 && res.json?.data?.left === true, "sole remaining captain can leave (team disbands)");
+
+  res = await api("/api/v1/players/me/team", { jar: capJars[1] });
+  check(res.json?.data?.team === null, "team is gone after dissolution");
+
+  return [...usernames, ...capUsers];
 }
 
 async function s4ScanMatrix(): Promise<string[]> {
@@ -448,10 +518,15 @@ async function s4ScanMatrix(): Promise<string[]> {
   await signIn(jars[0], usernames[0], SEED_PLAYER_PASSWORD);
   await signIn(jars[1], usernames[1], SEED_PLAYER_PASSWORD);
 
+  // The scanning player must belong to a team (the scan route enforces NO_TEAM
+  // otherwise). The second player stays team-less to exercise that guard.
+  let res = await api("/api/v1/players/me/team", { method: "POST", body: { team_name: "QA-Scan-Team" }, jar: jars[0] });
+  check(res.status === 200, "scan player creates a team");
+
   // Mentor is forbidden to scan.
   const mentorJar: Jar = new Map();
   await signIn(mentorJar, SEED_MENTOR_USERNAME, SEED_MENTOR_PASSWORD);
-  let res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: signedQr(index.id, SEED_GAME_ID, round.id, qr1.id) }, jar: mentorJar });
+  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: signedQr(index.id, SEED_GAME_ID, round.id, qr1.id) }, jar: mentorJar });
   check(res.status === 403, "mentor cannot scan (403)");
 
   // Happy path: a valid first scan drains the pool and awards full points.

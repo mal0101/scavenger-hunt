@@ -8,9 +8,10 @@ import { useQRStore, type ScanResultPayload } from "@/stores/qr-store";
 function ScanResultContent() {
   const searchParams = useSearchParams();
   const type = searchParams.get("type") ?? "index";
-  const { lastScanResult, scanType, clearScanResult } = useQRStore();
+  const dataParam = searchParams.get("data");
+  const { lastScanResult, clearScanResult } = useQRStore();
 
-  const isTrap = type === "trap" && scanType === "trap";
+  const isTrap = type === "trap";
 
   useEffect(() => {
     return () => {
@@ -18,17 +19,31 @@ function ScanResultContent() {
     };
   }, [clearScanResult]);
 
-  const scanResult: ScanResultPayload = lastScanResult ?? {
-    index_label: "",
-    game_id: "",
-    points_earned: 0,
-    team_total: 0,
-    scan_id: "",
-  };
+  let scanResult: ScanResultPayload;
 
-  const hasData = lastScanResult !== null;
+  if (dataParam) {
+    try {
+      scanResult = JSON.parse(decodeURIComponent(dataParam)) as ScanResultPayload;
+    } catch {
+      scanResult = lastScanResult ?? {
+        index_label: "",
+        game_id: "",
+        points_earned: 0,
+        team_total: 0,
+        scan_id: "",
+      };
+    }
+  } else {
+    scanResult = lastScanResult ?? {
+      index_label: "",
+      game_id: "",
+      points_earned: 0,
+      team_total: 0,
+      scan_id: "",
+    };
+  }
 
-  if (!hasData) {
+  if (!scanResult.index_label && !scanResult.scan_id) {
     return (
       <div className="px-4 space-y-4 max-w-lg mx-auto">
         <div className="bg-surface-container rounded-xl p-8 text-center border border-outline-variant/30">
@@ -58,7 +73,10 @@ function ScanResultContent() {
     <div className="px-4 space-y-4 max-w-lg mx-auto">
       <div className="space-y-4">
         {isTrap ? (
-          <Link href="/trap" className="block">
+          <Link
+            href={`/trap?data=${encodeURIComponent(dataParam ?? "")}`}
+            className="block"
+          >
             <div className="bg-surface-container-highest rounded-xl p-6 space-y-4 border-t-error border-l border-r border-b border-outline-variant hover:scale-[1.02] transition-transform cursor-pointer relative overflow-hidden ambient-glow">
               <div
                 className="absolute inset-0 opacity-5 pointer-events-none"

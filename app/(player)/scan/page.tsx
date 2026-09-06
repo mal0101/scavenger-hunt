@@ -9,7 +9,7 @@ import type { ActiveGameView } from "@/lib/types/api-responses";
 
 export default function ScanPage() {
   const router = useRouter();
-  const { showScanError, setShowScanError, setScanResult } = useQRStore();
+  const { setScanResult } = useQRStore();
   const [scanStatus, setScanStatus] = useState<"idle" | "scanning" | "found">("idle");
   const [game, setGame] = useState<ActiveGameView | null>(null);
   const [gameLoading, setGameLoading] = useState(true);
@@ -90,19 +90,19 @@ export default function ScanPage() {
         }
 
         const type = j.data.index.type === "trap" ? "trap" : "index";
-        setScanResult(
-          {
-            index_label: j.data.index.label,
-            game_id: game.id,
-            points_earned: j.data.points_earned,
-            team_total: j.data.team_total,
-            scan_id: j.data.scan_id,
-            question: j.data.question ?? null,
-            at_risk: j.data.at_risk ?? null,
-          },
-          type
+        const payload = {
+          index_label: j.data.index.label,
+          game_id: game.id,
+          points_earned: j.data.points_earned,
+          team_total: j.data.team_total,
+          scan_id: j.data.scan_id,
+          question: j.data.question ?? null,
+          at_risk: j.data.at_risk ?? null,
+        };
+        setScanResult(payload, type);
+        router.push(
+          `/scan-result?type=${type}&data=${encodeURIComponent(JSON.stringify(payload))}`
         );
-        router.push(`/scan-result?type=${type}`);
       } catch (err) {
         const message =
           err instanceof ApiError
@@ -122,13 +122,13 @@ export default function ScanPage() {
 
   const handleError = useCallback(
     (error: string) => {
-      setShowScanError(true);
+      setSubmitError(error);
       console.error("Scan error:", error);
     },
-    [setShowScanError]
+    []
   );
 
-  const { scanning, hasCamera, startScanning, stopScanning } = useCamera({
+  const { scanning, startScanning, stopScanning } = useCamera({
     onScan: handleScan,
     onError: handleError,
   });
@@ -238,10 +238,27 @@ export default function ScanPage() {
         )}
       </div>
 
+      {/* Scan / camera error banner */}
+      {submitError && (
+        <div className="bg-error-container/20 border border-error/40 rounded-xl px-4 py-3 flex items-start gap-3">
+          <span className="material-symbols-outlined text-error">error</span>
+          <p className="font-body text-body-md text-on-surface flex-1">
+            {submitError}
+          </p>
+          <button
+            onClick={() => setSubmitError("")}
+            aria-label="Dismiss scan error"
+            className="material-symbols-outlined text-on-surface-variant text-lg"
+          >
+            close
+          </button>
+        </div>
+      )}
+
       {/* Action Button */}
       <button
         onClick={toggleScanning}
-        disabled={!hasCamera || submitting || (gameLoading && !game)}
+        disabled={submitting || (gameLoading && !game)}
         className="w-full py-4 rounded-xl bg-primary-container text-on-primary-container font-label text-label-sm font-bold uppercase tracking-widest flex items-center justify-center gap-2 hover:shadow-[0_0_20px_rgba(217,119,7,0.4)] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <span className="material-symbols-outlined text-lg">
@@ -251,11 +268,9 @@ export default function ScanPage() {
           ? "Stop Scanning"
           : submitting
             ? "Verifying..."
-            : hasCamera
-              ? game
-                ? "Start Scanner"
-                : "Awaiting Hunt"
-              : "Camera Unavailable"}
+            : game
+              ? "Start Scanner"
+              : "Awaiting Hunt"}
       </button>
         </>
       )}

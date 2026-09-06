@@ -31,14 +31,27 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const user = await db.user.findUnique({ where: { username } });
+    const isPhoneLike = /^\+?[0-9]{8,15}$/.test(username);
+    const user = isPhoneLike
+      ? await db.user.findFirst({
+          where: { phone_number: username },
+        })
+      : await db.user.findUnique({ where: { username } });
     if (!user) {
-      return apiError("Invalid username or password", "INVALID_CREDENTIALS", 401);
+      return apiError(
+        "Invalid username or phone number or password",
+        "INVALID_CREDENTIALS",
+        401
+      );
     }
 
     const valid = await verifyPassword(password, user.password_hash);
     if (!valid) {
-      return apiError("Invalid username or password", "INVALID_CREDENTIALS", 401);
+      return apiError(
+        "Invalid username or phone number or password",
+        "INVALID_CREDENTIALS",
+        401
+      );
     }
 
     if (user.role === "PLAYER") {

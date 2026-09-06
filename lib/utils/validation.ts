@@ -5,8 +5,8 @@ export const usernameSchema = z
   .min(3, "Username must be at least 3 characters")
   .max(32, "Username must be at most 32 characters")
   .regex(
-    /^[a-zA-Z0-9_.-]+$/,
-    "Username may only contain letters, numbers, dots, dashes and underscores"
+    /^\+?[a-zA-Z0-9_.-]+$/,
+    "Username may only contain letters, numbers, dots, dashes, underscores or a leading + sign"
   );
 
 export const passwordSchema = z
@@ -46,6 +46,7 @@ export const gameSchema = z.object({
 
 export const indexSchema = z.object({
   game_id: z.string().uuid(),
+  round_id: z.string().uuid().optional(),
   label: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
   points: z.number().int().min(1).max(100).default(25),
@@ -53,6 +54,8 @@ export const indexSchema = z.object({
   location_lat: z.number().min(-90).max(90).optional(),
   location_lng: z.number().min(-180).max(180).optional(),
   enigma_type: z.string().max(50).optional(),
+  question: z.string().max(500).optional(),
+  answer: z.string().max(500).optional(),
 });
 
 export const scanSchema = z.object({

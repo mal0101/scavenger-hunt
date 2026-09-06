@@ -160,11 +160,27 @@ export async function getRoundForGame(
 export async function getIndexesForGame(
   gameId: string,
   roundId: string
-): Promise<Array<{ id: string; label: string; points: number }>> {
+): Promise<
+  Array<{
+    id: string;
+    label: string;
+    points: number;
+    question: string | null;
+    answer: string | null;
+    enigma_type: string | null;
+  }>
+> {
   const db = dbInstance();
   return db.index.findMany({
     where: { game_id: gameId, round_id: roundId },
-    select: { id: true, label: true, points: true },
+    select: {
+      id: true,
+      label: true,
+      points: true,
+      question: true,
+      answer: true,
+      enigma_type: true,
+    },
   });
 }
 

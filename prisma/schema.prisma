@@ -107,6 +107,8 @@ model Index {
   location_lat  Float?
   location_lng  Float?
   enigma_type   String?
+  question      String?
+  answer        String?
   created_at    DateTime @default(now())
 
   game    Game     @relation(fields: [game_id], references: [id], onDelete: Cascade)
@@ -184,6 +186,7 @@ model Scan {
   game_id       String?
   round_id      String?
   points_earned Int
+  resolved      Boolean  @default(true)
   scanned_at    DateTime @default(now())
   gps_lat       Float?
   gps_lng       Float?

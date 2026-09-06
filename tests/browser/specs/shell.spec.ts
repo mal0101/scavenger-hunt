@@ -36,7 +36,6 @@ test.describe("player shell pages", () => {
       { path: "/leaderboard", heading: "Live Leaderboard" },
       { path: "/vault", heading: null },
       { path: "/logs", heading: null },
-      { path: "/enigma", heading: null },
       { path: "/trap", heading: null },
       { path: "/scan-result", heading: null },
       { path: "/team", heading: "Your Crew" },

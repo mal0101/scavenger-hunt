@@ -68,7 +68,7 @@ test.describe("security headers & CSP", () => {
     await page.goto("/dock");
     await page.goto("/leaderboard");
     await page.goto(
-      "/scan-result?type=enigma&data=" +
+      "/scan-result?type=index&data=" +
         encodeURIComponent(
           '{"index_label":"x","points_earned":10,"team_total":10,"scan_id":"none"}'
         )

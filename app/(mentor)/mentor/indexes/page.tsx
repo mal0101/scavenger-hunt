@@ -11,6 +11,7 @@ interface IndexEntry {
   points: number;
   location_name: string | null;
   enigma_type: string | null;
+  question: string | null;
   scan_count: number;
 }
 
@@ -31,6 +32,8 @@ export default function MentorIndexesPage() {
   const [qrBusy, setQrBusy] = useState(false);
   const [qrResult, setQrResult] = useState<Array<{ index_id?: string; label: string; format?: string; svg?: string; data_url?: string }>>([]);
   const [activeQr, setActiveQr] = useState<IndexEntry | null>(null);
+  const [activeQrData, setActiveQrData] = useState<string | null>(null);
+  const [activeQrLoading, setActiveQrLoading] = useState(false);
   const [form, setForm] = useState({
     game_id: "",
     label: "",
@@ -38,6 +41,8 @@ export default function MentorIndexesPage() {
     points: 25,
     location_name: "",
     enigma_type: "",
+    question: "",
+    answer: "",
   });
 
   useEffect(() => {
@@ -82,12 +87,14 @@ export default function MentorIndexesPage() {
           points: Number(form.points),
           location_name: form.location_name || undefined,
           enigma_type: form.enigma_type || undefined,
+          question: form.question || undefined,
+          answer: form.answer || undefined,
           description: form.description || undefined,
         },
       });
       if (j.success) {
         setShowCreate(false);
-        setForm({ game_id: "", label: "", description: "", points: 25, location_name: "", enigma_type: "" });
+        setForm({ game_id: "", label: "", description: "", points: 25, location_name: "", enigma_type: "", question: "", answer: "" });
         setRefreshKey((k) => k + 1);
       } else {
         setFormError(j.message || "Failed to create index");
@@ -121,6 +128,29 @@ export default function MentorIndexesPage() {
 
   async function handleOpenQr(index: IndexEntry) {
     setActiveQr(index);
+    setActiveQrData(null);
+    setActiveQrLoading(true);
+    try {
+      const j = await apiFetch<{
+        success: boolean;
+        data: { codes?: Array<{ format: string; data_url?: string; svg?: string }> };
+      }>("/api/v1/admin/indexes/generate", {
+        method: "POST",
+        body: {
+          game_id: index.game_id,
+          index_ids: [index.id],
+          format: "png",
+        },
+      });
+      const code = j.data?.codes?.[0];
+      if (code) {
+        setActiveQrData(code.data_url ?? null);
+      }
+    } catch {
+      setActiveQrData(null);
+    } finally {
+      setActiveQrLoading(false);
+    }
   }
 
   return (
@@ -215,6 +245,30 @@ export default function MentorIndexesPage() {
                 <option value="logic">Logic</option>
               </select>
             </div>
+            {form.enigma_type === "trap" && (
+              <>
+                <div>
+                  <label className="font-label text-label-sm text-on-surface-variant uppercase block mb-2">Trap Question</label>
+                  <input
+                    type="text"
+                    value={form.question}
+                    onChange={(e) => setForm({ ...form, question: e.target.value })}
+                    placeholder="What moves steam through the city below?"
+                    className="w-full px-4 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg font-body text-body-md text-on-surface focus:outline-none focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="font-label text-label-sm text-on-surface-variant uppercase block mb-2">Correct Answer</label>
+                  <input
+                    type="text"
+                    value={form.answer}
+                    onChange={(e) => setForm({ ...form, answer: e.target.value })}
+                    placeholder="steam"
+                    className="w-full px-4 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg font-body text-body-md text-on-surface focus:outline-none focus:border-primary"
+                  />
+                </div>
+              </>
+            )}
           </div>
           {formError && (
             <div className="bg-error-container/20 border border-error/40 rounded-lg p-3 flex items-center gap-3">
@@ -256,42 +310,66 @@ export default function MentorIndexesPage() {
       </div>
 
       {qrResult.length > 0 && (
-        <div className="bg-surface-container rounded-xl border border-primary/30 p-6 space-y-3">
+        <div className="bg-surface-container rounded-xl border border-primary/30 p-6 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="font-headline text-lg text-on-surface">
               Generated QR Codes ({qrResult.length})
             </h3>
-            <button
-              onClick={() => setQrResult([])}
-              className="p-1 rounded text-on-surface-variant hover:text-on-surface"
-            >
-              <span className="material-symbols-outlined">close</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => window.print()}
+                className="px-3 py-1.5 btn-shimmer bg-primary-container/20 border border-primary/40 text-primary font-label text-label-sm font-bold uppercase tracking-widest rounded-lg hover:bg-primary-container/30 transition-all flex items-center gap-2"
+              >
+                <span className="material-symbols-outlined text-lg">print</span>
+                Print
+              </button>
+              <button
+                onClick={() => setQrResult([])}
+                className="p-1 rounded text-on-surface-variant hover:text-on-surface"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {qrResult.map((code) => (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 print-qr-sheet">
+            {qrResult.map((code, i) => (
               <div
                 key={code.index_id}
-                className="p-3 bg-surface-container-low rounded-lg border border-outline-variant/20 flex flex-col items-center gap-2"
+                className="p-4 bg-white rounded-lg border border-outline-variant/20 flex flex-col items-center gap-2"
               >
                 {code.format === "png" && code.data_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={code.data_url} alt={code.label} className="w-28 h-28" />
+                  <img src={code.data_url} alt={code.label} className="w-40 h-40" />
                 ) : code.svg ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={`data:image/svg+xml;utf8,${encodeURIComponent(code.svg)}`}
-                    alt={`QR code for ${code.label}`}
-                    role="img"
-                    className="w-28 h-28"
+                  <div
+                    className="w-40 h-40"
+                    dangerouslySetInnerHTML={{ __html: code.svg }}
                   />
                 ) : (
                   <span className="material-symbols-outlined text-4xl text-on-surface-variant">qr_code</span>
                 )}
-                <p className="font-label text-label-sm text-on-surface text-center">{code.label}</p>
+                <p className="font-label text-sm text-neutral-800 font-bold text-center">{code.label}</p>
+                <p className="font-label text-xs text-neutral-500 text-center">
+                  Index #{i + 1}
+                </p>
               </div>
             ))}
           </div>
+          <style jsx global>{`
+            @media print {
+              body { background: white; }
+              body *:not(.print-qr-sheet):not(.print-qr-sheet *) { visibility: hidden; }
+              .print-qr-sheet {
+                visibility: visible !important;
+              }
+              .print-qr-sheet {
+                position: absolute !important;
+                left: 0;
+                top: 0;
+                width: 100%;
+              }
+            }
+          `}</style>
         </div>
       )}
 
@@ -308,11 +386,22 @@ export default function MentorIndexesPage() {
               <span className="material-symbols-outlined">close</span>
             </button>
             <p className="font-headline text-xl text-on-surface">{activeQr.label}</p>
-            <div className="aspect-square bg-white rounded-lg flex items-center justify-center">
-              <span className="material-symbols-outlined text-on-surface-variant text-6xl">qr_code</span>
+            <div className="aspect-square bg-white rounded-lg flex items-center justify-center overflow-hidden">
+              {activeQrLoading ? (
+                <span className="material-symbols-outlined text-on-surface-variant text-6xl animate-pulse">qr_code</span>
+              ) : activeQrData ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={activeQrData} alt={activeQr.label} className="w-full h-full object-contain p-3" />
+              ) : (
+                <span className="material-symbols-outlined text-on-surface-variant text-6xl">qr_code</span>
+              )}
             </div>
             <p className="font-label text-label-sm text-on-surface-variant text-center">
-              Use the &ldquo;Generate QR Codes&rdquo; action above to produce a real scannable code for this game.
+              {activeQrData
+                ? "Scan this code with the player app."
+                : activeQrLoading
+                  ? "Generating QR code..."
+                  : "No scannable code available. Ensure the game has an active round."}
             </p>
           </div>
         </div>
@@ -353,6 +442,9 @@ export default function MentorIndexesPage() {
                 <p className="font-label text-label-sm text-on-surface-variant">
                   {index.game_title} · {index.location_name ?? "No location"} · {index.points} pts · {index.scan_count} scans
                 </p>
+                {index.enigma_type === "trap" && index.question && (
+                  <p className="font-body text-body-sm text-error/80 mt-1">Q: {index.question}</p>
+                )}
               </div>
               <button
                 onClick={() => handleOpenQr(index)}

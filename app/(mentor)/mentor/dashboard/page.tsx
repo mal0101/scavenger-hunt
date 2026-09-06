@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api-client";
-import { useLeaderboard } from "@/hooks/use-leaderboard";
 
 interface Game {
   id: string;
@@ -75,27 +74,12 @@ export default function MentorDashboardPage() {
   }, []);
 
   const activeGame = games.find((g) => g.status === "ACTIVE");
-  const { connected: lbConnected, teams: lbTeams } = useLeaderboard({
-    gameId: activeGame?.id ?? "",
-    enabled: !!activeGame,
-  });
-
   const totalTeams = games.reduce((sum, g) => sum + g.team_count, 0);
   const activeGameCount = games.filter((g) => g.status === "ACTIVE").length;
   const finishedGameCount = games.filter((g) => g.status === "FINISHED").length;
   const pendingGameCount = games.filter((g) => g.status === "PENDING").length;
 
-  const sseTeams = lbTeams.map((t) => ({
-    id: t.team_id,
-    name: t.name,
-    total_score: t.score,
-    eliminated: t.eliminated,
-    member_count: t.member_count ?? 0,
-    rank: t.rank,
-  }));
-  const snapshotTeams = sseTeams.length > 0
-    ? sseTeams
-    : (activeDetail?.teams ?? []).slice(0, 5) as GameTeam[];
+  const snapshotTeams = (activeDetail?.teams ?? []).slice(0, 5);
   const topTeam = snapshotTeams[0];
 
   const statusColor: Record<string, string> = {
@@ -117,9 +101,9 @@ export default function MentorDashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 text-on-surface-variant">
-          <span className={`w-2 h-2 rounded-full ${activeGame && lbConnected ? "bg-primary animate-pulse" : "bg-on-surface-variant animate-pulse"}`} />
+          <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
           <span className="font-label text-label-sm uppercase">
-            {activeGame && lbConnected ? "LIVE" : lastSync ? `Synced ${lastSync.toLocaleTimeString()}` : "LIVE"}
+            {lastSync ? `Synced ${lastSync.toLocaleTimeString()}` : "LIVE"}
           </span>
         </div>
       </div>
@@ -183,73 +167,62 @@ export default function MentorDashboardPage() {
       <div className="grid lg:grid-cols-2 gap-6">
         {/* Active game hero + live leaderboard */}
         <div className="space-y-6">
-          {activeGame ? (
+          {activeDetail && topTeam ? (
             <div className="glass-panel rounded-xl p-6 space-y-4 relative overflow-hidden ambient-glow">
               <div className="absolute top-3 right-5 opacity-30 animate-gear-slow pointer-events-none">
                 <span className="material-symbols-outlined text-primary text-5xl">settings</span>
               </div>
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="font-headline text-lg text-on-surface">{activeGame.title}</h2>
+                  <h2 className="font-headline text-lg text-on-surface">{activeDetail.title}</h2>
                   <p className="font-label text-label-sm text-on-surface-variant uppercase">
-                    Round {activeGame.current_round ?? "—"} — {lbConnected ? "Live Leaderboard" : "Leaderboard"}
+                    Round {activeGame?.current_round ?? "—"} — Live Leaderboard
                   </p>
                 </div>
                 <span className="px-3 py-1 bg-primary-container/20 border border-primary/50 rounded-full flex items-center gap-1.5 animate-pulse-border">
-                  <span className={`w-2 h-2 rounded-full ${lbConnected ? "bg-primary animate-pulse" : "bg-outline"}`} />
-                  <span className="font-label text-label-sm text-primary">{lbConnected ? "LIVE" : "POLLING"}</span>
+                  <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                  <span className="font-label text-label-sm text-primary">LIVE</span>
                 </span>
               </div>
 
-              {topTeam ? (
-                <div className="space-y-2">
-                  {snapshotTeams.map((t) => (
-                    <Link
-                      key={t.id}
-                      href={`/mentor/games/${activeGame.id}`}
-                      className={`flex items-center gap-3 p-2.5 rounded-lg border transition-all ${
-                        t.eliminated
-                          ? "opacity-50 bg-surface-container-low border-outline-variant/20"
-                          : "bg-surface-container border-outline-variant/30 hover:border-primary/40"
+              <div className="space-y-2">
+                {snapshotTeams.map((t) => (
+                  <Link
+                    key={t.id}
+                    href={`/mentor/games/${activeDetail.id}`}
+                    className={`flex items-center gap-3 p-2.5 rounded-lg border transition-all ${
+                      t.eliminated
+                        ? "opacity-50 bg-surface-container-low border-outline-variant/20"
+                        : "bg-surface-container border-outline-variant/30 hover:border-primary/40"
+                    }`}
+                  >
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center font-headline text-sm font-bold ${
+                        t.rank <= 3
+                          ? "bg-primary-container text-on-primary-container shadow-[0_0_10px_rgba(217,119,7,0.4)]"
+                          : "bg-surface-container-high text-on-surface-variant"
                       }`}
                     >
-                      <div
-                        className={`w-8 h-8 rounded-full flex items-center justify-center font-headline text-sm font-bold ${
-                          t.rank <= 3
-                            ? "bg-primary-container text-on-primary-container shadow-[0_0_10px_rgba(217,119,7,0.4)]"
-                            : "bg-surface-container-high text-on-surface-variant"
-                        }`}
-                      >
-                        {t.rank}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className={`font-headline text-sm truncate ${t.eliminated ? "text-on-surface-variant line-through" : "text-on-surface"}`}>
-                          {t.name}
-                        </p>
-                        <p className="font-label text-label-sm text-on-surface-variant">
-                          {t.member_count} members
-                        </p>
-                      </div>
-                      <span className="font-headline text-lg text-primary font-bold etched-text">
-                        {t.total_score}
-                      </span>
-                    </Link>
-                  ))}
-                </div>
-              ) : (
-                <div className="py-6 text-center">
-                  <span className="material-symbols-outlined text-on-surface-variant text-4xl mb-2 block">
-                    leaderboard
-                  </span>
-                  <p className="font-body text-body-md text-on-surface-variant">
-                    Waiting for teams to scan...
-                  </p>
-                </div>
-              )}
+                      {t.rank}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className={`font-headline text-sm truncate ${t.eliminated ? "text-on-surface-variant line-through" : "text-on-surface"}`}>
+                        {t.name}
+                      </p>
+                      <p className="font-label text-label-sm text-on-surface-variant">
+                        {t.member_count} members
+                      </p>
+                    </div>
+                    <span className="font-headline text-lg text-primary font-bold etched-text">
+                      {t.total_score}
+                    </span>
+                  </Link>
+                ))}
+              </div>
 
               <div className="pt-2">
                 <Link
-                  href={`/mentor/games/${activeGame.id}`}
+                  href={`/mentor/games/${activeDetail.id}`}
                   className="flex items-center justify-center gap-2 w-full py-2.5 bg-primary-container text-on-primary-container font-label text-label-sm font-bold uppercase tracking-widest rounded-lg hover:shadow-[0_0_20px_rgba(217,119,7,0.4)] transition-all"
                 >
                   Manage Hunt
@@ -257,6 +230,33 @@ export default function MentorDashboardPage() {
                 </Link>
               </div>
             </div>
+          ) : activeGame ? (
+            <Link href={`/mentor/games/${activeGame.id}`} className="block">
+              <div className="glass-panel rounded-xl p-6 space-y-4 ambient-glow">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="font-headline text-lg text-on-surface">{activeGame.title}</h2>
+                    <p className="font-label text-label-sm text-on-surface-variant uppercase">
+                      Round {activeGame.current_round} — In Progress
+                    </p>
+                  </div>
+                  <span className="px-3 py-1 bg-primary-container/20 border border-primary/50 rounded-full flex items-center gap-1.5 animate-pulse-border">
+                    <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                    <span className="font-label text-label-sm text-primary">LIVE</span>
+                  </span>
+                </div>
+                <div className="flex gap-4">
+                  <span className="font-label text-label-sm text-on-surface-variant flex items-center gap-1">
+                    <span className="material-symbols-outlined text-sm">groups</span>
+                    {activeGame.team_count} teams
+                  </span>
+                  <span className="font-label text-label-sm text-on-surface-variant flex items-center gap-1">
+                    <span className="material-symbols-outlined text-sm">flag</span>
+                    {activeGame.round_count} rounds
+                  </span>
+                </div>
+              </div>
+            </Link>
           ) : (
             <div className="glass-panel rounded-xl p-8 text-center">
               <span className="material-symbols-outlined text-on-surface-variant text-4xl mb-2 block animate-flicker-amber">

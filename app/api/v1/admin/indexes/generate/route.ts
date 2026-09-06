@@ -41,9 +41,17 @@ export async function POST(request: NextRequest) {
       return apiError("No indexes found for generation", "NO_INDEXES");
     }
 
+    // Resolve the round used for the QR payload. When not provided,
+    // fall back to the index's own round, then the game's active round.
+    const activeGameRound = await db.round.findFirst({
+      where: { game_id, status: "ACTIVE" },
+      select: { id: true },
+    });
+    const defaultRoundId = round_id ?? activeGameRound?.id;
+
     const generated = [];
     for (const index of indexes) {
-      const activeRound = round_id ?? index.round_id;
+      const activeRound = index.round_id ?? defaultRoundId;
       if (!activeRound) continue;
 
       const qrCode = await db.qrCode.upsert({

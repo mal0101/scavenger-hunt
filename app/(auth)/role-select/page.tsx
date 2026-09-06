@@ -40,7 +40,7 @@ export default function RoleSelectPage() {
                   Player
                 </h2>
                 <p className="font-body text-sm text-on-surface-variant">
-                  Join the hunt, scan QR codes, solve enigmas
+                  Join the hunt, scan QR codes, earn points
                 </p>
               </div>
             </div>

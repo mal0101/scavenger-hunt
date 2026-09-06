@@ -106,6 +106,42 @@ export async function POST(
       return apiError("You have already scanned this index", "ALREADY_SCANNED");
     }
 
+    const isTrap = index.enigma_type === "trap";
+
+    // Traps: create a pending scan whose points are only settled once the
+    // player submits an answer via POST /games/:id/trap/:scanId/answer. The QR
+    // pool is untouched so other teams can still run the same trap.
+    if (isTrap) {
+      const scan = await db.scan.create({
+        data: {
+          player_id: player.id,
+          team_id: player.team_id,
+          index_id: payload!.index_id,
+          game_id: gameId,
+          round_id: activeRound.id,
+          points_earned: 0,
+          resolved: false,
+        },
+      });
+
+      return apiSuccess(
+        {
+          scan_id: scan.id,
+          index: {
+            id: index.id,
+            label: index.label,
+            type: index.enigma_type,
+          },
+          points_earned: 0,
+          pending: true,
+          question: index.question ?? null,
+          at_risk: index.points,
+          team_total: player.total_score,
+        },
+        "Trap activated"
+      );
+    }
+
     // Single-claim model: the first valid scan atomically drains the pool and
     // depletes the code. updateMany + the ACTIVE status guard make the claim
     // atomic, so a concurrent scan loses the race and sees QR_DEPLETED.

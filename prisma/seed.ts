@@ -15,15 +15,21 @@ async function main() {
   const adminHash = await bcrypt.hash(ADMIN_PASSWORD, 10);
   const mentor = await db.user.upsert({
     where: { username: ADMIN_USERNAME },
-    update: { password_hash: adminHash, nickname: "Admin Mentor", role: "MENTOR" },
+    update: {
+      password_hash: adminHash,
+      nickname: "Admin Mentor",
+      role: "MENTOR",
+      phone_number: "+212600000000",
+    },
     create: {
       username: ADMIN_USERNAME,
       password_hash: adminHash,
       nickname: "Admin Mentor",
       role: "MENTOR",
+      phone_number: "+212600000000",
     },
   });
-  console.log(`Mentor: ${mentor.username} (${mentor.id})`);
+  console.log(`Mentor: ${mentor.username} (${mentor.phone_number})`);
 
   const game = await db.game.upsert({
     where: { id: "00000000-0000-0000-0000-000000000001" },
@@ -61,6 +67,8 @@ async function main() {
     { label: "The Compass Rose", points: 25, location_name: "Courtyard", enigma_type: "trivia" },
     { label: "Boiler Room", points: 40, location_name: "Basement level", enigma_type: "physical" },
     { label: "The Enigma Vault", points: 75, location_name: "Library corner", enigma_type: "logic" },
+    { label: "The Pressure Gauge", points: 40, location_name: "Water tower stairwell", enigma_type: "trap", question: "What moves steam through the city below?", answer: "steam" },
+    { label: "Mistlock Regulator", points: 30, location_name: "Rooftop fan housing", enigma_type: "trap", question: "Name the gear that dares turn backwards?", answer: "idler" },
   ];
 
   const playerHash = await bcrypt.hash(PLAYER_PASSWORD, 10);
@@ -71,7 +79,7 @@ async function main() {
       where: {
         id: `00000000-0000-0000-0000-${String(i + 1).padStart(12, "0")}`,
       },
-      update: {},
+      update: { points: idx.points, question: idx.question, answer: idx.answer },
       create: {
         id: `00000000-0000-0000-0000-${String(i + 1).padStart(12, "0")}`,
         game_id: game.id,
@@ -80,6 +88,8 @@ async function main() {
         points: idx.points,
         location_name: idx.location_name,
         enigma_type: idx.enigma_type,
+        question: idx.question as string | undefined,
+        answer: idx.answer as string | undefined,
       },
     });
     console.log(`Index: ${created.label} (${created.points} pts)`);
@@ -99,19 +109,20 @@ async function main() {
   }
 
   const devPlayers = [
-    { username: "player1", nickname: "Player One" },
-    { username: "player2", nickname: "Player Two" },
-    { username: "player3", nickname: "Player Three" },
-    { username: "player4", nickname: "Player Four" },
+    { username: "player1", nickname: "Player One", phone_number: "+212600000001" },
+    { username: "player2", nickname: "Player Two", phone_number: "+212600000002" },
+    { username: "player3", nickname: "Player Three", phone_number: "+212600000003" },
+    { username: "player4", nickname: "Player Four", phone_number: "+212600000004" },
   ];
 
   for (const dp of devPlayers) {
     const user = await db.user.upsert({
       where: { username: dp.username },
-      update: { password_hash: playerHash, nickname: dp.nickname, role: "PLAYER" },
+      update: { password_hash: playerHash, nickname: dp.nickname, role: "PLAYER", phone_number: dp.phone_number },
       create: {
         username: dp.username,
         password_hash: playerHash,
+        phone_number: dp.phone_number,
         nickname: dp.nickname,
         role: "PLAYER",
       },

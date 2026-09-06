@@ -17,8 +17,11 @@ function LoginForm() {
     e.preventDefault();
     setError(null);
 
-    if (username.trim().length < 3) {
-      setError("Username must be at least 3 characters.");
+    const trimmed = username.trim();
+    if (trimmed.length < 3) {
+      setError(
+        "Enter your callsign or phone number (at least 3 characters)."
+      );
       return;
     }
     if (password.length < 8) {
@@ -35,7 +38,7 @@ function LoginForm() {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: username.trim(), password }),
+        body: JSON.stringify({ username: trimmed, password }),
       });
 
       const body = (await res.json()) as {
@@ -45,7 +48,7 @@ function LoginForm() {
       };
 
       if (!res.ok || !body.success || !body.data?.user) {
-        setError(body.message || "Invalid username or password.");
+        setError(body.message || "Invalid username or phone number or password.");
         return;
       }
 
@@ -80,7 +83,7 @@ function LoginForm() {
             htmlFor="username"
             className="font-label text-label-sm text-on-surface-variant uppercase tracking-widest"
           >
-            Username
+            Username or Phone
           </label>
           <input
             id="username"
@@ -88,7 +91,7 @@ function LoginForm() {
             autoComplete="username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
-            placeholder="Your callsign"
+            placeholder="Callsign or +2126XX XXX XXX"
             className="mt-1 w-full bg-surface-container-low border border-outline-variant/50 rounded-lg px-4 py-3 font-body text-body-md text-on-surface focus:outline-none focus:border-primary/60 focus:ring-1 focus:ring-primary/40"
           />
         </div>

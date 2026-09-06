@@ -117,4 +117,30 @@ test.describe("mentor admin UI", () => {
     await expect(qrImgs.first()).toBeVisible({ timeout: 15000 });
     await expect(qrImgs).toHaveCount(indexes.length);
   });
+
+  test("newly created index gets a QR code without a round selection", async ({
+    page,
+  }) => {
+    await signIn(page);
+    await page.goto("/mentor/indexes");
+    await page.waitForURL("**/mentor/indexes");
+
+    // Open the create form and fill it, leaving round unset. The mentor UI
+    // submits game_id + label + points; the server must attach the game's
+    // active round so the index is immediately QR-ready.
+    const label = `QA Fresh Index ${Date.now()}`;
+    await page.getByRole("button", { name: "New Index" }).click();
+    await page.locator("form div select").first().selectOption(gameId);
+    await page.getByPlaceholder("Smiling Rock").fill(label);
+    await page.getByRole("button", { name: "Create Index" }).click();
+    await expect(page.getByText(label)).toBeVisible();
+
+    // The "QR" action on the fresh row opens a modal with a generated code.
+    const row = page.locator("div.bg-surface-container", { hasText: label });
+    await row.getByRole("button", { name: "QR" }).click();
+    const modal = page.locator("div.fixed");
+    await expect(modal.getByText(label)).toBeVisible();
+    await expect(modal.locator("img")).toBeVisible({ timeout: 15000 });
+    await expect(modal.getByText(/Scan this code with the player app\./)).toBeVisible();
+  });
 });

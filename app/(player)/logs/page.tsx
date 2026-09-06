@@ -138,7 +138,7 @@ export default function LogsPage() {
               </div>
               <div className="text-right">
                 <p className="font-headline text-lg text-primary font-bold">
-                  +{scan.points_earned}
+                  {scan.points_earned > 0 ? "+" + scan.points_earned : scan.points_earned}
                 </p>
                 <p className="font-label text-label-sm text-on-surface-variant">
                   pts

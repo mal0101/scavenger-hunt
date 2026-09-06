@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
         points: idx.points,
         location_name: idx.location_name,
         enigma_type: idx.enigma_type,
+        question: idx.question,
         scan_count: idx._count.scans,
       }))
     );
@@ -62,9 +63,21 @@ export async function POST(request: NextRequest) {
     });
     if (!game) return apiNotFound("Game not found");
 
+    // If no round was specified, assign the game's active round so the
+    // index is immediately ready for QR generation.
+    let roundId = parsed.data.round_id ?? null;
+    if (!roundId) {
+      const activeRound = await db.round.findFirst({
+        where: { game_id: parsed.data.game_id, status: "ACTIVE" },
+        select: { id: true },
+      });
+      roundId = activeRound?.id ?? null;
+    }
+
     const index = await db.index.create({
       data: {
         game_id: parsed.data.game_id,
+        round_id: roundId,
         label: parsed.data.label,
         description: parsed.data.description,
         points: parsed.data.points,
@@ -72,6 +85,8 @@ export async function POST(request: NextRequest) {
         location_lat: parsed.data.location_lat,
         location_lng: parsed.data.location_lng,
         enigma_type: parsed.data.enigma_type,
+        question: parsed.data.question,
+        answer: parsed.data.answer,
       },
     });
 

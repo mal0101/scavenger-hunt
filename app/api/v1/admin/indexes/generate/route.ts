@@ -7,7 +7,6 @@ import { requireMentor } from "@/lib/auth/guard";
 
 const schema = z.object({
   game_id: z.string().uuid(),
-  round_id: z.string().uuid().optional(),
   format: z.enum(["png", "svg"]).default("png"),
   index_ids: z.array(z.string().uuid()).optional(),
 });
@@ -23,7 +22,7 @@ export async function POST(request: NextRequest) {
       return apiError("Invalid generation request", "VALIDATION_ERROR");
     }
 
-    const { game_id, round_id, format, index_ids } = parsed.data;
+    const { game_id, format, index_ids } = parsed.data;
 
     const game = await db.game.findUnique({ where: { id: game_id } });
     if (!game) return apiError("Game not found", "NOT_FOUND", 404);
@@ -31,7 +30,6 @@ export async function POST(request: NextRequest) {
     const indexes = await db.index.findMany({
       where: {
         game_id,
-        ...(round_id ? { round_id } : {}),
         ...(index_ids ? { id: { in: index_ids } } : {}),
       },
       orderBy: { label: "asc" },
@@ -41,21 +39,10 @@ export async function POST(request: NextRequest) {
       return apiError("No indexes found for generation", "NO_INDEXES");
     }
 
-    // Resolve the round used for the QR payload. When not provided,
-    // fall back to the index's own round, then the game's active round.
-    const activeGameRound = await db.round.findFirst({
-      where: { game_id, status: "ACTIVE" },
-      select: { id: true },
-    });
-    const defaultRoundId = round_id ?? activeGameRound?.id;
-
     const generated = [];
     for (const index of indexes) {
-      const activeRound = index.round_id ?? defaultRoundId;
-      if (!activeRound) continue;
-
       const qrCode = await db.qrCode.upsert({
-        where: { index_id_round_id: { index_id: index.id, round_id: activeRound } },
+        where: { index_id: index.id },
         update: {
           points: index.points,
           pool_value: index.points,
@@ -65,7 +52,6 @@ export async function POST(request: NextRequest) {
         create: {
           index_id: index.id,
           game_id,
-          round_id: activeRound,
           points: index.points,
           pool_value: index.points,
         },
@@ -82,10 +68,10 @@ export async function POST(request: NextRequest) {
       };
 
       if (format === "svg") {
-        const svg = await generateQrSvg(index.id, game_id, activeRound, qrCode.id);
+        const svg = await generateQrSvg(index.id, game_id, qrCode.id);
         generated.push({ ...base, format: "svg", svg });
       } else {
-        const dataUrl = await generateQrImage(index.id, game_id, activeRound, qrCode.id);
+        const dataUrl = await generateQrImage(index.id, game_id, qrCode.id);
         generated.push({ ...base, format: "png", data_url: dataUrl });
       }
     }

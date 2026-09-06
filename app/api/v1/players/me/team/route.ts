@@ -138,16 +138,34 @@ export async function POST(request: NextRequest) {
 
     const { team_name, invite_code } = parsed.data;
 
-    const existingPlayer = await db.player.findUnique({
+    let existingPlayer = await db.player.findUnique({
       where: { user_id: auth.sub },
     });
 
-    if (existingPlayer?.team_id) {
-      return apiConflict("You are already in a team");
+    if (!existingPlayer) {
+      const activeGame = await db.game.findFirst({
+        where: { status: "ACTIVE" },
+        orderBy: { created_at: "desc" },
+        select: { id: true },
+      });
+
+      const activeGameId = activeGame?.id;
+      if (!activeGameId) {
+        return apiError("No active game to join", "NO_ACTIVE_GAME");
+      }
+
+      existingPlayer = await db.player.create({
+        data: {
+          user_id: auth.sub,
+          game_id: activeGameId,
+          total_score: 0,
+          status: "ACTIVE",
+        },
+      });
     }
 
-    if (!existingPlayer) {
-      return apiError("Player profile not found", "NOT_FOUND", 404);
+    if (existingPlayer.team_id) {
+      return apiConflict("You are already in a team");
     }
 
     if (invite_code) {

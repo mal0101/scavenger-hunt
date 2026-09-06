@@ -139,7 +139,6 @@ async function signIn(
 function signedQr(
   indexId: string,
   gameId: string,
-  roundId: string,
   codeId: string,
   ts?: string
 ): string {
@@ -148,9 +147,8 @@ function signedQr(
     code_id: codeId,
     index_id: indexId,
     game_id: gameId,
-    round_id: roundId,
     timestamp,
-    signature: hmacSign(codeId, indexId, gameId, roundId, timestamp),
+    signature: hmacSign(codeId, indexId, gameId, timestamp),
   });
 }
 
@@ -500,14 +498,11 @@ async function s4ScanMatrix(): Promise<string[]> {
     where: { game_id: SEED_GAME_ID },
     orderBy: { id: "asc" },
   });
-  const round = await db.round.findFirst({
-    where: { game_id: SEED_GAME_ID, status: "ACTIVE" },
-  });
   const game = await db.game.findUnique({ where: { id: SEED_GAME_ID } });
-  if (!index || !round || !game) throw new Error("seed data missing for scan matrix");
+  if (!index || !game) throw new Error("seed data missing for scan matrix");
 
   const qr1 = await db.qrCode.findUnique({
-    where: { index_id_round_id: { index_id: index.id, round_id: round.id } },
+    where: { index_id: index.id },
   });
   if (!qr1) throw new Error("seed QR missing for first index");
 
@@ -526,11 +521,11 @@ async function s4ScanMatrix(): Promise<string[]> {
   // Mentor is forbidden to scan.
   const mentorJar: Jar = new Map();
   await signIn(mentorJar, SEED_MENTOR_USERNAME, SEED_MENTOR_PASSWORD);
-  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: signedQr(index.id, SEED_GAME_ID, round.id, qr1.id) }, jar: mentorJar });
+  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: signedQr(index.id, SEED_GAME_ID, qr1.id) }, jar: mentorJar });
   check(res.status === 403, "mentor cannot scan (403)");
 
   // Happy path: a valid first scan drains the pool and awards full points.
-  const happy = signedQr(index.id, SEED_GAME_ID, round.id, qr1.id);
+  const happy = signedQr(index.id, SEED_GAME_ID, qr1.id);
   res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: happy }, jar: jars[0] });
   check(res.status === 200 && res.json?.data?.points_earned === index.points, `scan awards full pool (${index.points} pts)`);
   check(res.json?.data?.index?.label === index.label, "scan response identifies the index");
@@ -541,9 +536,21 @@ async function s4ScanMatrix(): Promise<string[]> {
   check(res.status === 200 && res.json?.data?.passed_challenges === 1, "dashboard reports 1 passed challenge after scan");
   check(typeof res.json?.data?.team_rank === "number" && res.json?.data?.team_rank >= 1, "dashboard reports a numeric team rank (DB fallback)");
 
-  // The code is now depleted: re-scanning it is rejected outright.
+  // The same player cannot re-claim the same index.
   res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: happy }, jar: jars[0] });
-  check(res.status === 400 && res.json?.error === "QR_DEPLETED", "second scan of a claimed code rejected (QR_DEPLETED)");
+  check(res.status === 400 && res.json?.error === "ALREADY_SCANNED", "same player re-scan rejected (ALREADY_SCANNED)");
+
+  // A second player/team can still claim the code but earns 33% less than the
+  // original value (rounded, 67% of `points`), and that reduced rate is stable.
+  const reduced = Math.max(1, Math.round(index.points * 0.67));
+  const drainer = uniqueUsername("s4c").slice(0, 28);
+  usernames.push(drainer);
+  await provisionUser(drainer, SEED_PLAYER_PASSWORD);
+  const drainJar: Jar = new Map();
+  await signIn(drainJar, drainer, SEED_PLAYER_PASSWORD);
+  await api("/api/v1/players/me/team", { method: "POST", body: { team_name: "QA-Scan-Team-2" }, jar: drainJar });
+  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: happy }, jar: drainJar });
+  check(res.status === 200 && res.json?.data?.points_earned === reduced, `second scan earns ${reduced} pts (33% off the original)`);
 
   // Negative cases use a *second* index so the depleted-code guard can't
   // short-circuit the validation path under test.
@@ -553,27 +560,21 @@ async function s4ScanMatrix(): Promise<string[]> {
   });
   if (!index2) throw new Error("expected a second seeded index");
   const qr2 = await db.qrCode.findUnique({
-    where: { index_id_round_id: { index_id: index2.id, round_id: round.id } },
+    where: { index_id: index2.id },
   });
   if (!qr2) throw new Error("seed QR missing for second index");
-
-  // Round mismatch (QR signed for a different round)
-  const otherRound = "ffffffff-ffff-ffff-ffff-ffffffffffff";
-  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: signedQr(index2.id, SEED_GAME_ID, otherRound, qr2.id) }, jar: jars[0] });
-  check(res.status === 400 && res.json?.error === "QR_ROUND_MISMATCH", "QR for another round rejected");
 
   // Invalid signature (corrupt the signed signature field, keep base64 valid).
   // XOR the first hex digit so the corruption is guaranteed to change the
   // value even when the HMAC already starts with "0".
   const stamp = new Date().toISOString();
-  const signature = hmacSign(qr2.id, index2.id, SEED_GAME_ID, round.id, stamp);
+  const signature = hmacSign(qr2.id, index2.id, SEED_GAME_ID, stamp);
   const taintedFirst =
     (Number.parseInt(signature[0]!, 16) ^ 1).toString(16);
   const corrupted = encodeQrPayload({
     code_id: qr2.id,
     index_id: index2.id,
     game_id: SEED_GAME_ID,
-    round_id: round.id,
     timestamp: stamp,
     signature: taintedFirst + signature.slice(1),
   });
@@ -582,25 +583,46 @@ async function s4ScanMatrix(): Promise<string[]> {
 
   // Game mismatch
   const otherGame = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee";
-  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: signedQr(index2.id, otherGame, round.id, qr2.id) }, jar: jars[0] });
+  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: signedQr(index2.id, otherGame, qr2.id) }, jar: jars[0] });
   check(res.status === 400 && String(res.json?.message).includes("QR_GAME_MISMATCH"), "QR bound to another game rejected");
 
   // Jailbroken / expired / future / undecodable timestamps
   const old = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
-  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: signedQr(index2.id, SEED_GAME_ID, round.id, qr2.id, old) }, jar: jars[0] });
+  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: signedQr(index2.id, SEED_GAME_ID, qr2.id, old) }, jar: jars[0] });
   check(res.status === 400 && String(res.json?.message).includes("QR_EXPIRED"), "expired QR rejected");
 
   const future = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: signedQr(index2.id, SEED_GAME_ID, round.id, qr2.id, future) }, jar: jars[0] });
+  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: signedQr(index2.id, SEED_GAME_ID, qr2.id, future) }, jar: jars[0] });
   check(res.status === 400 && String(res.json?.message).includes("QR_FUTURE_TIMESTAMP"), "future-dated QR rejected");
 
   res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: "@@@not-qr@@@" }, jar: jars[0] });
   check(res.status === 400 && String(res.json?.message).includes("QR_DECODE_FAILED"), "undecodable QR rejected");
 
   // Fresh player with no team can't scan
-  const qrNoTeam = signedQr(index.id, SEED_GAME_ID, round.id, qr1.id);
+  const qrNoTeam = signedQr(index.id, SEED_GAME_ID, qr1.id);
   res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: qrNoTeam }, jar: jars[1] });
   check(res.status === 400 && res.json?.error === "NO_TEAM", "scan without a team rejected");
+
+  // Eliminated teams lose scan access entirely.
+  const eliminatedUser = uniqueUsername("s4e").slice(0, 28);
+  usernames.push(eliminatedUser);
+  await provisionUser(eliminatedUser, SEED_PLAYER_PASSWORD);
+  const eliminatedJar: Jar = new Map();
+  await signIn(eliminatedJar, eliminatedUser, SEED_PLAYER_PASSWORD);
+  res = await api("/api/v1/players/me/team", { method: "POST", body: { team_name: "QA-Eliminated-Team" }, jar: eliminatedJar });
+  check(res.status === 200, "eliminated-candidate team created");
+  const elimPlayer = await db.player.findUnique({
+    where: { user_id: (await db.user.findUnique({ where: { username: eliminatedUser } }))?.id },
+  });
+  if (elimPlayer?.team_id) {
+    await db.team.update({
+      where: { id: elimPlayer.team_id },
+      data: { eliminated: true },
+    });
+  }
+  const qrEliminated = signedQr(index2.id, SEED_GAME_ID, qr2.id);
+  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: qrEliminated }, jar: eliminatedJar });
+  check(res.status === 400 && res.json?.error === "TEAM_ELIMINATED", "eliminated team cannot scan (TEAM_ELIMINATED)");
 
   // Player in a not-yet-started game
   const pendingUser = await db.user.findUnique({ where: { username: PENDING_USER } });
@@ -610,7 +632,7 @@ async function s4ScanMatrix(): Promise<string[]> {
   const pendingGameId = pendingGame?.game_id ?? "";
   const pendingJar: Jar = new Map();
   await signIn(pendingJar, PENDING_USER, SEED_PLAYER_PASSWORD);
-  res = await api(`/api/v1/games/${pendingGameId}/scan`, { method: "POST", body: { qr_data: signedQr(index.id, pendingGameId, round.id, qr1.id) }, jar: pendingJar });
+  res = await api(`/api/v1/games/${pendingGameId}/scan`, { method: "POST", body: { qr_data: signedQr(index.id, pendingGameId, qr1.id) }, jar: pendingJar });
   check(res.status === 400 && res.json?.error === "GAME_NOT_ACTIVE", "scan in a PENDING game rejected");
 
   // Scan history ledger

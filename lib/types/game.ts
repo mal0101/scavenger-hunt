@@ -25,7 +25,6 @@ export interface RoundType {
 export interface IndexType {
   id: string;
   game_id: string;
-  round_id: string | null;
   label: string;
   description: string | null;
   points: number;

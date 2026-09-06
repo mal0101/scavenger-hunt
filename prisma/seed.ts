@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+﻿import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 const db = new PrismaClient();
@@ -36,7 +36,7 @@ async function main() {
     update: {},
     create: {
       id: "00000000-0000-0000-0000-000000000001",
-      title: "ESCAPE ROOM — Kick-off Week 2026",
+      title: "ESCAPE ROOM ÔÇö Kick-off Week 2026",
       description: "A steampunk scavenger hunt across the ENSAM Casablanca campus",
       max_rounds: 3,
       round_duration: 1800,
@@ -83,7 +83,6 @@ async function main() {
       create: {
         id: `00000000-0000-0000-0000-${String(i + 1).padStart(12, "0")}`,
         game_id: game.id,
-        round_id: round1.id,
         label: idx.label,
         points: idx.points,
         location_name: idx.location_name,
@@ -95,12 +94,11 @@ async function main() {
     console.log(`Index: ${created.label} (${created.points} pts)`);
 
     await db.qrCode.upsert({
-      where: { index_id_round_id: { index_id: created.id, round_id: round1.id } },
+      where: { index_id: created.id },
       update: { points: created.points, pool_value: created.points },
       create: {
         index_id: created.id,
         game_id: game.id,
-        round_id: round1.id,
         points: created.points,
         pool_value: created.points,
         status: "ACTIVE",

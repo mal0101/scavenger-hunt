@@ -71,11 +71,12 @@ export default function PlayerShell({
           <button
             onClick={handleSignOut}
             disabled={signingOut}
+            title="Sign out"
             aria-label="Sign out"
-            className="text-on-surface-variant hover:text-error transition-colors"
+            className="text-on-surface-variant hover:text-error transition-colors disabled:opacity-50"
           >
-            <span className="material-symbols-outlined text-xl" aria-hidden="true">
-              logout
+            <span className="material-symbols-outlined text-xl">
+              {signingOut ? "progress_activity animate-spin" : "logout"}
             </span>
           </button>
         </div>

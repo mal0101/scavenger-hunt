@@ -41,16 +41,32 @@ export async function POST(
 
     const { payload } = validation;
 
-    const player = await db.player.findUnique({
+    let player = await db.player.findUnique({
       where: { user_id: auth.sub },
     });
 
     if (!player) {
-      return apiError("Player profile not found", "NOT_FOUND", 404);
+      player = await db.player.create({
+        data: {
+          user_id: auth.sub,
+          game_id: gameId,
+          total_score: 0,
+          status: "ACTIVE",
+        },
+      });
     }
 
     if (!player.team_id) {
       return apiError("You must be in a team to scan", "NO_TEAM");
+    }
+
+    const teamRow = await db.team.findUnique({
+      where: { id: player.team_id },
+      select: { eliminated: true },
+    });
+
+    if (teamRow?.eliminated) {
+      return apiError("This team has been eliminated and cannot scan", "TEAM_ELIMINATED");
     }
 
     const game = await db.game.findUnique({ where: { id: gameId } });
@@ -66,10 +82,6 @@ export async function POST(
       return apiError("No active round", "NO_ACTIVE_ROUND");
     }
 
-    if (payload!.round_id !== activeRound.id) {
-      return apiError("QR code is not valid for the current round", "QR_ROUND_MISMATCH");
-    }
-
     const qrCode = await db.qrCode.findUnique({
       where: { id: payload!.code_id },
     });
@@ -77,8 +89,7 @@ export async function POST(
     if (
       !qrCode ||
       qrCode.index_id !== payload!.index_id ||
-      qrCode.game_id !== gameId ||
-      qrCode.round_id !== activeRound.id
+      qrCode.game_id !== gameId
     ) {
       return apiError("QR code does not match a registered checkpoint", "QR_UNKNOWN_CODE");
     }
@@ -142,19 +153,28 @@ export async function POST(
       );
     }
 
-    // Single-claim model: the first valid scan atomically drains the pool and
-    // depletes the code. updateMany + the ACTIVE status guard make the claim
-    // atomic, so a concurrent scan loses the race and sees QR_DEPLETED.
-    const claimed = await db.qrCode.updateMany({
+    // Reduced pool model: the FIRST scan pays the full original value, but
+    // from the SECOND scan onward every claim pays the reduced value (33% off
+    // the ORIGINAL points), and stays at that reduced rate for all subsequent
+    // scans — it does not keep shrinking. Rewriting the pool also makes it
+    // clear to re-scanners that the lower value is now the current one.
+    const reduced = Math.max(1, Math.round(qrCode.points * 0.67));
+
+    const score =
+      qrCode.pool_value === qrCode.points ? qrCode.points : reduced;
+
+    // Set the shared pool to the reduced value (first scan only touches pool
+    // bookkeeping, not the value paid out), so the value is durable for any
+    // later scan.
+    await db.qrCode.updateMany({
       where: { id: qrCode.id, status: "ACTIVE" },
-      data: { status: "DEPLETED", pool_value: 0, first_scanned_at: new Date() },
+      data: {
+        pool_value: reduced,
+        ...(qrCode.pool_value === qrCode.points
+          ? { first_scanned_at: new Date() }
+          : {}),
+      },
     });
-
-    if (claimed.count === 0) {
-      return apiError("This QR code has already been fully claimed", "QR_DEPLETED");
-    }
-
-    const score = qrCode.pool_value;
 
     const scan = await db.scan.create({
       data: {

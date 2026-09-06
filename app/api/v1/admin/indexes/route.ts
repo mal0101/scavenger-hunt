@@ -18,7 +18,6 @@ export async function GET(request: NextRequest) {
       where,
       include: {
         game: { select: { id: true, title: true } },
-        round: { select: { id: true, round_number: true } },
         _count: { select: { scans: true } },
       },
       orderBy: { created_at: "desc" },
@@ -29,8 +28,6 @@ export async function GET(request: NextRequest) {
         id: idx.id,
         game_id: idx.game_id,
         game_title: idx.game.title,
-        round_id: idx.round_id,
-        round_number: idx.round?.round_number ?? null,
         label: idx.label,
         description: idx.description,
         points: idx.points,
@@ -63,21 +60,9 @@ export async function POST(request: NextRequest) {
     });
     if (!game) return apiNotFound("Game not found");
 
-    // If no round was specified, assign the game's active round so the
-    // index is immediately ready for QR generation.
-    let roundId = parsed.data.round_id ?? null;
-    if (!roundId) {
-      const activeRound = await db.round.findFirst({
-        where: { game_id: parsed.data.game_id, status: "ACTIVE" },
-        select: { id: true },
-      });
-      roundId = activeRound?.id ?? null;
-    }
-
     const index = await db.index.create({
       data: {
         game_id: parsed.data.game_id,
-        round_id: roundId,
         label: parsed.data.label,
         description: parsed.data.description,
         points: parsed.data.points,

@@ -15,6 +15,7 @@ export default function ScanPage() {
   const [gameLoading, setGameLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [eliminated, setEliminated] = useState(false);
   const scanInFlightRef = useRef(false);
 
   useEffect(() => {
@@ -24,6 +25,19 @@ export default function ScanPage() {
       })
       .catch(() => {})
       .finally(() => setGameLoading(false));
+
+    // An eliminated team must not be able to scan: surface the elimination
+    // state up front instead of letting the player into the scanner.
+    apiFetch<{
+      success: boolean;
+      data?: { team: { eliminated: boolean } | null };
+    }>("/api/v1/players/me")
+      .then((j) => {
+        if (j.success && j.data?.team?.eliminated) {
+          setEliminated(true);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const handleScan = useCallback(
@@ -54,10 +68,25 @@ export default function ScanPage() {
             index: { id: string; label: string; type: string | null };
           };
           message?: string;
+          error?: string;
         };
 
         if (!j.success || !j.data) {
-          throw new Error(j.message || "Scan validation failed");
+          // Silently ignore scans of already-scanned indexes
+          if (j.message && j.message.includes("already scanned")) {
+            setScanStatus("idle");
+            return;
+          }
+          if (j.error === "TEAM_ELIMINATED") {
+            setEliminated(true);
+            setSubmitError("Your team has been eliminated and cannot scan.");
+          } else if (j.error === "NO_TEAM") {
+            setSubmitError("You must be in a team to scan");
+          } else {
+            setSubmitError(j.message || "Scan validation failed");
+          }
+          setScanStatus("idle");
+          return;
         }
 
         const type = j.data.index.type === "trap" ? "trap" : "index";
@@ -105,7 +134,7 @@ export default function ScanPage() {
   });
 
   const toggleScanning = async () => {
-    if (submitting) return;
+    if (submitting || eliminated) return;
     if (scanning) {
       await stopScanning();
       setScanStatus("idle");
@@ -117,6 +146,23 @@ export default function ScanPage() {
 
   return (
     <div className="px-4 space-y-6 max-w-lg mx-auto">
+      {eliminated ? (
+        <div className="text-center py-16 space-y-4">
+          <div className="w-20 h-20 mx-auto rounded-full bg-error-container border-2 border-error flex items-center justify-center">
+            <span className="material-symbols-outlined text-error text-4xl">
+              cancel
+            </span>
+          </div>
+          <p className="font-headline text-headline-lg-mobile text-on-surface">
+            You Have Been Eliminated
+          </p>
+          <p className="font-body text-body-md text-on-surface-variant">
+            Your team is out of the hunt and can no longer scan checkpoints or
+            play challenges.
+          </p>
+        </div>
+      ) : (
+        <>
       {/* Scanner Viewfinder */}
       <div className="relative aspect-square rounded-2xl overflow-hidden bg-surface-container-lowest border-2 border-outline-variant">
         <div
@@ -192,40 +238,6 @@ export default function ScanPage() {
         )}
       </div>
 
-      {/* Error message */}
-      {showScanError && (
-        <div className="bg-error-container/20 border border-error/30 rounded-lg p-4 flex items-center gap-3">
-          <span className="material-symbols-outlined text-error">error</span>
-          <div className="flex-1">
-            <p className="font-body text-body-md text-on-surface">
-              Camera permission denied or not available.
-            </p>
-          </div>
-          <button
-            onClick={() => setShowScanError(false)}
-            className="text-on-surface-variant hover:text-error"
-          >
-            <span className="material-symbols-outlined text-lg">close</span>
-          </button>
-        </div>
-      )}
-
-      {/* Submit error */}
-      {submitError && (
-        <div className="bg-error-container/20 border border-error/30 rounded-lg p-4 flex items-center gap-3">
-          <span className="material-symbols-outlined text-error">report</span>
-          <div className="flex-1">
-            <p className="font-body text-body-md text-on-surface">{submitError}</p>
-          </div>
-          <button
-            onClick={() => setSubmitError("")}
-            className="text-on-surface-variant hover:text-error"
-          >
-            <span className="material-symbols-outlined text-lg">close</span>
-          </button>
-        </div>
-      )}
-
       {/* Action Button */}
       <button
         onClick={toggleScanning}
@@ -245,6 +257,8 @@ export default function ScanPage() {
                 : "Awaiting Hunt"
               : "Camera Unavailable"}
       </button>
+        </>
+      )}
     </div>
   );
 }

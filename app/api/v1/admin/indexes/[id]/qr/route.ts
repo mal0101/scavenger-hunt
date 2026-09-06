@@ -14,10 +14,10 @@ export async function POST(
 
     const { id } = await params;
     const body = await request.json();
-    const { game_id, round_id, format = "png" } = body;
+    const { game_id, format = "png" } = body;
 
-    if (!game_id || !round_id) {
-      return apiError("game_id and round_id are required", "VALIDATION_ERROR");
+    if (!game_id) {
+      return apiError("game_id is required", "VALIDATION_ERROR");
     }
 
     const index = await db.index.findUnique({ where: { id } });
@@ -25,13 +25,8 @@ export async function POST(
       return apiError("Index not found for this game", "NOT_FOUND", 404);
     }
 
-    const round = await db.round.findUnique({ where: { id: round_id } });
-    if (!round || round.game_id !== game_id) {
-      return apiError("Round not found for this game", "NOT_FOUND", 404);
-    }
-
     const qrCode = await db.qrCode.upsert({
-      where: { index_id_round_id: { index_id: id, round_id } },
+      where: { index_id: id },
       update: {
         points: index.points,
         pool_value: index.points,
@@ -41,14 +36,13 @@ export async function POST(
       create: {
         index_id: id,
         game_id,
-        round_id,
         points: index.points,
         pool_value: index.points,
       },
     });
 
     if (format === "svg") {
-      const svg = await generateQrSvg(id, game_id, round_id, qrCode.id);
+      const svg = await generateQrSvg(id, game_id, qrCode.id);
       return apiSuccess(
         {
           code_id: qrCode.id,
@@ -61,7 +55,7 @@ export async function POST(
       );
     }
 
-    const dataUrl = await generateQrImage(id, game_id, round_id, qrCode.id);
+    const dataUrl = await generateQrImage(id, game_id, qrCode.id);
     return apiSuccess(
       {
         code_id: qrCode.id,

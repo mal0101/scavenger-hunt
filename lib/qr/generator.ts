@@ -5,7 +5,6 @@ export interface QrPayload {
   code_id: string;
   index_id: string;
   game_id: string;
-  round_id: string;
   timestamp: string;
   signature: string;
 }
@@ -13,17 +12,15 @@ export interface QrPayload {
 export function createQrPayload(
   indexId: string,
   gameId: string,
-  roundId: string,
   codeId: string
 ): QrPayload {
   const timestamp = new Date().toISOString();
-  const signature = hmacSign(codeId, indexId, gameId, roundId, timestamp);
+  const signature = hmacSign(codeId, indexId, gameId, timestamp);
 
   return {
     code_id: codeId,
     index_id: indexId,
     game_id: gameId,
-    round_id: roundId,
     timestamp,
     signature,
   };
@@ -45,10 +42,9 @@ export function decodeQrPayload(encoded: string): QrPayload | null {
 export async function generateQrImage(
   indexId: string,
   gameId: string,
-  roundId: string,
   codeId: string
 ): Promise<string> {
-  const payload = createQrPayload(indexId, gameId, roundId, codeId);
+  const payload = createQrPayload(indexId, gameId, codeId);
   const encoded = encodeQrPayload(payload);
   return QRCode.toDataURL(encoded, {
     errorCorrectionLevel: "M",
@@ -64,10 +60,9 @@ export async function generateQrImage(
 export async function generateQrSvg(
   indexId: string,
   gameId: string,
-  roundId: string,
   codeId: string
 ): Promise<string> {
-  const payload = createQrPayload(indexId, gameId, roundId, codeId);
+  const payload = createQrPayload(indexId, gameId, codeId);
   const encoded = encodeQrPayload(payload);
   return QRCode.toString(encoded, {
     type: "svg",

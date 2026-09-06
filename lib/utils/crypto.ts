@@ -15,10 +15,9 @@ export function hmacSign(
   codeId: string,
   indexId: string,
   gameId: string,
-  roundId: string,
   timestamp: string
 ): string {
-  const payload = `${codeId}:${indexId}:${gameId}:${roundId}:${timestamp}`;
+  const payload = `${codeId}:${indexId}:${gameId}:${timestamp}`;
   return crypto.createHmac("sha256", getHmacSecret()).update(payload).digest("hex");
 }
 
@@ -27,10 +26,9 @@ export function hmacVerify(
   codeId: string,
   indexId: string,
   gameId: string,
-  roundId: string,
   timestamp: string
 ): boolean {
-  const expected = hmacSign(codeId, indexId, gameId, roundId, timestamp);
+  const expected = hmacSign(codeId, indexId, gameId, timestamp);
   const sigBuffer = Buffer.from(signature, "hex");
   const expectedBuffer = Buffer.from(expected, "hex");
 

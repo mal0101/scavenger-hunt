@@ -137,8 +137,12 @@ export default function MentorSettingsPage() {
               accent={runtime.redis.configured}
             />
             <Row
-              label="Auth Mode"
-              value={runtime.auth.provider ?? "credentials"}
+              label="Authentication"
+              value={
+                runtime.auth.provider === "credentials"
+                  ? "Credentials (username + password)"
+                  : runtime.auth.provider
+              }
               accent
             />
           </Section>
@@ -189,7 +193,7 @@ export default function MentorSettingsPage() {
           </Section>
 
           <p className="font-label text-label-sm text-on-surface-variant/70">
-            Note: Knobs such as OTP expiry, refresh window and scan rate limits are
+            Note: Knobs such as token expiry, refresh window and scan rate limits are
             governed by environment variables on the server. Use the dashboard and
             game-level controls for run-time changes.
           </p>

@@ -11,40 +11,36 @@ import { validateQrCode } from "@/lib/qr/validator";
 const CODE = "00000000-0000-0000-0000-00000000000a";
 const IDX = "00000000-0000-0000-0000-000000000001";
 const GAME = "00000000-0000-0000-0000-000000000001";
-const ROUND = "00000000-0000-0000-0000-000000000002";
 
 const HOUR = 60 * 60 * 1000;
 
 function buildPayload(
-  overrides: { codeId?: string; indexId?: string; gameId?: string; roundId?: string; timestamp?: string } = {}
+  overrides: { codeId?: string; indexId?: string; gameId?: string; timestamp?: string } = {}
 ) {
   const timestamp = overrides.timestamp ?? new Date().toISOString();
   const codeId = overrides.codeId ?? CODE;
   const indexId = overrides.indexId ?? IDX;
   const gameId = overrides.gameId ?? GAME;
-  const roundId = overrides.roundId ?? ROUND;
   return {
     code_id: codeId,
     index_id: indexId,
     game_id: gameId,
-    round_id: roundId,
     timestamp,
-    signature: hmacSign(codeId, indexId, gameId, roundId, timestamp),
+    signature: hmacSign(codeId, indexId, gameId, timestamp),
   };
 }
 
 test("createQrPayload produces a signed payload", () => {
-  const payload = createQrPayload(IDX, GAME, ROUND, CODE);
+  const payload = createQrPayload(IDX, GAME, CODE);
   assert.equal(payload.code_id, CODE);
   assert.equal(payload.index_id, IDX);
   assert.equal(payload.game_id, GAME);
-  assert.equal(payload.round_id, ROUND);
   assert.equal(typeof payload.signature, "string");
   assert.equal(payload.signature.length, 64);
 });
 
 test("encode/decode round-trips the payload", () => {
-  const payload = createQrPayload(IDX, GAME, ROUND, CODE);
+  const payload = createQrPayload(IDX, GAME, CODE);
   const decoded = decodeQrPayload(encodeQrPayload(payload));
   assert.deepEqual(decoded, payload);
 });
@@ -59,7 +55,7 @@ test("decodeQrPayload returns null for garbage", () => {
 });
 
 test("validateQrCode accepts a valid freshly-signed code", () => {
-  const result = validateQrCode(encodeQrPayload(createQrPayload(IDX, GAME, ROUND, CODE)), GAME);
+  const result = validateQrCode(encodeQrPayload(createQrPayload(IDX, GAME, CODE)), GAME);
   assert.equal(result.valid, true);
   assert.equal(result.payload?.index_id, IDX);
   assert.equal(result.payload?.code_id, CODE);

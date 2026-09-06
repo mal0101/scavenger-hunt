@@ -3,7 +3,6 @@ import { test } from "../fixtures/base";
 import { loginAs, api } from "../helpers/auth";
 import {
   getActiveGame,
-  getRoundForGame,
   getIndexesForGame,
   getQrCodeForIndex,
   createUser,
@@ -36,13 +35,12 @@ test.afterAll(async () => {
 
 async function setup() {
   const game = await getActiveGame();
-  const round = await getRoundForGame(game.id, game.current_round);
-  const indexes = await getIndexesForGame(game.id, round.id);
+  const indexes = await getIndexesForGame(game.id);
   const index = indexes.find(
     (idx) => idx.enigma_type === "trap" && idx.question === TRAP_QUESTION
   );
-  const qrCode = await getQrCodeForIndex(index!.id, round.id);
-  return { gameId: game.id, roundId: round.id, index: index!, codeId: qrCode.id };
+  const qrCode = await getQrCodeForIndex(index!.id);
+  return { gameId: game.id, index: index!, codeId: qrCode.id };
 }
 
 async function joinTeam(page: Page): Promise<void> {
@@ -58,8 +56,8 @@ async function joinTeam(page: Page): Promise<void> {
 
 /** POST the signed trap QR through the API (the same validator the camera
  *  path drives) and return the pending trap scan response. */
-async function scanTrapViaApi(page: Page, gameId: string, roundId: string, index: { id: string }, codeId: string) {
-  const encoded = encodeQrPayload(createQrPayload(index.id, gameId, roundId, codeId));
+async function scanTrapViaApi(page: Page, gameId: string, index: { id: string }, codeId: string) {
+  const encoded = encodeQrPayload(createQrPayload(index.id, gameId, codeId));
   const res = await api<{
     success: boolean;
     data?: { scan_id: string; index?: { label: string; type: string | null }; pending?: boolean; question?: string | null; at_risk?: number };
@@ -75,8 +73,8 @@ test.describe("trap challenge", () => {
   }) => {
     await authPlayer(page, P1);
     await joinTeam(page);
-    const { gameId, roundId, index, codeId } = await setup();
-    const { res } = await scanTrapViaApi(page, gameId, roundId, index, codeId);
+    const { gameId, index, codeId } = await setup();
+    const { res } = await scanTrapViaApi(page, gameId, index, codeId);
 
     // A trap yields no immediate points and stays pending.
     expect(res.json.success).toBe(true);
@@ -135,10 +133,10 @@ test.describe("trap challenge", () => {
   }) => {
     await authPlayer(page, P2);
     await joinTeam(page);
-    const { gameId, roundId, index, codeId } = await setup();
+    const { gameId, index, codeId } = await setup();
 
     // The same trap code is NOT depleted for a second team.
-    const { res } = await scanTrapViaApi(page, gameId, roundId, index, codeId);
+    const { res } = await scanTrapViaApi(page, gameId, index, codeId);
     expect(res.json.success).toBe(true);
     expect(res.json.data?.pending).toBe(true);
     expect(res.json.data?.question).toBeTruthy();

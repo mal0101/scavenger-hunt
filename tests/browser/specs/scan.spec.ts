@@ -3,7 +3,6 @@ import { test } from "../fixtures/base";
 import { loginAs, api } from "../helpers/auth";
 import {
   getActiveGame,
-  getRoundForGame,
   getIndexesForGame,
   getQrCodeForIndex,
   createUser,
@@ -44,21 +43,19 @@ interface IndexRow {
 
 interface ScanFixture {
   gameId: string;
-  roundId: string;
   index: IndexRow;
   codeId: string;
 }
 
 async function setup(indexOffset: number): Promise<ScanFixture> {
   const game = await getActiveGame();
-  const round = await getRoundForGame(game.id, game.current_round);
-  const indexes = await getIndexesForGame(game.id, round.id);
+  const indexes = await getIndexesForGame(game.id);
   if (indexes.length <= indexOffset) {
     throw new Error(`Seeded game has no index at offset ${indexOffset}`);
   }
   const index = indexes[indexOffset];
-  const qrCode = await getQrCodeForIndex(index.id, round.id);
-  return { gameId: game.id, roundId: round.id, index, codeId: qrCode.id };
+  const qrCode = await getQrCodeForIndex(index.id);
+  return { gameId: game.id, index, codeId: qrCode.id };
 }
 
 /** Verify + team so the scanner has a team to award points to. */
@@ -78,12 +75,12 @@ test.describe("QR camera scan", () => {
     page,
     context,
   }) => {
-    const { gameId, roundId, index, codeId } = await setup(INDEX_FULL_SCAN);
+    const { gameId, index, codeId } = await setup(INDEX_FULL_SCAN);
     await authPlayer(page, P1);
     await joinTeam(page);
 
     // Forge a valid signed payload and render it in the synthetic camera.
-    const encoded = encodeQrPayload(createQrPayload(index.id, gameId, roundId, codeId));
+    const encoded = encodeQrPayload(createQrPayload(index.id, gameId, codeId));
     const url = await qrDataUrl(encoded);
     await context.addInitScript(syntheticCameraInitScript(url));
 
@@ -137,11 +134,11 @@ test.describe("QR camera scan", () => {
   });
 
   test("tampered QR shows an error banner and stays on the scanner", async ({ page, context }) => {
-    const { gameId, roundId, index, codeId } = await setup(INDEX_FULL_SCAN);
+    const { gameId, index, codeId } = await setup(INDEX_FULL_SCAN);
     await authPlayer(page, P2);
     await joinTeam(page);
 
-    const badPayload = createQrPayload(index.id, gameId, roundId, codeId);
+    const badPayload = createQrPayload(index.id, gameId, codeId);
     badPayload.signature = "0".repeat(64);
     const encoded = encodeQrPayload(badPayload);
     const url = await qrDataUrl(encoded);
@@ -169,30 +166,30 @@ test.describe("QR camera scan", () => {
     expect(new URL(page.url()).pathname).toBe("/scan");
   });
 
-  test("a re-scanned (depleted) QR is rejected as already claimed", async ({
+  test("a re-scanned QR drains 33% of the original value for a second team", async ({
     page,
     context,
   }) => {
-    const { gameId, roundId, index, codeId } = await setup(INDEX_DEPLETED);
+    const { gameId, index, codeId } = await setup(INDEX_DEPLETED);
     await authPlayer(page, P3);
     await joinTeam(page);
 
-    const encoded = encodeQrPayload(createQrPayload(index.id, gameId, roundId, codeId));
+    const encoded = encodeQrPayload(createQrPayload(index.id, gameId, codeId));
     const url = await qrDataUrl(encoded);
     await context.addInitScript(syntheticCameraInitScript(url));
 
-    // First scan claims the code and awards full points.
+    // First scan claims the code for the full original value.
     await page.goto("/scan");
     await page.getByRole("button", { name: "Start Scanner" }).click();
     await page.waitForURL("**/scan-result?type=*&data=*", { timeout: 45000 });
 
-    // Second scan of the same code: the server must report it as fully claimed.
+    // A second scan (this player already has a scan for the index) is rejected.
     const res = await api<{ success: boolean; error?: string }>(
       page,
       `/api/v1/games/${gameId}/scan`,
       { method: "POST", body: { qr_data: encoded } }
     );
     expect(res.json.success).toBe(false);
-    expect(res.json.error).toBe("QR_DEPLETED");
+    expect(res.json.error).toBe("ALREADY_SCANNED");
   });
 });

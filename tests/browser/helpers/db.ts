@@ -58,18 +58,17 @@ export async function createUser(
   return user.id;
 }
 
-/** The QrCode row that backs a scan for (index, round). */
+/** The QrCode row that backs a scan for an index. */
 export async function getQrCodeForIndex(
-  indexId: string,
-  roundId: string
+  indexId: string
 ): Promise<{ id: string; status: string; pool_value: number }> {
   const db = dbInstance();
   const code = await db.qrCode.findUnique({
-    where: { index_id_round_id: { index_id: indexId, round_id: roundId } },
+    where: { index_id: indexId },
     select: { id: true, status: true, pool_value: true },
   });
   if (!code) {
-    throw new Error(`No QrCode for index ${indexId} / round ${roundId}`);
+    throw new Error(`No QrCode for index ${indexId}`);
   }
   return code;
 }
@@ -158,8 +157,7 @@ export async function getRoundForGame(
 }
 
 export async function getIndexesForGame(
-  gameId: string,
-  roundId: string
+  gameId: string
 ): Promise<
   Array<{
     id: string;
@@ -172,7 +170,7 @@ export async function getIndexesForGame(
 > {
   const db = dbInstance();
   return db.index.findMany({
-    where: { game_id: gameId, round_id: roundId },
+    where: { game_id: gameId },
     select: {
       id: true,
       label: true,

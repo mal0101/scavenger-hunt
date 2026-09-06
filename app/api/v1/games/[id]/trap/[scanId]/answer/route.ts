@@ -48,6 +48,13 @@ export async function POST(
     if (scan.index.enigma_type !== "trap" || !scan.index.question || !scan.index.answer) {
       return apiError("This index is not a trap with a question", "NOT_A_TRAP");
     }
+    const scanTeam = await db.team.findUnique({
+      where: { id: scan.team_id },
+      select: { eliminated: true },
+    });
+    if (scanTeam?.eliminated) {
+      return apiError("This team has been eliminated and cannot play", "TEAM_ELIMINATED");
+    }
 
     const correct =
       parsed.data.answer.trim().toLowerCase() ===

@@ -60,6 +60,15 @@ export async function POST(
       return apiError("You must be in a team to scan", "NO_TEAM");
     }
 
+    const teamRow = await db.team.findUnique({
+      where: { id: player.team_id },
+      select: { eliminated: true },
+    });
+
+    if (teamRow?.eliminated) {
+      return apiError("This team has been eliminated and cannot scan", "TEAM_ELIMINATED");
+    }
+
     const game = await db.game.findUnique({ where: { id: gameId } });
     if (!game || game.status !== "ACTIVE") {
       return apiError("Game is not active", "GAME_NOT_ACTIVE");

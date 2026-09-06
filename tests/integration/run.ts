@@ -614,6 +614,27 @@ async function s4ScanMatrix(): Promise<string[]> {
   res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: qrNoTeam }, jar: jars[1] });
   check(res.status === 400 && res.json?.error === "NO_TEAM", "scan without a team rejected");
 
+  // Eliminated teams lose scan access entirely.
+  const eliminatedUser = uniqueUsername("s4e").slice(0, 28);
+  usernames.push(eliminatedUser);
+  await provisionUser(eliminatedUser, SEED_PLAYER_PASSWORD);
+  const eliminatedJar: Jar = new Map();
+  await signIn(eliminatedJar, eliminatedUser, SEED_PLAYER_PASSWORD);
+  res = await api("/api/v1/players/me/team", { method: "POST", body: { team_name: "QA-Eliminated-Team" }, jar: eliminatedJar });
+  check(res.status === 200, "eliminated-candidate team created");
+  const elimPlayer = await db.player.findUnique({
+    where: { user_id: (await db.user.findUnique({ where: { username: eliminatedUser } }))?.id },
+  });
+  if (elimPlayer?.team_id) {
+    await db.team.update({
+      where: { id: elimPlayer.team_id },
+      data: { eliminated: true },
+    });
+  }
+  const qrEliminated = signedQr(index2.id, SEED_GAME_ID, round.id, qr2.id);
+  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: qrEliminated }, jar: eliminatedJar });
+  check(res.status === 400 && res.json?.error === "TEAM_ELIMINATED", "eliminated team cannot scan (TEAM_ELIMINATED)");
+
   // Player in a not-yet-started game
   const pendingUser = await db.user.findUnique({ where: { username: PENDING_USER } });
   const pendingGame = pendingUser

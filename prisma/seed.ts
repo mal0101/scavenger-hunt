@@ -49,9 +49,16 @@ async function main() {
   });
   console.log(`Game: ${game.id} (${game.title})`);
 
+  const existingActive = await db.round.findFirst({
+    where: { game_id: game.id, status: "ACTIVE" },
+    select: { id: true },
+  });
+
   const round1 = await db.round.upsert({
     where: { game_id_round_number: { game_id: game.id, round_number: 1 } },
-    update: {},
+    update: existingActive
+      ? {}
+      : { status: "ACTIVE", started_at: new Date() },
     create: {
       game_id: game.id,
       round_number: 1,

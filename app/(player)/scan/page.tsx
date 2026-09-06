@@ -53,6 +53,9 @@ export default function ScanPage() {
             scan_id: string;
             points_earned: number;
             team_total: number;
+            pending?: boolean;
+            question?: string | null;
+            at_risk?: number;
             index: { id: string; label: string; type: string | null };
           };
           message?: string;
@@ -73,13 +76,16 @@ export default function ScanPage() {
           return;
         }
 
-        const type = j.data.index.type === "trap" ? "trap" : "enigma";
+        const type = j.data.index.type === "trap" ? "trap" : "index";
         const payload = encodeURIComponent(
           JSON.stringify({
             index_label: j.data.index.label,
+            game_id: game.id,
             points_earned: j.data.points_earned,
             team_total: j.data.team_total,
             scan_id: j.data.scan_id,
+            question: j.data.question ?? null,
+            at_risk: j.data.at_risk ?? null,
           })
         );
         router.push(`/scan-result?type=${type}&data=${payload}`);

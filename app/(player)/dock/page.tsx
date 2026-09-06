@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api-client";
 
 interface GameData {
@@ -17,6 +18,8 @@ interface PlayerData {
   id: string;
   nickname: string | null;
   total_score: number;
+  passed_challenges: number;
+  team_rank: number | null;
   team: {
     id: string;
     name: string;
@@ -26,9 +29,11 @@ interface PlayerData {
 }
 
 export default function DockPage() {
+  const router = useRouter();
   const [game, setGame] = useState<GameData | null>(null);
   const [player, setPlayer] = useState<PlayerData | null>(null);
   const [loading, setLoading] = useState(true);
+  const redirectedRef = useRef(false);
 
   useEffect(() => {
     async function load() {
@@ -38,7 +43,16 @@ export default function DockPage() {
           apiFetch<{ success: boolean; data: PlayerData }>("/api/v1/players/me"),
         ]);
         if (gameRes.success && gameRes.data) setGame(gameRes.data);
-        if (playerRes.success) setPlayer(playerRes.data);
+        if (playerRes.success) {
+          setPlayer(playerRes.data);
+          // M5: a player with no team is sent to team creation/join instead of
+          // landing on the dock directly.
+          if (!playerRes.data.team && !redirectedRef.current) {
+            redirectedRef.current = true;
+            router.replace("/team");
+            return;
+          }
+        }
       } catch (err) {
         console.error("Dock load error:", err instanceof Error ? err.message : err);
       } finally {
@@ -46,7 +60,7 @@ export default function DockPage() {
       }
     }
     load();
-  }, []);
+  }, [router]);
 
   const objective = game
     ? `Round ${game.current_round} of ${game.title}`
@@ -104,6 +118,22 @@ export default function DockPage() {
             </p>
           </div>
           <div className="brass-plate rounded-lg p-3 text-center">
+            <p className="font-headline text-2xl text-primary font-bold etched-text">
+              {loading ? "--" : player?.team_rank ? `#${player.team_rank}` : "—"}
+            </p>
+            <p className="font-label text-label-sm text-on-surface-variant uppercase">
+              Team Rank
+            </p>
+          </div>
+          <div className="brass-plate rounded-lg p-3 text-center">
+            <p className="font-headline text-2xl text-primary font-bold etched-text">
+              {loading ? "--" : player?.passed_challenges ?? 0}
+            </p>
+            <p className="font-label text-label-sm text-on-surface-variant uppercase">
+              Passed
+            </p>
+          </div>
+          <div className="brass-plate rounded-lg p-3 text-center">
             <p className="font-headline text-lg text-on-surface font-bold truncate">
               {loading ? "..." : teamName}
             </p>
@@ -149,6 +179,17 @@ export default function DockPage() {
             </span>
             <span className="font-label text-label-sm text-primary font-bold uppercase">
               Scan QR
+            </span>
+          </a>
+          <a
+            href="/team"
+            className="flex flex-col items-center gap-2 p-4 brass-plate rounded-lg hover:bg-surface-container-highest transition-all group"
+          >
+            <span className="material-symbols-outlined text-on-surface-variant text-2xl group-hover:text-primary transition-colors">
+              groups
+            </span>
+            <span className="font-label text-label-sm text-on-surface-variant font-bold uppercase group-hover:text-primary transition-colors">
+              Team
             </span>
           </a>
           <a

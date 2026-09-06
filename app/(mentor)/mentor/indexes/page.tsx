@@ -11,6 +11,7 @@ interface IndexEntry {
   points: number;
   location_name: string | null;
   enigma_type: string | null;
+  question: string | null;
   scan_count: number;
 }
 
@@ -40,6 +41,8 @@ export default function MentorIndexesPage() {
     points: 25,
     location_name: "",
     enigma_type: "",
+    question: "",
+    answer: "",
   });
 
   useEffect(() => {
@@ -84,12 +87,14 @@ export default function MentorIndexesPage() {
           points: Number(form.points),
           location_name: form.location_name || undefined,
           enigma_type: form.enigma_type || undefined,
+          question: form.question || undefined,
+          answer: form.answer || undefined,
           description: form.description || undefined,
         },
       });
       if (j.success) {
         setShowCreate(false);
-        setForm({ game_id: "", label: "", description: "", points: 25, location_name: "", enigma_type: "" });
+        setForm({ game_id: "", label: "", description: "", points: 25, location_name: "", enigma_type: "", question: "", answer: "" });
         setRefreshKey((k) => k + 1);
       } else {
         setFormError(j.message || "Failed to create index");
@@ -240,6 +245,30 @@ export default function MentorIndexesPage() {
                 <option value="logic">Logic</option>
               </select>
             </div>
+            {form.enigma_type === "trap" && (
+              <>
+                <div>
+                  <label className="font-label text-label-sm text-on-surface-variant uppercase block mb-2">Trap Question</label>
+                  <input
+                    type="text"
+                    value={form.question}
+                    onChange={(e) => setForm({ ...form, question: e.target.value })}
+                    placeholder="What moves steam through the city below?"
+                    className="w-full px-4 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg font-body text-body-md text-on-surface focus:outline-none focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="font-label text-label-sm text-on-surface-variant uppercase block mb-2">Correct Answer</label>
+                  <input
+                    type="text"
+                    value={form.answer}
+                    onChange={(e) => setForm({ ...form, answer: e.target.value })}
+                    placeholder="steam"
+                    className="w-full px-4 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg font-body text-body-md text-on-surface focus:outline-none focus:border-primary"
+                  />
+                </div>
+              </>
+            )}
           </div>
           {formError && (
             <div className="bg-error-container/20 border border-error/40 rounded-lg p-3 flex items-center gap-3">
@@ -413,6 +442,9 @@ export default function MentorIndexesPage() {
                 <p className="font-label text-label-sm text-on-surface-variant">
                   {index.game_title} · {index.location_name ?? "No location"} · {index.points} pts · {index.scan_count} scans
                 </p>
+                {index.enigma_type === "trap" && index.question && (
+                  <p className="font-body text-body-sm text-error/80 mt-1">Q: {index.question}</p>
+                )}
               </div>
               <button
                 onClick={() => handleOpenQr(index)}

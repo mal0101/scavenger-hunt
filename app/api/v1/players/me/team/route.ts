@@ -6,6 +6,124 @@ import { generateInviteCode } from "@/lib/utils/crypto";
 import { requirePlayer } from "@/lib/auth/guard";
 import { GAME_CONSTANTS } from "@/lib/utils/constants";
 
+export async function GET(request: NextRequest) {
+  try {
+    const auth = await requirePlayer(request);
+    if (auth instanceof Response) return auth;
+
+    const player = await db.player.findUnique({
+      where: { user_id: auth.sub },
+      select: { id: true, team_id: true },
+    });
+
+    if (!player) {
+      return apiError("Player profile not found", "NOT_FOUND", 404);
+    }
+
+    if (!player.team_id) {
+      return apiSuccess({ team: null });
+    }
+
+    const team = await db.team.findUnique({
+      where: { id: player.team_id },
+      include: {
+        players: {
+          select: {
+            id: true,
+            total_score: true,
+            status: true,
+            user: { select: { id: true, username: true, nickname: true } },
+          },
+        },
+      },
+    });
+
+    if (!team) {
+      return apiSuccess({ team: null });
+    }
+
+    return apiSuccess({
+      team: {
+        id: team.id,
+        name: team.name,
+        invite_code: team.invite_code,
+        total_score: team.total_score,
+        eliminated: team.eliminated,
+        game_id: team.game_id,
+        captain_id: team.captain_id,
+        is_captain: team.captain_id === player.id,
+        member_count: team.players.length,
+        members: team.players.map((p) => ({
+          id: p.id,
+          user_id: p.user.id,
+          username: p.user.username,
+          nickname: p.user.nickname,
+          total_score: p.total_score,
+          status: p.status,
+          is_captain: p.id === team.captain_id,
+          is_me: p.id === player.id,
+        })),
+      },
+    });
+  } catch (error) {
+    console.error("Get team error:", error instanceof Error ? error.message : "unknown");
+    return apiInternal("Failed to get team");
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const auth = await requirePlayer(request);
+    if (auth instanceof Response) return auth;
+
+    const player = await db.player.findUnique({
+      where: { user_id: auth.sub },
+      select: { id: true, team_id: true },
+    });
+
+    if (!player) {
+      return apiError("Player profile not found", "NOT_FOUND", 404);
+    }
+
+    if (!player.team_id) {
+      return apiError("You are not in a team", "NOT_IN_TEAM", 400);
+    }
+
+    const team = await db.team.findUnique({
+      where: { id: player.team_id },
+      include: { players: { select: { id: true } } },
+    });
+
+    if (!team) {
+      return apiError("Team not found", "NOT_FOUND", 404);
+    }
+
+    const isCaptain = team.captain_id === player.id;
+
+    if (isCaptain && team.players.length > 1) {
+      return apiError(
+        "Captains cannot leave while the team has other members; pass leadership first",
+        "CAPTAIN_CANNOT_LEAVE",
+        409
+      );
+    }
+
+    await db.player.update({
+      where: { id: player.id },
+      data: { team_id: null },
+    });
+
+    if (team.players.length === 1) {
+      await db.team.delete({ where: { id: team.id } });
+    }
+
+    return apiSuccess({ left: true }, "Left team successfully");
+  } catch (error) {
+    console.error("Leave team error:", error instanceof Error ? error.message : "unknown");
+    return apiInternal("Failed to leave team");
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const auth = await requirePlayer(request);
@@ -88,6 +206,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (!team_name) {
+      return apiError("Team name is required", "VALIDATION_ERROR");
+    }
+
     const teamCount = await db.team.count({
       where: { game_id: existingPlayer.game_id },
     });
@@ -125,6 +247,7 @@ export async function POST(request: NextRequest) {
         name: team_name,
         invite_code: code,
         game_id: existingPlayer.game_id,
+        captain_id: existingPlayer.id,
       },
     });
 

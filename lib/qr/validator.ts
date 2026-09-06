@@ -19,6 +19,7 @@ export function validateQrCode(
 
   const signatureValid = hmacVerify(
     payload.signature,
+    payload.code_id,
     payload.index_id,
     payload.game_id,
     payload.round_id,
@@ -26,6 +27,10 @@ export function validateQrCode(
   );
 
   if (!signatureValid) {
+    return { valid: false, error: "QR_SIGNATURE_INVALID" };
+  }
+
+  if (!payload.code_id) {
     return { valid: false, error: "QR_SIGNATURE_INVALID" };
   }
 

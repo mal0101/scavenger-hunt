@@ -1,6 +1,6 @@
 import { expect } from "@playwright/test";
 import { test } from "../fixtures/base";
-import { loginAs } from "../helpers/auth";
+import { loginAs, SEED_ADMIN_USERNAME, SEED_ADMIN_PASSWORD } from "../helpers/auth";
 import {
   createQaGame,
   getActiveGame,
@@ -8,7 +8,6 @@ import {
   getIndexesForGame,
 } from "../helpers/db";
 
-const MENTOR = "+212600000001";
 let createdGameId: string | null = null;
 let gameId: string;
 
@@ -25,9 +24,13 @@ test.afterAll(async () => {
   }
 });
 
+async function signIn(page: Parameters<typeof loginAs>[0]): Promise<void> {
+  await loginAs(page, SEED_ADMIN_USERNAME, SEED_ADMIN_PASSWORD);
+}
+
 test.describe("mentor admin UI", () => {
   test("game detail renders current state controls and config", async ({ page }) => {
-    await loginAs(page, MENTOR);
+    await signIn(page);
     await page.goto(`/mentor/games/${gameId}`);
     await page.waitForURL(`**/mentor/games/${gameId}`);
 
@@ -47,7 +50,7 @@ test.describe("mentor admin UI", () => {
   test("full state machine drives through START → ELIMINATE → FINISH → RESET", async ({
     page,
   }) => {
-    await loginAs(page, MENTOR);
+    await signIn(page);
 
     // Provision an isolated game so the sequence never touches the shared game.
     createdGameId = (await createQaGame(`QA-Browser-Mentor-${Date.now()}`)).id;
@@ -75,10 +78,23 @@ test.describe("mentor admin UI", () => {
     await expect(page.getByRole("button", { name: "Start Game" })).toBeVisible();
   });
 
+  test("dashboard hero streams the live leaderboard over SSE", async ({ page }) => {
+    await signIn(page);
+    await page.goto("/mentor/dashboard");
+    await page.waitForURL("**/mentor/dashboard");
+
+    await expect(page.getByRole("heading", { name: "Command Center" })).toBeVisible();
+
+    // The seeded game is ACTIVE, so the hero panel subscribes to the leaderboard
+    // SSE. Once connected its subtitle reads "Live Leaderboard".
+    await expect(page.getByText("Live Leaderboard")).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole("link", { name: "Manage Hunt" })).toBeVisible();
+  });
+
   test("generate QR codes for a game produces one render per index", async ({
     page,
   }) => {
-    await loginAs(page, MENTOR);
+    await signIn(page);
     await page.goto("/mentor/indexes");
     await page.waitForURL("**/mentor/indexes");
 
@@ -100,5 +116,31 @@ test.describe("mentor admin UI", () => {
     const qrImgs = qrBlock.locator("img");
     await expect(qrImgs.first()).toBeVisible({ timeout: 15000 });
     await expect(qrImgs).toHaveCount(indexes.length);
+  });
+
+  test("newly created index gets a QR code without a round selection", async ({
+    page,
+  }) => {
+    await signIn(page);
+    await page.goto("/mentor/indexes");
+    await page.waitForURL("**/mentor/indexes");
+
+    // Open the create form and fill it, leaving round unset. The mentor UI
+    // submits game_id + label + points; the server must attach the game's
+    // active round so the index is immediately QR-ready.
+    const label = `QA Fresh Index ${Date.now()}`;
+    await page.getByRole("button", { name: "New Index" }).click();
+    await page.locator("form div select").first().selectOption(gameId);
+    await page.getByPlaceholder("Smiling Rock").fill(label);
+    await page.getByRole("button", { name: "Create Index" }).click();
+    await expect(page.getByText(label)).toBeVisible();
+
+    // The "QR" action on the fresh row opens a modal with a generated code.
+    const row = page.locator("div.bg-surface-container", { hasText: label });
+    await row.getByRole("button", { name: "QR" }).click();
+    const modal = page.locator("div.fixed");
+    await expect(modal.getByText(label)).toBeVisible();
+    await expect(modal.locator("img")).toBeVisible({ timeout: 15000 });
+    await expect(modal.getByText(/Scan this code with the player app\./)).toBeVisible();
   });
 });

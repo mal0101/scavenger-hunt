@@ -9,6 +9,7 @@ interface LeaderboardEntry {
   name: string;
   score: number;
   eliminated: boolean;
+  member_count?: number;
 }
 
 interface UseLeaderboardOptions {

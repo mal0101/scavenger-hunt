@@ -16,9 +16,10 @@ export async function GET(
     const team = await db.team.findUnique({
       where: { id },
       include: {
+        captain: { select: { id: true, user: { select: { username: true, nickname: true } } } },
         players: {
           include: {
-            user: { select: { id: true, nickname: true, phone_number: true } },
+            user: { select: { id: true, username: true, nickname: true } },
           },
         },
         scans: {
@@ -38,11 +39,13 @@ export async function GET(
       invite_code: team.invite_code,
       total_score: team.total_score,
       eliminated: team.eliminated,
+      captain_id: team.captain_id,
+      captain_username: team.captain?.user.username ?? null,
       member_count: team.players.length,
       players: team.players.map((p) => ({
         id: p.user.id,
+        username: p.user.username,
         nickname: p.user.nickname,
-        phone_masked: p.user.phone_number.slice(0, 4) + "****" + p.user.phone_number.slice(-2),
         status: p.status,
         total_score: p.total_score,
       })),

@@ -1,15 +1,22 @@
 import { expect } from "@playwright/test";
 import { test } from "../fixtures/base";
 import { loginAs } from "../helpers/auth";
+import { createUser } from "../helpers/db";
 
-const P1 = "+212699910031";
-let createdPhones: string[] = [];
+const SUF = Date.now().toString(36);
+const P1 = `qa_security_${SUF}`;
+const PW = "TestPass_2026!";
+let createdUsernames: string[] = [];
+
+test.beforeAll(async () => {
+  await createUser(P1, PW);
+});
 
 test.afterAll(async () => {
-  if (createdPhones.length === 0) return;
+  if (createdUsernames.length === 0) return;
   const mod = await import("../helpers/db");
-  await mod.cleanupUsers(createdPhones);
-  createdPhones = [];
+  await mod.cleanupUsers(createdUsernames);
+  createdUsernames = [];
 });
 
 test.describe("security headers & CSP", () => {
@@ -56,12 +63,12 @@ test.describe("security headers & CSP", () => {
       });
     });
 
-    await loginAs(page, P1);
-    createdPhones.push(P1);
+    await loginAs(page, P1, PW);
+    createdUsernames.push(P1);
     await page.goto("/dock");
     await page.goto("/leaderboard");
     await page.goto(
-      "/scan-result?type=enigma&data=" +
+      "/scan-result?type=index&data=" +
         encodeURIComponent(
           '{"index_label":"x","points_earned":10,"team_total":10,"scan_id":"none"}'
         )

@@ -1,39 +1,49 @@
 import type { Page } from "@playwright/test";
 
-export const MOCK_CODE = "000000";
+export const SEED_ADMIN_USERNAME = "mentor";
+export const SEED_ADMIN_PASSWORD =
+  process.env.CREDENTIALS_SEED_ADMIN_PASSWORD ?? "ChangeMe_Admin_2026!";
+export const SEED_PLAYER_PASSWORD =
+  process.env.CREDENTIALS_SEED_PLAYER_PASSWORD ?? "DevPass_2026!";
 
 /**
- * Calls the auth API through the page's own request context, so the resulting
- * session cookies land in the browser context and subsequent page navigations
- * are authenticated.
+ * Signs in through the credentials API using the page's own request context, so
+ * the resulting session cookies land in the browser context and subsequent page
+ * navigations are authenticated. A fresh account is created via the mentor
+ * endpoint when `provision` is true, so each spec gets an isolated player.
  */
 export async function loginAs(
   page: Page,
-  phoneNumber: string,
-  code = MOCK_CODE
+  username: string,
+  password: string,
+  options: { provision?: boolean } = {}
 ): Promise<boolean> {
-  const otp = await page.request.post("/api/v1/auth/send-otp", {
-    data: { phone_number: phoneNumber },
+  if (options.provision === true) {
+    await provisionUser(page, username, password);
+  }
+  const res = await page.request.post("/api/v1/auth/login", {
+    data: { username, password },
   });
-  if (!otp.ok()) return false;
-
-  const verify = await page.request.post("/api/v1/auth/verify-otp", {
-    data: { phone_number: phoneNumber, code },
-  });
-  if (!verify.ok()) return false;
-  const body = (await verify.json()) as {
+  if (!res.ok()) return false;
+  const body = (await res.json()) as {
     success: boolean;
     data?: { user?: { role?: string } };
   };
   return body.success === true;
 }
 
-export async function requestOtp(
+/**
+ * Creates a PLAYER account through the admin endpoint. Requires the caller's
+ * session to already be a MENTOR (e.g. an admin helper invoked first).
+ */
+export async function provisionUser(
   page: Page,
-  phoneNumber: string
+  username: string,
+  password: string,
+  role: "PLAYER" | "MENTOR" = "PLAYER"
 ): Promise<boolean> {
-  const res = await page.request.post("/api/v1/auth/send-otp", {
-    data: { phone_number: phoneNumber },
+  const res = await page.request.post("/api/v1/admin/users", {
+    data: { username, password, role },
   });
   return res.ok();
 }

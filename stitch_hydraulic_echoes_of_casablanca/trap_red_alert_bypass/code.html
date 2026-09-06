@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Tidal Trap - Critical Event</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=JetBrains+Mono:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+  tailwind.config = {
+    darkMode: "class",
+    theme: {
+      extend: {
+        "colors": {
+                "surface-container": "#291d17",
+                "inverse-surface": "#f5ded5",
+                "surface-container-highest": "#40322c",
+                "on-primary-fixed": "#2f1500",
+                "on-surface-variant": "#dbc2b0",
+                "outline-variant": "#554336",
+                "surface-tint": "#ffb77d",
+                "on-error-container": "#ffdad6",
+                "inverse-primary": "#904d00",
+                "tertiary-container": "#a88b7a",
+                "surface-bright": "#453630",
+                "error-container": "#93000a",
+                "on-secondary-fixed-variant": "#653d1e",
+                "surface-container-high": "#342721",
+                "on-background": "#f5ded5",
+                "surface": "#1c110c",
+                "on-primary": "#4d2600",
+                "secondary-container": "#683f20",
+                "on-tertiary-container": "#392519",
+                "on-secondary": "#4b270a",
+                "outline": "#a38c7c",
+                "error": "#ffb4ab",
+                "background": "#1c110c",
+                "secondary": "#f5ba92",
+                "surface-variant": "#40322c",
+                "primary-fixed": "#ffdcc3",
+                "on-error": "#690005",
+                "on-surface": "#f5ded5",
+                "surface-dim": "#1c110c",
+                "tertiary-fixed": "#fedcc8",
+                "primary-container": "#d97707",
+                "tertiary": "#e1c0ad",
+                "surface-container-lowest": "#160c07",
+                "on-secondary-fixed": "#301400",
+                "primary": "#ffb77d",
+                "on-tertiary-fixed-variant": "#594234",
+                "inverse-on-surface": "#3b2d27",
+                "secondary-fixed": "#ffdcc5",
+                "on-primary-container": "#432100",
+                "on-secondary-container": "#e5ac85",
+                "surface-container-low": "#251913",
+                "tertiary-fixed-dim": "#e1c0ad",
+                "on-primary-fixed-variant": "#6e3900",
+                "on-tertiary-fixed": "#29170c",
+                "primary-fixed-dim": "#ffb77d",
+                "secondary-fixed-dim": "#f5ba92",
+                "on-tertiary": "#402c1f"
+        },
+        "borderRadius": {
+                "DEFAULT": "0.125rem",
+                "lg": "0.25rem",
+                "xl": "0.5rem",
+                "full": "0.75rem"
+        },
+        "spacing": {
+                "margin-mobile": "20px",
+                "gutter": "24px",
+                "container-max": "1280px",
+                "margin-desktop": "64px",
+                "unit": "8px"
+        },
+        "fontFamily": {
+                "label-md": [
+                        "JetBrains Mono"
+                ],
+                "headline-xl": [
+                        "Space Grotesk"
+                ],
+                "label-sm": [
+                        "JetBrains Mono"
+                ],
+                "body-md": [
+                        "IBM Plex Sans"
+                ],
+                "headline-lg": [
+                        "Space Grotesk"
+                ],
+                "headline-lg-mobile": [
+                        "Space Grotesk"
+                ],
+                "body-lg": [
+                        "IBM Plex Sans"
+                ]
+        },
+        "fontSize": {
+                "label-md": [
+                        "14px",
+                        {
+                                "lineHeight": "20px",
+                                "letterSpacing": "0.05em",
+                                "fontWeight": "500"
+                        }
+                ],
+                "headline-xl": [
+                        "48px",
+                        {
+                                "lineHeight": "56px",
+                                "letterSpacing": "-0.02em",
+                                "fontWeight": "700"
+                        }
+                ],
+                "label-sm": [
+                        "12px",
+                        {
+                                "lineHeight": "16px",
+                                "letterSpacing": "0.1em",
+                                "fontWeight": "500"
+                        }
+                ],
+                "body-md": [
+                        "16px",
+                        {
+                                "lineHeight": "24px",
+                                "fontWeight": "400"
+                        }
+                ],
+                "headline-lg": [
+                        "32px",
+                        {
+                                "lineHeight": "40px",
+                                "fontWeight": "600"
+                        }
+                ],
+                "headline-lg-mobile": [
+                        "24px",
+                        {
+                                "lineHeight": "32px",
+                                "fontWeight": "600"
+                        }
+                ],
+                "body-lg": [
+                        "18px",
+                        {
+                                "lineHeight": "28px",
+                                "fontWeight": "400"
+                        }
+                ]
+        }
+},
+    },
+  }
+</script>
+<style>
+        body {
+            background-color: theme('colors.background');
+        }
+        
+        .arch-top {
+            clip-path: path('M 0 40 Q 50 0 100 0 T 200 40 L 200 200 L 0 200 Z');
+        }
+
+        @keyframes flicker {
+            0%, 19%, 21%, 23%, 25%, 54%, 56%, 100% { opacity: 1; }
+            20%, 22%, 24%, 55% { opacity: 0.3; }
+        }
+        .flicker-alert {
+            animation: flicker 2s infinite;
+        }
+
+        @keyframes pulse-danger {
+            0% { box-shadow: inset 0 0 20px rgba(255, 0, 10, 0.2); }
+            50% { box-shadow: inset 0 0 60px rgba(255, 0, 10, 0.6); }
+            100% { box-shadow: inset 0 0 20px rgba(255, 0, 10, 0.2); }
+        }
+
+        .danger-overlay {
+            animation: pulse-danger 3s ease-in-out infinite;
+            pointer-events: none;
+            position: fixed;
+            inset: 0;
+            z-index: 50;
+        }
+
+        .heat-pipe-fill {
+            background: linear-gradient(90deg, theme('colors.error') 0%, theme('colors.primary-container') 50%, theme('colors.error') 100%);
+            background-size: 200% 100%;
+            animation: shimmer 2s infinite linear;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 100% 0; }
+            100% { background-position: -100% 0; }
+        }
+
+        .glass-panel {
+            backdrop-filter: blur(12px);
+            background: rgba(41, 29, 23, 0.6); /* surface-container */
+            border-top: 2px solid theme('colors.primary-container');
+            border-left: 1px solid theme('colors.outline-variant');
+            border-right: 1px solid theme('colors.outline-variant');
+            border-bottom: 1px solid theme('colors.outline-variant');
+            box-shadow: inset 0 0 20px rgba(217, 119, 7, 0.05); /* primary-container */
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+</head>
+<body class="text-on-surface font-body-md min-h-screen flex flex-col relative overflow-hidden bg-background">
+<!-- Pulsating Danger Effect Overlay -->
+<div class="danger-overlay"></div>
+<!-- Ambient Overlay for heat -->
+<div class="pointer-events-none fixed inset-0 bg-error/5 mix-blend-overlay z-0"></div>
+<!-- MAIN CONTENT CANVAS -->
+<main class="flex-1 flex flex-col relative z-10 px-4 md:px-margin-mobile pt-6 pb-24 gap-6 max-w-md mx-auto w-full">
+<!-- Header / Warning -->
+<div class="flex flex-col items-center text-center gap-2 mt-4"><div class="w-24 h-24 mb-4 mix-blend-luminosity">
+<img alt="ADE Logo" class="w-full h-full object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD2g0dkiLpG2HcAqv0UmFk-VkBujMuP36skXXOkxigBDfDA8NHMnBaTklx9PpsQiH9ON7LWVgrdMGY_WCYLtWO-0RJx-WcVLWrxVpuhS9fBwWsLSxrcfLqWHFk4ZRbNm31Ud52Rt3u23uLsXTF91HML103GI49tDAYwvlL34pGxbRxwwG0KwPeYaYc1cyrH_4u-DvHdi9eAV4aoOKxW6fzGFsOZzZlkrGuuEfe3i3of2gXVs6nteLX8RClY5SWMb0G2mQ"/>
+</div>
+<div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-error-container border border-error/50 flicker-alert shadow-[0_0_15px_rgba(255,180,171,0.3)]">
+<span class="material-symbols-outlined text-on-error-container font-variation-settings: 'FILL' 1;">warning</span>
+<span class="font-label-sm text-label-sm text-on-error-container tracking-widest">CRITICAL PRESSURE BREACH</span>
+</div>
+<h1 class="font-headline-xl text-headline-xl text-on-surface mt-2 drop-shadow-md">Tidal Trap</h1>
+<div class="font-label-md text-label-md text-outline flex items-center gap-2">
+<span>SECTOR 4</span>
+<span class="w-1 h-1 rounded-full bg-outline"></span>
+<span>VAULT SECURE</span>
+</div></div>
+<!-- Timer -->
+<div class="flex justify-center my-4">
+<div class="glass-panel px-8 py-4 rounded-xl flex flex-col items-center justify-center border-t-error"><span class="font-label-sm text-label-sm text-error uppercase mb-1">Time Remaining</span>
+<span class="font-headline-xl text-6xl text-error font-bold tracking-widest drop-shadow-[0_0_8px_rgba(255,180,171,0.5)]">02:00</span></div>
+</div><div class="glass-panel p-4 rounded-xl border-t-2 border-t-primary-container flex flex-col gap-4 mb-4">
+<div class="flex items-center gap-2 border-b border-outline-variant pb-2">
+<span class="material-symbols-outlined text-primary-container text-sm">security</span>
+<span class="font-label-sm text-label-sm text-primary-container tracking-widest uppercase">Security Protocol: Trivia Bypass</span>
+</div>
+<div class="flex flex-col gap-4">
+<p class="font-body-md text-on-surface italic">In hydraulic systems, what is the primary function of an accumulator during a pump failure?</p>
+<div class="grid grid-cols-1 gap-2">
+<button class="w-full py-2 px-4 rounded border border-outline-variant bg-surface-container-low text-on-surface text-label-md hover:bg-primary-container hover:text-on-primary-container transition-colors text-left flex items-center gap-3 group">
+<span class="w-4 h-4 rounded-full border border-outline-variant group-hover:border-on-primary-container"></span>
+                Increase fluid viscosity
+            </button>
+<button class="w-full py-2 px-4 rounded border border-outline-variant bg-surface-container-low text-on-surface text-label-md hover:bg-primary-container hover:text-on-primary-container transition-colors text-left flex items-center gap-3 group">
+<span class="w-4 h-4 rounded-full border border-outline-variant group-hover:border-on-primary-container"></span>
+                Maintain emergency pressure
+            </button>
+<button class="w-full py-2 px-4 rounded border border-outline-variant bg-surface-container-low text-on-surface text-label-md hover:bg-primary-container hover:text-on-primary-container transition-colors text-left flex items-center gap-3 group">
+<span class="w-4 h-4 rounded-full border border-outline-variant group-hover:border-on-primary-container"></span>
+                Filter particulate matter
+            </button>
+</div>
+</div>
+</div>
+<!-- Visualization -->
+<div class="relative w-full aspect-square rounded-2xl overflow-hidden glass-panel border-t-2 border-t-error p-1">
+<div class="absolute inset-1 rounded-xl overflow-hidden bg-surface-container-lowest">
+<!-- Background texture -->
+<div class="absolute inset-0 bg-[url('placeholder')] bg-cover bg-center opacity-40 mix-blend-luminosity" data-alt="A dark, industrial cross-section of a submerged coastal vault, heavily textured with oxidized rusty iron. The space is claustrophobic, illuminated by harsh, flickering amber and red emergency lighting. Water is visibly rising, creating a tense, high-pressure mechanical atmosphere. Victorian brass pipes line the walls."></div>
+<!-- Water Level -->
+<div class="absolute bottom-0 left-0 right-0 h-[60%] bg-surface-container-high/80 backdrop-blur-sm border-t border-outline-variant transition-all duration-1000 ease-in-out relative flex items-start justify-center pt-4">
+<!-- Water surface distortion -->
+<div class="absolute top-0 left-0 right-0 h-4 bg-gradient-to-b from-secondary/20 to-transparent"></div>
+<!-- Submerged elements hint -->
+<span class="material-symbols-outlined text-secondary/30 text-6xl mt-8">water_drop</span>
+</div>
+<!-- Overlay Gauges -->
+<div class="absolute top-4 left-4 flex flex-col gap-2">
+<div class="bg-surface/80 border border-outline-variant rounded px-2 py-1 flex items-center gap-2">
+<span class="material-symbols-outlined text-error text-sm font-variation-settings: 'FILL' 1;">speed</span>
+<span class="font-label-sm text-label-sm text-error">98% CAP</span>
+</div>
+</div>
+<div class="absolute top-4 right-4 flex flex-col gap-2">
+<div class="bg-surface/80 border border-outline-variant rounded px-2 py-1 flex items-center gap-2">
+<span class="material-symbols-outlined text-primary-container text-sm">thermostat</span>
+<span class="font-label-sm text-label-sm text-primary-container">TEMP HI</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Controls Area -->
+<div class="glass-panel p-4 rounded-xl flex flex-col gap-6 mt-2 relative">
+<!-- Decor rivets -->
+<div class="absolute top-2 left-2 w-2 h-2 rounded-full bg-surface-container-highest border border-outline-variant"></div>
+<div class="absolute top-2 right-2 w-2 h-2 rounded-full bg-surface-container-highest border border-outline-variant"></div>
+<div class="absolute bottom-2 left-2 w-2 h-2 rounded-full bg-surface-container-highest border border-outline-variant"></div>
+<div class="absolute bottom-2 right-2 w-2 h-2 rounded-full bg-surface-container-highest border border-outline-variant"></div>
+<div class="flex items-center justify-between px-2 pt-2">
+<span class="font-headline-lg text-headline-lg text-primary">HYDRAULIC RELAYS</span>
+<span class="font-label-sm text-label-sm text-outline-variant">SEQ REQ</span>
+</div>
+<!-- Toggles Grid -->
+<div class="grid grid-cols-4 gap-3">
+<!-- Toggle 1 -->
+<button class="flex flex-col items-center gap-3 group">
+<div class="font-label-sm text-label-sm text-outline-variant mb-1">LVL-01</div>
+<div class="w-8 h-16 bg-surface-container-low border border-outline-variant rounded-full relative shadow-inner">
+<div class="absolute bottom-1 left-1 right-1 h-7 bg-surface-variant rounded-full border border-outline transition-all duration-300 group-hover:bg-primary-container group-hover:border-primary-container group-hover:shadow-[0_0_10px_rgba(217,119,7,0.5)]"></div>
+</div>
+</button>
+<!-- Toggle 2 -->
+<button class="flex flex-col items-center gap-3 group">
+<div class="font-label-sm text-label-sm text-outline-variant mb-1">LVL-02</div>
+<div class="w-8 h-16 bg-surface-container-low border border-outline-variant rounded-full relative shadow-inner">
+<div class="absolute top-1 left-1 right-1 h-7 bg-primary-container rounded-full border border-primary-container shadow-[0_0_10px_rgba(217,119,7,0.5)] transition-all duration-300"></div>
+</div>
+</button>
+<!-- Toggle 3 -->
+<button class="flex flex-col items-center gap-3 group">
+<div class="font-label-sm text-label-sm text-outline-variant mb-1">LVL-03</div>
+<div class="w-8 h-16 bg-surface-container-low border border-outline-variant rounded-full relative shadow-inner">
+<div class="absolute bottom-1 left-1 right-1 h-7 bg-surface-variant rounded-full border border-outline transition-all duration-300 group-hover:bg-primary-container group-hover:border-primary-container group-hover:shadow-[0_0_10px_rgba(217,119,7,0.5)]"></div>
+</div>
+</button>
+<!-- Toggle 4 -->
+<button class="flex flex-col items-center gap-3 group">
+<div class="font-label-sm text-label-sm text-outline-variant mb-1">LVL-04</div>
+<div class="w-8 h-16 bg-surface-container-low border border-outline-variant rounded-full relative shadow-inner">
+<div class="absolute bottom-1 left-1 right-1 h-7 bg-surface-variant rounded-full border border-outline transition-all duration-300 group-hover:bg-primary-container group-hover:border-primary-container group-hover:shadow-[0_0_10px_rgba(217,119,7,0.5)]"></div>
+</div>
+</button>
+</div>
+<!-- Action Button -->
+<button class="w-full py-4 rounded-lg bg-surface-container-lowest border border-outline-variant text-outline-variant text-label-sm flex items-center justify-center gap-2 opacity-50 cursor-not-allowed font-label-md" disabled="true">
+<span class="material-symbols-outlined font-variation-settings: 'FILL' 1; group-hover:animate-pulse">lock</span>
+                MANUAL PUMP PURGE
+            </button>
+</div>
+</main>
+</body></html>

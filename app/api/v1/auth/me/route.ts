@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
 
     const user = await db.user.findUnique({
       where: { id: auth.sub },
-      select: { id: true, phone_number: true, role: true, nickname: true },
+      select: { id: true, username: true, role: true, nickname: true },
     });
 
     if (!user) return apiError("User not found", "NOT_FOUND", 404);
@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
       data: {
         user: {
           id: user.id,
-          phone: user.phone_number,
+          username: user.username,
           role: user.role,
           nickname: user.nickname,
         },

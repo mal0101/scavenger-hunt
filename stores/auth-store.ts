@@ -3,7 +3,7 @@ import { apiFetch } from "@/lib/api-client";
 
 interface User {
   id: string;
-  phone_number: string;
+  username: string;
   nickname: string | null;
   role: "PLAYER" | "MENTOR";
 }

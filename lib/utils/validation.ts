@@ -1,23 +1,38 @@
 import { z } from "zod";
 
-export const phoneSchema = z.object({
-  phone_number: z
-    .string()
-    .min(10, "Phone number must be at least 10 digits")
-    .max(15, "Phone number must be at most 15 digits")
-    .regex(/^\+?[0-9]+$/, "Phone number must contain only digits and optional + prefix"),
+export const usernameSchema = z
+  .string()
+  .min(3, "Username must be at least 3 characters")
+  .max(32, "Username must be at most 32 characters")
+  .regex(
+    /^\+?[a-zA-Z0-9_.-]+$/,
+    "Username may only contain letters, numbers, dots, dashes, underscores or a leading + sign"
+  );
+
+export const passwordSchema = z
+  .string()
+  .min(8, "Password must be at least 8 characters")
+  .max(128, "Password must be at most 128 characters");
+
+export const credentialsSchema = z.object({
+  username: usernameSchema,
+  password: passwordSchema,
 });
 
-export const otpSchema = z.object({
-  phone_number: z.string(),
-  code: z
-    .string()
-    .length(6, "OTP must be exactly 6 digits")
-    .regex(/^[0-9]+$/, "OTP must contain only digits"),
+export const createUserSchema = z.object({
+  username: usernameSchema,
+  password: passwordSchema,
+  role: z.enum(["PLAYER", "MENTOR"]).default("PLAYER"),
+  nickname: z.string().min(1).max(50).optional(),
+  game_id: z.string().uuid().optional(),
+});
+
+export const resetPasswordSchema = z.object({
+  password: passwordSchema,
 });
 
 export const teamSchema = z.object({
-  team_name: z.string().min(1).max(50),
+  team_name: z.string().min(1).max(50).optional(),
   invite_code: z.string().length(6).optional(),
 });
 
@@ -39,6 +54,8 @@ export const indexSchema = z.object({
   location_lat: z.number().min(-90).max(90).optional(),
   location_lng: z.number().min(-180).max(180).optional(),
   enigma_type: z.string().max(50).optional(),
+  question: z.string().max(500).optional(),
+  answer: z.string().max(500).optional(),
 });
 
 export const scanSchema = z.object({
@@ -58,8 +75,9 @@ export const stateTransitionSchema = z.object({
   ]),
 });
 
-export type PhoneInput = z.infer<typeof phoneSchema>;
-export type OtpInput = z.infer<typeof otpSchema>;
+export type CredentialsInput = z.infer<typeof credentialsSchema>;
+export type CreateUserInput = z.infer<typeof createUserSchema>;
+export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type TeamInput = z.infer<typeof teamSchema>;
 export type GameInput = z.infer<typeof gameSchema>;
 export type IndexInput = z.infer<typeof indexSchema>;

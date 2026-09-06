@@ -1,8 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  phoneSchema,
-  otpSchema,
+  credentialsSchema,
+  createUserSchema,
+  resetPasswordSchema,
   teamSchema,
   gameSchema,
   indexSchema,
@@ -10,25 +11,58 @@ import {
   stateTransitionSchema,
 } from "@/lib/utils/validation";
 
-test("phoneSchema accepts 10-15 digits with optional +", () => {
-  const ok = ["+212600000001", "0612345678", "14155551234"];
-  for (const p of ok) {
-    assert.equal(phoneSchema.safeParse({ phone_number: p }).success, true, p);
+test("credentialsSchema accepts valid username/password pairs", () => {
+  const ok = [
+    { username: "captain_a", password: "longenough" },
+    { username: "bert", password: "12345678" },
+    { username: "a.b-1_2", password: "x".repeat(128) },
+  ];
+  for (const c of ok) {
+    assert.equal(credentialsSchema.safeParse(c).success, true, JSON.stringify(c));
   }
 });
 
-test("phoneSchema rejects letters, symbols and wrong lengths", () => {
-  const bad = ["abc", "123", "123456789", "12-345", "a+123456789", "1234567890123456"];
-  for (const p of bad) {
-    assert.equal(phoneSchema.safeParse({ phone_number: p }).success, false, p);
+test("credentialsSchema rejects short usernames, bad chars and weak passwords", () => {
+  const bad = [
+    { username: "ab", password: "longenough" },
+    { username: "a b", password: "longenough" },
+    { username: "héllo", password: "longenough" },
+    { username: "x".repeat(33), password: "longenough" },
+    { username: "valid_name", password: "short" },
+    { username: "valid_name", password: "x".repeat(129) },
+  ];
+  for (const c of bad) {
+    assert.equal(credentialsSchema.safeParse(c).success, false, JSON.stringify(c));
   }
 });
 
-test("otpSchema requires exactly 6 digits", () => {
-  assert.equal(otpSchema.safeParse({ phone_number: "x", code: "123456" }).success, true);
-  for (const code of ["12345", "1234567", "abcdef", "12 456", ""]) {
-    assert.equal(otpSchema.safeParse({ phone_number: "x", code }).success, false, code);
-  }
+test("createUserSchema defaults role to PLAYER and allows optional nickname/game_id", () => {
+  const parsed = createUserSchema.safeParse({ username: "rookie", password: "12345678" });
+  assert.equal(parsed.success, true);
+  assert.equal(parsed.data.role, "PLAYER");
+
+  assert.equal(
+    createUserSchema.safeParse({
+      username: "mentor2",
+      password: "12345678",
+      role: "MENTOR",
+      nickname: "Ops",
+    }).success,
+    true
+  );
+  assert.equal(
+    createUserSchema.safeParse({
+      username: "rookie",
+      password: "12345678",
+      role: "ADMIN",
+    }).success,
+    false
+  );
+});
+
+test("resetPasswordSchema requires a strong password", () => {
+  assert.equal(resetPasswordSchema.safeParse({ password: "12345678" }).success, true);
+  assert.equal(resetPasswordSchema.safeParse({ password: "short" }).success, false);
 });
 
 test("teamSchema requires a name and optionally a 6-char invite code", () => {

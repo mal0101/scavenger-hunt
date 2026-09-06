@@ -5,7 +5,7 @@ import { apiUnauthorized, apiForbidden } from "@/lib/types/api";
 export interface AuthPayload {
   sub: string;
   role: "PLAYER" | "MENTOR";
-  phone: string;
+  username: string;
 }
 
 export async function requireAuth(
@@ -24,7 +24,7 @@ export async function requireAuth(
     return {
       sub: payload.sub,
       role: payload.role as "PLAYER" | "MENTOR",
-      phone: payload.phone,
+      username: payload.username,
     };
   } catch {
     return apiUnauthorized("Invalid or expired token");

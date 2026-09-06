@@ -36,6 +36,7 @@ export async function GET(request: NextRequest) {
         points: idx.points,
         location_name: idx.location_name,
         enigma_type: idx.enigma_type,
+        question: idx.question,
         scan_count: idx._count.scans,
       }))
     );
@@ -84,6 +85,8 @@ export async function POST(request: NextRequest) {
         location_lat: parsed.data.location_lat,
         location_lng: parsed.data.location_lng,
         enigma_type: parsed.data.enigma_type,
+        question: parsed.data.question,
+        answer: parsed.data.answer,
       },
     });
 

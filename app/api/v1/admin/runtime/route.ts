@@ -11,9 +11,6 @@ export async function GET(request: NextRequest) {
     const redisUrl = process.env.UPSTASH_REDIS_REST_URL ?? "";
     const redisConfigured = redisUrl.startsWith("https://");
 
-    const otpMockRaw = process.env.OTP_MOCK ?? "";
-    const otpMock = otpMockRaw === "true" || otpMockRaw === "1";
-
     return NextResponse.json({
       success: true,
       data: {
@@ -26,12 +23,8 @@ export async function GET(request: NextRequest) {
           mode: redisConfigured ? "upstash" : "local-mock",
           configured: redisConfigured,
         },
-        otp: {
-          mock: otpMock,
-          expiry_seconds: GAME_CONSTANTS.OTP_EXPIRY_SECONDS,
-          rate_limit_seconds: GAME_CONSTANTS.OTP_RATE_LIMIT_SECONDS,
-        },
         auth: {
+          provider: "credentials",
           access_expiry_seconds: GAME_CONSTANTS.ACCESS_TOKEN_EXPIRY,
           refresh_expiry_seconds: GAME_CONSTANTS.REFRESH_TOKEN_EXPIRY,
         },
@@ -43,7 +36,7 @@ export async function GET(request: NextRequest) {
         },
         mentor: {
           id: auth.sub,
-          phone: auth.phone,
+          username: auth.username,
         },
         sse: {
           heartbeat_interval: GAME_CONSTANTS.SSE_HEARTBEAT_INTERVAL,

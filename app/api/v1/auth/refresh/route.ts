@@ -42,12 +42,12 @@ export async function POST(request: NextRequest) {
     const newAccessToken = await signAccessToken(
       payload.sub,
       payload.role,
-      payload.phone
+      payload.username
     );
     const newRefreshToken = await signRefreshToken(
       payload.sub,
       payload.role,
-      payload.phone
+      payload.username
     );
 
     const newPayload = await verifyRefreshToken(newRefreshToken);

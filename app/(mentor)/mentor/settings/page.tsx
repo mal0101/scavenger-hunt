@@ -8,8 +8,7 @@ interface RuntimeData {
   environment: string;
   database: { provider: string; configured: boolean };
   redis: { mode: string; configured: boolean };
-  otp: { mock: boolean; expiry_seconds: number; rate_limit_seconds: number };
-  auth: { access_expiry_seconds: number; refresh_expiry_seconds: number };
+  auth: { provider: string; access_expiry_seconds: number; refresh_expiry_seconds: number };
   game: {
     max_rounds: number;
     round_duration: number;
@@ -138,18 +137,18 @@ export default function MentorSettingsPage() {
               accent={runtime.redis.configured}
             />
             <Row
-              label="OTP Mode"
-              value={runtime.otp.mock ? "Mock (accepts 000000)" : "Production"}
+              label="Authentication"
+              value={
+                runtime.auth.provider === "credentials"
+                  ? "Credentials (username + password)"
+                  : runtime.auth.provider
+              }
               accent
             />
           </Section>
 
           <Section title="Live Configuration">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <Row
-                label="OTP Expiry"
-                value={`${runtime.otp.expiry_seconds}s`}
-              />
               <Row
                 label="Access Token"
                 value={`${runtime.auth.access_expiry_seconds}s`}
@@ -194,7 +193,7 @@ export default function MentorSettingsPage() {
           </Section>
 
           <p className="font-label text-label-sm text-on-surface-variant/70">
-            Note: Knobs such as OTP expiry, refresh window and scan rate limits are
+            Note: Knobs such as token expiry, refresh window and scan rate limits are
             governed by environment variables on the server. Use the dashboard and
             game-level controls for run-time changes.
           </p>

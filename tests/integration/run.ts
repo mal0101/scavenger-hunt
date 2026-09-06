@@ -2,7 +2,7 @@
  * Zero-dependency integration suite for the scavenger-hunt API.
  *
  * Runs against a live server (default http://localhost:3000) with the DB
- * provisioned from the migrations + seed. Use in mock-OAuth/mock-Redis mode:
+ * provisioned from the migrations + seed. Use in mock-Redis mode:
  *
  *   export UPSTASH_REDIS_REST_URL=
  *   export UPSTASH_REDIS_REST_TOKEN=
@@ -14,15 +14,17 @@
  */
 
 import { PrismaClient } from "@prisma/client";
-import { calculateScanScore } from "@/lib/game/engine";
+import bcrypt from "bcryptjs";
 import { hmacSign } from "@/lib/utils/crypto";
 import { encodeQrPayload } from "@/lib/qr/generator";
 
 const BASE_URL = process.env.BASE_URL ?? "http://localhost:3000";
 const SEED_GAME_ID = "00000000-0000-0000-0000-000000000001";
-const SEED_MENTOR_PHONE = "+212600000001";
-const FULL_PHONE = "+13105550001";
-const PENDING_PHONE = "+13105550002";
+const SEED_MENTOR_USERNAME = "mentor";
+const SEED_MENTOR_PASSWORD =
+  process.env.CREDENTIALS_SEED_ADMIN_PASSWORD ?? "ChangeMe_Admin_2026!";
+const SEED_PLAYER_PASSWORD =
+  process.env.CREDENTIALS_SEED_PLAYER_PASSWORD ?? "DevPass_2026!";
 
 const db = new PrismaClient();
 
@@ -37,8 +39,21 @@ function check(condition: boolean, label: string): void {
 }
 
 const now = Date.now();
-function uniquePhone(label: string): string {
-  return `+354${label}${now % 10000000}`;
+function uniqueUsername(label: string): string {
+  return `qa_int_${label}_${(now % 10000000).toString(36)}`;
+}
+
+async function provisionUser(
+  username: string,
+  password: string,
+  role: "PLAYER" | "MENTOR" = "PLAYER"
+): Promise<string> {
+  const hash = bcrypt.hashSync(password, 10);
+  const user = await db.user.create({
+    data: { username, password_hash: hash, role, nickname: username },
+    select: { id: true },
+  });
+  return user.id;
 }
 
 // ─── HTTP / cookie helpers ──────────────────────────────────────────────
@@ -89,39 +104,53 @@ async function api(
     const key = pair.slice(0, eq);
     const value = pair.slice(eq + 1);
     setCookies.set(key, value);
-    if (opts.jar) {
-      if (value === "" || raw.includes("Max-Age=0")) opts.jar.delete(key);
-      else opts.jar.set(key, value);
-    } else if (opts.jar === undefined && value !== "" && !raw.includes("Max-Age=0")) {
-      // If no jar passed, we don't track cookies.
+    if (opts.jar && value !== "" && !raw.includes("Max-Age=0")) {
+      opts.jar.set(key, value);
+    } else if (opts.jar && (value === "" || raw.includes("Max-Age=0"))) {
+      opts.jar.delete(key);
     }
   }
 
   return { status: res.status, json, setCookies };
 }
 
-async function signIn(jar: Jar, phone: string): Promise<{ role: string; user_id: string }> {
-  await api(`/api/v1/auth/send-otp`, { method: "POST", body: { phone_number: phone } });
-  const res = await api(`/api/v1/auth/verify-otp`, {
+async function signIn(
+  jar: Jar,
+  username: string,
+  password: string
+): Promise<{ role: string; user_id: string; username: string }> {
+  const res = await api(`/api/v1/auth/login`, {
     method: "POST",
-    body: { phone_number: phone, code: "000000" },
+    body: { username, password },
     jar,
   });
   if (res.status !== 200) {
-    throw new Error(`signIn(${phone}) failed with status ${res.status}: ${JSON.stringify(res.json)}`);
+    throw new Error(`signIn(${username}) failed with status ${res.status}: ${JSON.stringify(res.json)}`);
   }
-  return { role: res.json?.data?.user?.role, user_id: res.json?.data?.user?.id };
+  return {
+    role: res.json?.data?.user?.role,
+    user_id: res.json?.data?.user?.id,
+    username: res.json?.data?.user?.username,
+  };
 }
 
-// Build a QR payload string signed with the shared HMAC_SECRET.
-function signedQr(indexId: string, gameId: string, roundId: string, ts?: string): string {
+// Build a QR payload string signed with the shared HMAC_SECRET. The payload
+// is bound to the QrCode row so the scan route can enforce single-claim.
+function signedQr(
+  indexId: string,
+  gameId: string,
+  roundId: string,
+  codeId: string,
+  ts?: string
+): string {
   const timestamp = ts ?? new Date().toISOString();
   return encodeQrPayload({
+    code_id: codeId,
     index_id: indexId,
     game_id: gameId,
     round_id: roundId,
     timestamp,
-    signature: hmacSign(indexId, gameId, roundId, timestamp),
+    signature: hmacSign(codeId, indexId, gameId, roundId, timestamp),
   });
 }
 
@@ -182,12 +211,27 @@ function fixtureTeamCode(seed: number): string {
   return `QA${seed.toString(36).padStart(4, "0").toUpperCase()}`;
 }
 
+let FULL_USER = "";
+let PENDING_USER = "";
+
 async function createFixtures(): Promise<void> {
-  await db.user.deleteMany({ where: { phone_number: { in: [FULL_PHONE, PENDING_PHONE] } } });
+  FULL_USER = uniqueUsername("full").slice(0, 28);
+  PENDING_USER = uniqueUsername("pending").slice(0, 28);
+  await db.user.deleteMany({ where: { username: { in: [FULL_USER, PENDING_USER] } } });
   await db.game.deleteMany({ where: { title: { startsWith: "QA-" } } });
   await db.team.deleteMany({ where: { name: { startsWith: "QA-" } } });
 
-  const mentor = await db.user.findUnique({ where: { phone_number: SEED_MENTOR_PHONE } });
+  // Re-arm every QR code for the seeded game so the single-claim scan matrix
+  // starts from a clean slate on every run (previous runs deplete them).
+  await db.qrCode.updateMany({
+    where: { game_id: SEED_GAME_ID },
+    data: { status: "ACTIVE", first_scanned_at: null },
+  });
+  await db.$executeRawUnsafe(
+    `UPDATE qr_codes SET pool_value = points WHERE game_id = '${SEED_GAME_ID}'`
+  );
+
+  const mentor = await db.user.findUnique({ where: { username: SEED_MENTOR_USERNAME } });
   const createdBy = mentor?.id ?? "unknown";
 
   const fullGame = await db.game.create({
@@ -209,7 +253,11 @@ async function createFixtures(): Promise<void> {
     })),
   });
   const fullUser = await db.user.create({
-    data: { phone_number: FULL_PHONE, role: "PLAYER" },
+    data: {
+      username: FULL_USER,
+      password_hash: bcrypt.hashSync(SEED_PLAYER_PASSWORD, 10),
+      role: "PLAYER",
+    },
   });
   await db.player.create({
     data: { user_id: fullUser.id, game_id: fullGame.id, status: "ACTIVE" },
@@ -230,7 +278,11 @@ async function createFixtures(): Promise<void> {
     data: { name: "QA-PendingTeam", invite_code: fixtureTeamCode(999), game_id: pendingGame.id },
   });
   const pendingUser = await db.user.create({
-    data: { phone_number: PENDING_PHONE, role: "PLAYER" },
+    data: {
+      username: PENDING_USER,
+      password_hash: bcrypt.hashSync(SEED_PLAYER_PASSWORD, 10),
+      role: "PLAYER",
+    },
   });
   await db.player.create({
     data: {
@@ -244,8 +296,8 @@ async function createFixtures(): Promise<void> {
   console.log("  fixtures ready (full game @100 teams, pending game + team)");
 }
 
-async function cleanup(phones: string[]): Promise<void> {
-  await db.user.deleteMany({ where: { phone_number: { in: phones } } });
+async function cleanup(usernames: string[]): Promise<void> {
+  await db.user.deleteMany({ where: { username: { in: [...new Set(usernames)] } } });
   await db.game.deleteMany({ where: { title: { startsWith: "QA-" } } });
   await db.team.deleteMany({ where: { name: { startsWith: "QA-" } } });
 }
@@ -254,29 +306,26 @@ async function cleanup(phones: string[]): Promise<void> {
 async function s1AuthLifecycle(): Promise<string[]> {
   console.log("S1 auth lifecycle");
   const jar: Jar = new Map();
-  const p1 = uniquePhone("1");
+  const u1 = uniqueUsername("s1").slice(0, 28);
+  await provisionUser(u1, SEED_PLAYER_PASSWORD);
 
   let res = await api("/api/v1/auth/me");
   check(res.status === 401, "unauthenticated /auth/me -> 401");
 
-  res = await api("/api/v1/auth/send-otp", { method: "POST", body: { phone_number: "abc" } });
-  check(res.status === 400 && res.json?.error === "VALIDATION_ERROR", "send-otp rejects malformed phone");
+  res = await api("/api/v1/auth/login", { method: "POST", body: { username: "ab", password: SECRET_PASS } });
+  check(res.status === 400 && res.json?.error === "VALIDATION_ERROR", "login rejects too-short username");
 
-  res = await api("/api/v1/auth/send-otp", { method: "POST", body: { phone_number: p1 } });
-  check(res.status === 200, "send-otp dispatches (mock)");
+  res = await api("/api/v1/auth/login", { method: "POST", body: { username: u1, password: "WrongPass_123!" } });
+  check(res.status === 401 && res.json?.error === "INVALID_CREDENTIALS", "login rejects wrong password");
 
-  res = await api("/api/v1/auth/verify-otp", { method: "POST", body: { phone_number: p1, code: "111111" } });
-  check(res.status === 400 && res.json?.error === "OTP_INVALID", "wrong OTP rejected");
-
-  res = await api("/api/v1/auth/verify-otp", {
-    method: "POST", body: { phone_number: p1, code: "000000" }, jar,
-  });
-  check(res.status === 200 && res.json?.data?.user?.role === "PLAYER", "correct OTP signs in as PLAYER");
+  res = await api("/api/v1/auth/login", { method: "POST", body: { username: u1, password: SEED_PLAYER_PASSWORD }, jar });
+  check(res.status === 200 && res.json?.data?.user?.role === "PLAYER", "login signs in as PLAYER");
+  const userId = res.json?.data?.user?.id as string;
   check(jar.has("access_token") && jar.has("refresh_token"), "auth cookies set");
   const accessBeforeRefresh = jar.get("access_token");
 
   res = await api("/api/v1/auth/me", { jar });
-  check(res.status === 200 && res.json?.data?.user?.phone === p1, "me returns the signed-in user");
+  check(res.status === 200 && res.json?.data?.user?.username === u1, "me returns the signed-in user");
 
   res = await api("/api/v1/players/me", { jar });
   check(res.status === 200 && res.json?.data?.total_score === 0 && res.json?.data?.team === null, "fresh player profile with zero balance");
@@ -308,40 +357,54 @@ async function s1AuthLifecycle(): Promise<string[]> {
   res = await api("/api/v1/auth/me", { jar: clearedJar });
   check(res.status === 401, "me after logout -> 401");
 
-  return [p1];
+  return [u1, userId];
 }
+
+const SECRET_PASS = "Just4Tests_2026!";
 
 async function s2AutoRegistration(): Promise<string[]> {
   console.log("S2 player auto-registration");
-  const p2 = uniquePhone("2");
+  const u2 = uniqueUsername("s2").slice(0, 28);
   const jar: Jar = new Map();
-  await signIn(jar, p2);
+  await provisionUser(u2, SEED_PLAYER_PASSWORD);
+  await signIn(jar, u2, SEED_PLAYER_PASSWORD);
 
-  const user = await db.user.findUnique({ where: { phone_number: p2 } });
-  check(Boolean(user), "user row created for new phone");
+  const user = await db.user.findUnique({ where: { username: u2 } });
+  check(Boolean(user), "user row pre-provisioned for login");
 
   const player = user ? await db.player.findUnique({ where: { user_id: user.id } }) : null;
-  check(Boolean(player), "player profile auto-created on sign-in");
+  check(Boolean(player), "player profile auto-created on login");
   check(player ? player.game_id === SEED_GAME_ID : false, "auto-registration lands in the active seeded game");
   check((player?.total_score ?? -1) === 0, "new player starts at zero");
 
   const res = await api("/api/v1/players/me", { jar });
   check(res.status === 200, "player profile readable over HTTP");
 
-  return [p2];
+  return [u2];
 }
 
 async function s3Teams(): Promise<string[]> {
   console.log("S3 teams");
-  const phones = [uniquePhone("1"), uniquePhone("2"), uniquePhone("3"), uniquePhone("4"), uniquePhone("5")];
-  const jars = phones.map(() => new Map() as Jar);
-  const roles = await Promise.all(phones.map((p, i) => signIn(jars[i], p)));
+  const usernames = Array.from({ length: 5 }, (_, i) => uniqueUsername(`t${i + 1}`).slice(0, 28));
+  const jars = usernames.map(() => new Map() as Jar);
+  const roles = await Promise.all(
+    usernames.map(async (u, i) => {
+      await provisionUser(u, SEED_PLAYER_PASSWORD);
+      return signIn(jars[i], u, SEED_PLAYER_PASSWORD);
+    })
+  );
   check(roles.every((r) => r.role === "PLAYER"), "all team players signed in");
 
   const teamName = `QA-Team-${now}`;
   let res = await api("/api/v1/players/me/team", { method: "POST", body: { team_name: teamName }, jar: jars[0] });
   check(res.status === 200 && res.json?.data?.invite_code, "player 1 creates a team");
   const inviteCode = res.json?.data?.invite_code as string;
+
+  // The creator is the captain of the new team (M2).
+  res = await api("/api/v1/players/me", { jar: jars[0] });
+  const myPlayerId = res.json?.data?.id as string;
+  const myTeam = res.json?.data?.team as { captain_id: string };
+  check(myTeam?.captain_id === myPlayerId, "team creator is recorded as captain");
 
   res = await api("/api/v1/players/me/team", { method: "POST", body: { team_name: "dup" }, jar: jars[0] });
   check(res.status === 409, "already-in-team create -> conflict");
@@ -364,11 +427,71 @@ async function s3Teams(): Promise<string[]> {
   check(res.status === 409, "player already in a team cannot create another");
 
   const fullJar: Jar = new Map();
-  await signIn(fullJar, FULL_PHONE);
+  await signIn(fullJar, FULL_USER, SEED_PLAYER_PASSWORD);
   res = await api("/api/v1/players/me/team", { method: "POST", body: { team_name: "QA-Overflow" }, jar: fullJar });
   check(res.status === 409 && res.json?.error === "MAX_TEAMS_REACHED", "team create blocked at MAX_TEAMS_PER_GAME");
 
-  return phones;
+  // ── M2: captain management (GET detail, kick, leave, transfer, disband) ──
+  const capUsers = Array.from({ length: 3 }, (_, i) => uniqueUsername(`cap${i + 1}`).slice(0, 28));
+  const capJars = capUsers.map(() => new Map() as Jar);
+  await Promise.all(
+    capUsers.map(async (u, i) => {
+      await provisionUser(u, SEED_PLAYER_PASSWORD);
+      return signIn(capJars[i], u, SEED_PLAYER_PASSWORD);
+    })
+  );
+
+  res = await api("/api/v1/players/me/team", { jar: capJars[0] });
+  check(res.status === 200 && res.json?.data?.team === null, "GET team returns null when not in a team");
+
+  res = await api("/api/v1/players/me/team", { method: "POST", body: { team_name: "QA-Captain" }, jar: capJars[0] });
+  check(res.status === 200 && res.json?.data?.invite_code, "captain creates a fresh team");
+  const capCode = res.json?.data?.invite_code as string;
+
+  res = await api("/api/v1/players/me/team", { method: "POST", body: { team_name: "x", invite_code: capCode }, jar: capJars[1] });
+  check(res.status === 200, "member joins the captain team");
+
+  res = await api("/api/v1/players/me/team", { jar: capJars[0] });
+  const capTeam = res.json?.data?.team as { members: Array<{ id: string; username: string; is_captain: boolean; is_me: boolean }> } | null;
+  check(Boolean(capTeam) && capTeam?.members.length === 2, "GET team lists members");
+  const captainLookup = capTeam?.members.find((m) => m.is_captain);
+  check(Boolean(captainLookup) && captainLookup?.is_me === true, "GET team exposes is_captain flag");
+  const memberId = (capTeam?.members.find((m) => !m.is_captain)?.id ?? "") as string;
+
+  res = await api(`/api/v1/players/me/team/members/${memberId}`, { method: "DELETE", jar: capJars[1] });
+  check(res.status === 403, "non-captain cannot kick a crewmate (403)");
+
+  res = await api(`/api/v1/players/me/team/members/${memberId}`, { method: "DELETE", jar: capJars[0] });
+  check(res.status === 200, "captain kicks a member (200)");
+
+  res = await api("/api/v1/players/me/team", { jar: capJars[1] });
+  check(res.json?.data?.team === null, "kicked member is no longer on the team");
+
+  res = await api("/api/v1/players/me/team", { method: "POST", body: { team_name: "x", invite_code: capCode }, jar: capJars[1] });
+  check(res.status === 200, "kicked member can rejoin by invite");
+
+  res = await api("/api/v1/players/me/team", { method: "DELETE", jar: capJars[0] });
+  check(res.status === 409 && res.json?.error === "CAPTAIN_CANNOT_LEAVE", "captain cannot leave while crewmates remain");
+
+  res = await api(`/api/v1/players/me/team/members/${memberId}`, { method: "PATCH", jar: capJars[0] });
+  check(res.status === 200 && res.json?.data?.captain_id === memberId, "captain transfers leadership");
+
+  res = await api(`/api/v1/players/me/team/members/${memberId}`, { method: "PATCH", jar: capJars[0] });
+  check(res.status === 403, "former captain cannot transfer again (403)");
+
+  res = await api("/api/v1/players/me/team", { method: "DELETE", jar: capJars[0] });
+  check(res.status === 200, "former captain can leave after transfer");
+
+  res = await api("/api/v1/players/me/team", { jar: capJars[0] });
+  check(res.json?.data?.team === null, "former captain is team-less after leaving");
+
+  res = await api("/api/v1/players/me/team", { method: "DELETE", jar: capJars[1] });
+  check(res.status === 200 && res.json?.data?.left === true, "sole remaining captain can leave (team disbands)");
+
+  res = await api("/api/v1/players/me/team", { jar: capJars[1] });
+  check(res.json?.data?.team === null, "team is gone after dissolution");
+
+  return [...usernames, ...capUsers];
 }
 
 async function s4ScanMatrix(): Promise<string[]> {
@@ -383,92 +506,111 @@ async function s4ScanMatrix(): Promise<string[]> {
   const game = await db.game.findUnique({ where: { id: SEED_GAME_ID } });
   if (!index || !round || !game) throw new Error("seed data missing for scan matrix");
 
-  const expectedScore = calculateScanScore(
-    index.points,
-    Math.max(0, game.round_duration - Math.floor((Date.now() - round.started_at!.getTime()) / 1000)),
-    game.round_duration
-  );
+  const qr1 = await db.qrCode.findUnique({
+    where: { index_id_round_id: { index_id: index.id, round_id: round.id } },
+  });
+  if (!qr1) throw new Error("seed QR missing for first index");
 
-  const phones = [uniquePhone("1"), uniquePhone("5")];
-  const jars = phones.map(() => new Map() as Jar);
-  await signIn(jars[0], phones[0]);
-  await signIn(jars[1], phones[1]);
+  const usernames = [uniqueUsername("s4a").slice(0, 28), uniqueUsername("s4b").slice(0, 28)];
+  const jars = usernames.map(() => new Map() as Jar);
+  await provisionUser(usernames[0], SEED_PLAYER_PASSWORD);
+  await provisionUser(usernames[1], SEED_PLAYER_PASSWORD);
+  await signIn(jars[0], usernames[0], SEED_PLAYER_PASSWORD);
+  await signIn(jars[1], usernames[1], SEED_PLAYER_PASSWORD);
 
-  // P1 already belongs to a team (created in S3), so scans are permitted.
+  // The scanning player must belong to a team (the scan route enforces NO_TEAM
+  // otherwise). The second player stays team-less to exercise that guard.
+  let res = await api("/api/v1/players/me/team", { method: "POST", body: { team_name: "QA-Scan-Team" }, jar: jars[0] });
+  check(res.status === 200, "scan player creates a team");
 
   // Mentor is forbidden to scan.
   const mentorJar: Jar = new Map();
-  await signIn(mentorJar, SEED_MENTOR_PHONE);
-  let res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: signedQr(index.id, SEED_GAME_ID, round.id) }, jar: mentorJar });
+  await signIn(mentorJar, SEED_MENTOR_USERNAME, SEED_MENTOR_PASSWORD);
+  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: signedQr(index.id, SEED_GAME_ID, round.id, qr1.id) }, jar: mentorJar });
   check(res.status === 403, "mentor cannot scan (403)");
 
-  // Happy path
-  const qr1 = signedQr(index.id, SEED_GAME_ID, round.id);
-  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: qr1 }, jar: jars[0] });
-  check(res.status === 200 && res.json?.data?.points_earned === expectedScore, `scan awards expected score (${expectedScore})`);
+  // Happy path: a valid first scan drains the pool and awards full points.
+  const happy = signedQr(index.id, SEED_GAME_ID, round.id, qr1.id);
+  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: happy }, jar: jars[0] });
+  check(res.status === 200 && res.json?.data?.points_earned === index.points, `scan awards full pool (${index.points} pts)`);
   check(res.json?.data?.index?.label === index.label, "scan response identifies the index");
 
-  // Duplicate scan
-  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: qr1 }, jar: jars[0] });
-  check(res.status === 400 && res.json?.error === "ALREADY_SCANNED", "second scan of same index rejected");
+  // Dashboard stats reflect the scan: passed challenges increment and the team
+  // gets a concrete rank from the DB fallback (mock Redis is empty in dev).
+  res = await api("/api/v1/players/me", { jar: jars[0] });
+  check(res.status === 200 && res.json?.data?.passed_challenges === 1, "dashboard reports 1 passed challenge after scan");
+  check(typeof res.json?.data?.team_rank === "number" && res.json?.data?.team_rank >= 1, "dashboard reports a numeric team rank (DB fallback)");
 
-  // Negative cases use a *second*, unscanned index so the ALREADY_SCANNED
-  // guard can't short-circuit the validation path under test.
+  // The code is now depleted: re-scanning it is rejected outright.
+  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: happy }, jar: jars[0] });
+  check(res.status === 400 && res.json?.error === "QR_DEPLETED", "second scan of a claimed code rejected (QR_DEPLETED)");
+
+  // Negative cases use a *second* index so the depleted-code guard can't
+  // short-circuit the validation path under test.
   const index2 = await db.index.findFirst({
     where: { game_id: SEED_GAME_ID, id: { not: index.id } },
     orderBy: { id: "asc" },
   });
   if (!index2) throw new Error("expected a second seeded index");
+  const qr2 = await db.qrCode.findUnique({
+    where: { index_id_round_id: { index_id: index2.id, round_id: round.id } },
+  });
+  if (!qr2) throw new Error("seed QR missing for second index");
 
   // Round mismatch (QR signed for a different round)
   const otherRound = "ffffffff-ffff-ffff-ffff-ffffffffffff";
-  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: signedQr(index2.id, SEED_GAME_ID, otherRound) }, jar: jars[0] });
+  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: signedQr(index2.id, SEED_GAME_ID, otherRound, qr2.id) }, jar: jars[0] });
   check(res.status === 400 && res.json?.error === "QR_ROUND_MISMATCH", "QR for another round rejected");
 
-  // Invalid signature (corrupt the signed signature field, keep base64 valid)
+  // Invalid signature (corrupt the signed signature field, keep base64 valid).
+  // XOR the first hex digit so the corruption is guaranteed to change the
+  // value even when the HMAC already starts with "0".
   const stamp = new Date().toISOString();
-  const signature = hmacSign(index2.id, SEED_GAME_ID, round.id, stamp);
+  const signature = hmacSign(qr2.id, index2.id, SEED_GAME_ID, round.id, stamp);
+  const taintedFirst =
+    (Number.parseInt(signature[0]!, 16) ^ 1).toString(16);
   const corrupted = encodeQrPayload({
+    code_id: qr2.id,
     index_id: index2.id,
     game_id: SEED_GAME_ID,
     round_id: round.id,
     timestamp: stamp,
-    signature: `0${signature.slice(1)}`,
+    signature: taintedFirst + signature.slice(1),
   });
   res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: corrupted }, jar: jars[0] });
   check(res.status === 400 && String(res.json?.message).includes("QR_SIGNATURE_INVALID"), "tampered signature rejected");
 
   // Game mismatch
   const otherGame = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee";
-  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: signedQr(index2.id, otherGame, round.id) }, jar: jars[0] });
+  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: signedQr(index2.id, otherGame, round.id, qr2.id) }, jar: jars[0] });
   check(res.status === 400 && String(res.json?.message).includes("QR_GAME_MISMATCH"), "QR bound to another game rejected");
 
   // Jailbroken / expired / future / undecodable timestamps
   const old = new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
-  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: signedQr(index2.id, SEED_GAME_ID, round.id, old) }, jar: jars[0] });
+  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: signedQr(index2.id, SEED_GAME_ID, round.id, qr2.id, old) }, jar: jars[0] });
   check(res.status === 400 && String(res.json?.message).includes("QR_EXPIRED"), "expired QR rejected");
 
   const future = new Date(Date.now() + 10 * 60 * 1000).toISOString();
-  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: signedQr(index2.id, SEED_GAME_ID, round.id, future) }, jar: jars[0] });
+  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: signedQr(index2.id, SEED_GAME_ID, round.id, qr2.id, future) }, jar: jars[0] });
   check(res.status === 400 && String(res.json?.message).includes("QR_FUTURE_TIMESTAMP"), "future-dated QR rejected");
 
   res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: "@@@not-qr@@@" }, jar: jars[0] });
   check(res.status === 400 && String(res.json?.message).includes("QR_DECODE_FAILED"), "undecodable QR rejected");
 
   // Fresh player with no team can't scan
-  const qr2 = signedQr(index.id, SEED_GAME_ID, round.id);
-  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: qr2 }, jar: jars[1] });
+  const qrNoTeam = signedQr(index.id, SEED_GAME_ID, round.id, qr1.id);
+  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: qrNoTeam }, jar: jars[1] });
   check(res.status === 400 && res.json?.error === "NO_TEAM", "scan without a team rejected");
 
   // Player in a not-yet-started game
-  const pendingUser = await db.user.findUnique({ where: { phone_number: PENDING_PHONE } });
+  const pendingUser = await db.user.findUnique({ where: { username: PENDING_USER } });
   const pendingGame = pendingUser
     ? await db.player.findUnique({ where: { user_id: pendingUser.id } })
     : null;
   const pendingGameId = pendingGame?.game_id ?? "";
   const pendingJar: Jar = new Map();
-  await signIn(pendingJar, PENDING_PHONE);
-  res = await api(`/api/v1/games/${pendingGameId}/scan`, { method: "POST", body: { qr_data: signedQr(index.id, pendingGameId, round.id) }, jar: pendingJar });
+  await signIn(pendingJar, PENDING_USER, SEED_PLAYER_PASSWORD);
+  res = await api(`/api/v1/games/${pendingGameId}/scan`, { method: "POST", body: { qr_data: signedQr(index.id, pendingGameId, round.id, qr1.id) }, jar: pendingJar });
   check(res.status === 400 && res.json?.error === "GAME_NOT_ACTIVE", "scan in a PENDING game rejected");
 
   // Scan history ledger
@@ -476,37 +618,72 @@ async function s4ScanMatrix(): Promise<string[]> {
   check(res.status === 200 && res.json?.data?.total >= 1, "player scans ledger populated");
   check(res.json?.data?.scans?.[0]?.index_label === index.label, "scan ledger reports index label");
 
-  return phones;
+  return usernames;
 }
 
 async function s5Admin(): Promise<string[]> {
   console.log("S5 admin");
-  const phones: string[] = [];
+  const usernames: string[] = [];
   const mentorJar: Jar = new Map();
-  const role = await signIn(mentorJar, SEED_MENTOR_PHONE);
+  const role = await signIn(mentorJar, SEED_MENTOR_USERNAME, SEED_MENTOR_PASSWORD);
   check(role.role === "MENTOR", "mentor signs in with MENTOR role");
 
   // PLAYER forbidden on admin surface
-  const playerPhones = [uniquePhone("9")];
+  const playerUser = uniqueUsername("s5").slice(0, 28);
+  await provisionUser(playerUser, SEED_PLAYER_PASSWORD);
+  usernames.push(playerUser);
   const playerJar: Jar = new Map();
-  await signIn(playerJar, playerPhones[0]);
-  phones.push(...playerPhones);
+  await signIn(playerJar, playerUser, SEED_PLAYER_PASSWORD);
   let res = await api("/api/v1/admin/runtime", { jar: playerJar });
   check(res.status === 403, "player blocked from admin runtime");
 
   // Runtime config truthfulness
   res = await api("/api/v1/admin/runtime", { jar: mentorJar });
   check(res.status === 200, "mentor reads runtime config");
+  check(res.json?.data?.auth?.provider === "credentials", "runtime reports auth provider credentials");
+  check(res.json?.data?.mentor?.username === SEED_MENTOR_USERNAME, "runtime reports the signed-in mentor");
   check(res.json?.data?.sse?.timer_sync_interval === 10000, "runtime reports timer_sync_interval 10000");
   check(res.json?.data?.sse?.heartbeat_interval === 25000, "runtime reports heartbeat_interval 25000");
-  check(res.json?.data?.otp?.mock === true, "runtime reports mock OTP in dev");
 
   // Seed game visible
   res = await api("/api/v1/admin/games", { jar: mentorJar });
   const seedGame = (res.json?.data ?? []).find((g: Record<string, unknown>) => g.id === SEED_GAME_ID);
   check(Boolean(seedGame) && seedGame.status === "ACTIVE", "seeded game listed as ACTIVE");
 
-  // Batch QR generation (svg field shape — fix D)
+  // Admin user provisioning + password reset
+  const provisionedUser = uniqueUsername("admin").slice(0, 28);
+  res = await api("/api/v1/admin/users", {
+    method: "POST", jar: mentorJar,
+    body: { username: provisionedUser, password: SECRET_PASS, role: "PLAYER" },
+  });
+  check(res.status === 200 && res.json?.data?.player, "mentor provisions a PLAYER account with a player row");
+  const provisioned = await db.user.findUnique({
+    where: { username: provisionedUser },
+    include: { player: true },
+  });
+  check(Boolean(provisioned?.player), "provisioned user has an active player profile");
+  check(provisioned?.player?.game_id === SEED_GAME_ID, "provisioned player lands in the active seeded game");
+
+  res = await api("/api/v1/admin/users", {
+    method: "POST", jar: mentorJar,
+    body: { username: provisionedUser, password: SECRET_PASS, role: "PLAYER" },
+  });
+  check(res.status === 409 && res.json?.error === "CONFLICT", "duplicate provisioning rejected");
+
+  res = await api(`/api/v1/admin/users/${provisioned!.id}/reset-password`, {
+    method: "POST", jar: mentorJar,
+    body: { password: `${SECRET_PASS}2` },
+  });
+  check(res.status === 200, "mentor resets a user's password");
+
+  const newPassJar: Jar = new Map();
+  res = await api("/api/v1/auth/login", { method: "POST", body: { username: provisionedUser, password: SECRET_PASS }, jar: newPassJar });
+  check(res.status === 401, "old password rejected after reset");
+  res = await api("/api/v1/auth/login", { method: "POST", body: { username: provisionedUser, password: `${SECRET_PASS}2` }, jar: newPassJar });
+  check(res.status === 200, "new password accepted after reset");
+  usernames.push(provisionedUser);
+
+  // Batch QR generation (svg field shape)
   res = await api("/api/v1/admin/indexes/generate", {
     method: "POST", jar: mentorJar,
     body: { game_id: SEED_GAME_ID, format: "svg" },
@@ -516,9 +693,10 @@ async function s5Admin(): Promise<string[]> {
   check(codes.length === 5, "batch QR generates one code per seeded index");
   check(codes.every((c: Record<string, unknown>) => typeof c.svg === "string" && (c.svg as string).startsWith("<svg")), "svg payload under `svg` field");
   check(codes.every((c: Record<string, unknown>) => !("data" in c)), "no legacy `data` field leaked");
+  check(codes.every((c: Record<string, unknown>) => typeof c.code_id === "string" && c.status === "ACTIVE" && Number(c.pool_value) === Number(c.points)), "each code reports its code_id, ACTIVE status and full pool");
 
-  // Single QR generation missing fields (fix F)
-  res = await api(`/api/v1/admin/indexes/${"00000000-0000-0000-0000-000000000001"}/qr`, {
+  // Single QR generation missing fields
+  res = await api(`/api/v1/admin/indexes/00000000-0000-0000-0000-000000000001/qr`, {
     method: "POST", jar: mentorJar, body: {},
   });
   check(res.status === 400 && res.json?.error === "VALIDATION_ERROR", "single QR without fields -> 400");
@@ -560,14 +738,15 @@ async function s5Admin(): Promise<string[]> {
   res = await transition("reset");
   check(res.status === 200 && res.json?.data?.new_status === "PENDING" && res.json?.data?.current_round === 0, "reset -> PENDING (round 0)");
 
-  return [`${newGameId}`, ...phones];
+  return [newGameId, ...usernames];
 }
 
 async function s6Sse(): Promise<string[]> {
   console.log("S6 SSE");
-  const phone = uniquePhone("6");
+  const username = uniqueUsername("s6").slice(0, 28);
   const jar: Jar = new Map();
-  await signIn(jar, phone);
+  await provisionUser(username, SEED_PLAYER_PASSWORD);
+  await signIn(jar, username, SEED_PLAYER_PASSWORD);
   const token = jar.get("access_token") as string;
 
   const timerEvents = await readSse(`/api/v1/sse/timer/${SEED_GAME_ID}`, token, (e) => e.type === "timer", 8000);
@@ -588,13 +767,13 @@ async function s6Sse(): Promise<string[]> {
   const noToken = await api(`/api/v1/sse/timer/${SEED_GAME_ID}`);
   check(noToken.status === 401, "SSE without token -> 401");
 
-  return [phone];
+  return [username];
 }
 
 async function s7Ledger(): Promise<void> {
   console.log("S7 ledger/telemetry");
   const mentorJar: Jar = new Map();
-  await signIn(mentorJar, SEED_MENTOR_PHONE);
+  await signIn(mentorJar, SEED_MENTOR_USERNAME, SEED_MENTOR_PASSWORD);
 
   const res = await api(`/api/v1/admin/teams?game_id=${SEED_GAME_ID}`, { jar: mentorJar });
   check(res.status === 200, "admin lists teams");
@@ -612,23 +791,27 @@ async function main(): Promise<void> {
 
   await db.$connect();
 
-  let allPhones: string[] = [];
+  let allUsernames: string[] = [];
   let qaGameIds: string[] = [];
   try {
     await createFixtures();
 
-    const p1 = await s1AuthLifecycle();
-    const p2 = await s2AutoRegistration();
-    const p3 = await s3Teams();
-    const p4 = await s4ScanMatrix();
-    const p5 = await s5Admin();
-    const p6 = await s6Sse();
+    const s1 = await s1AuthLifecycle();
+    const s2 = await s2AutoRegistration();
+    const s3 = await s3Teams();
+    const s4 = await s4ScanMatrix();
+    const s5 = await s5Admin();
+    const s6 = await s6Sse();
     await s7Ledger();
 
-    allPhones = [...new Set([...p1, ...p2, ...p3, ...p4, ...p5, ...p6])];
-    qaGameIds = p5.filter((x) => x.length === 36); // the transition game id
+    allUsernames = [...s1, ...s2, ...s3, ...s4, ...s5, ...s6];
+    qaGameIds = s5.filter((x) => x.length === 36); // the transition game id
   } finally {
-    await cleanup(allPhones);
+    await cleanup([
+      ...allUsernames.filter((x) => x.startsWith("qa_int_")),
+      FULL_USER,
+      PENDING_USER,
+    ]);
     await db.game.deleteMany({ where: { id: { in: qaGameIds } } });
     await db.$disconnect();
   }

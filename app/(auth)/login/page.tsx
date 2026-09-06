@@ -19,9 +19,7 @@ function LoginForm() {
 
     const trimmed = username.trim();
     if (trimmed.length < 3) {
-      setError(
-        "Enter your callsign or phone number (at least 3 characters)."
-      );
+      setError("Username must be at least 3 characters.");
       return;
     }
     if (password.length < 8) {
@@ -48,7 +46,7 @@ function LoginForm() {
       };
 
       if (!res.ok || !body.success || !body.data?.user) {
-        setError(body.message || "Invalid username or phone number or password.");
+        setError("Invalid username or password");
         return;
       }
 

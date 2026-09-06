@@ -3,23 +3,52 @@
 import { useState } from "react";
 import Link from "next/link";
 import { Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { apiFetch, ApiError } from "@/lib/api-client";
-import { useQRStore } from "@/stores/qr-store";
+import { useQRStore, type ScanResultPayload } from "@/stores/qr-store";
 
 function TrapContent() {
+  const searchParams = useSearchParams();
+  const dataParam = searchParams.get("data");
   const { lastScanResult, scanType } = useQRStore();
 
-  const challenge =
-    scanType === "trap" && lastScanResult
-      ? {
-          index_label: lastScanResult.index_label,
-          question: lastScanResult.question,
-          game_id: lastScanResult.game_id,
-          scan_id: lastScanResult.scan_id,
-          at_risk: lastScanResult.at_risk,
-          team_total: lastScanResult.team_total,
-        }
-      : null;
+  let challenge:
+    | {
+        index_label: string;
+        question: string | null;
+        game_id: string;
+        scan_id: string;
+        at_risk: number | null;
+        team_total: number;
+      }
+    | null = null;
+
+  if (dataParam) {
+    try {
+      const parsed = JSON.parse(decodeURIComponent(dataParam)) as ScanResultPayload;
+      challenge = {
+        index_label: parsed.index_label,
+        question: parsed.question ?? null,
+        game_id: parsed.game_id,
+        scan_id: parsed.scan_id,
+        at_risk: parsed.at_risk ?? null,
+        team_total: parsed.team_total,
+      };
+    } catch {
+      // fall through to store below
+    }
+  }
+
+  if (!challenge && scanType === "trap" && lastScanResult) {
+    challenge = {
+      index_label: lastScanResult.index_label,
+      question: lastScanResult.question ?? null,
+      game_id: lastScanResult.game_id,
+      scan_id: lastScanResult.scan_id,
+      at_risk: lastScanResult.at_risk ?? null,
+      team_total: lastScanResult.team_total,
+    };
+  }
 
   const [answer, setAnswer] = useState("");
   const [submitting, setSubmitting] = useState(false);

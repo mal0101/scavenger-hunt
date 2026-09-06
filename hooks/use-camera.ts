@@ -61,6 +61,11 @@ export function useCamera({ onScan, onError }: UseCameraOptions) {
           "Camera permission denied. Please enable camera access."
         );
         setHasCamera(false);
+      } else if (message.includes("NotFoundError")) {
+        callbackRef.current.onError?.(
+          "Camera not available on this device."
+        );
+        setHasCamera(false);
       } else {
         callbackRef.current.onError?.("Failed to start camera scanner.");
       }

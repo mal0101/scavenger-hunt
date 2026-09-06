@@ -8,15 +8,14 @@ interface RuntimeData {
   environment: string;
   database: { provider: string; configured: boolean };
   redis: { mode: string; configured: boolean };
-  otp: { mock: boolean; expiry_seconds: number; rate_limit_seconds: number };
-  auth: { access_expiry_seconds: number; refresh_expiry_seconds: number };
+  auth: { provider: string; access_expiry_seconds: number; refresh_expiry_seconds: number };
   game: {
     max_rounds: number;
     round_duration: number;
     elimination_pct: number;
     max_scans_per_minute: number;
   };
-  mentor: { id: string; phone: string };
+  mentor: { id: string; username: string };
   sse: { heartbeat_interval: number; timer_sync_interval: number };
 }
 
@@ -138,18 +137,14 @@ export default function MentorSettingsPage() {
               accent={runtime.redis.configured}
             />
             <Row
-              label="OTP Mode"
-              value={runtime.otp.mock ? "Mock (accepts 000000)" : "Production"}
+              label="Auth Mode"
+              value={runtime.auth.provider ?? "credentials"}
               accent
             />
           </Section>
 
           <Section title="Live Configuration">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <Row
-                label="OTP Expiry"
-                value={`${runtime.otp.expiry_seconds}s`}
-              />
               <Row
                 label="Access Token"
                 value={`${runtime.auth.access_expiry_seconds}s`}
@@ -181,7 +176,7 @@ export default function MentorSettingsPage() {
           <Section title="Session">
             <div className="space-y-3">
               <Row label="Mentor ID" value={runtime.mentor.id.slice(0, 12) + "…"} accent />
-              <Row label="Phone" value={runtime.mentor.phone} accent />
+              <Row label="Username" value={runtime.mentor.username} accent />
               <button
                 onClick={handleSignOut}
                 disabled={signingOut}

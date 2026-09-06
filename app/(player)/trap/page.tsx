@@ -1,30 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Suspense } from "react";
-import { apiFetch } from "@/lib/api-client";
+import { apiFetch, ApiError } from "@/lib/api-client";
+import { useQRStore } from "@/stores/qr-store";
 
 function TrapContent() {
-  const searchParams = useSearchParams();
-  const data = searchParams.get("data");
+  const { lastScanResult, scanType } = useQRStore();
 
-  let challenge: {
-    index_label?: string;
-    question?: string | null;
-    game_id?: string;
-    scan_id?: string;
-    at_risk?: number;
-    team_total?: number;
-  } = {};
-  if (data) {
-    try {
-      challenge = JSON.parse(decodeURIComponent(data));
-    } catch {
-      // static
-    }
-  }
+  const challenge =
+    scanType === "trap" && lastScanResult
+      ? {
+          index_label: lastScanResult.index_label,
+          question: lastScanResult.question,
+          game_id: lastScanResult.game_id,
+          scan_id: lastScanResult.scan_id,
+          at_risk: lastScanResult.at_risk,
+          team_total: lastScanResult.team_total,
+        }
+      : null;
 
   const [answer, setAnswer] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -36,7 +31,7 @@ function TrapContent() {
   const [error, setError] = useState("");
 
   const submit = async () => {
-    if (!challenge.game_id || !challenge.scan_id || submitting) return;
+    if (!challenge?.game_id || !challenge.scan_id || submitting) return;
     setSubmitting(true);
     setError("");
     try {
@@ -53,14 +48,43 @@ function TrapContent() {
         return;
       }
       setResult(j.data);
-    } catch {
-      setError("Network error submitting answer");
+    } catch (err) {
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : "Network error submitting answer"
+      );
     } finally {
       setSubmitting(false);
     }
   };
 
   const answered = result !== null;
+
+  if (!challenge) {
+    return (
+      <div className="px-4 space-y-6 max-w-md mx-auto">
+        <div className="bg-surface-container rounded-xl p-8 text-center border border-outline-variant/30">
+          <span className="material-symbols-outlined text-on-surface-variant text-4xl mb-3 block">
+            error_outline
+          </span>
+          <p className="font-headline text-lg text-on-surface mb-2">
+            No Trap Data
+          </p>
+          <p className="font-body text-body-md text-on-surface-variant mb-4">
+            Trap challenge data is no longer available. Scan a trap QR code to trigger a challenge.
+          </p>
+          <Link
+            href="/scan"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary-container text-on-primary-container font-label text-label-sm font-bold uppercase tracking-widest rounded-lg hover:shadow-[0_0_20px_rgba(217,119,7,0.4)] transition-all"
+          >
+            <span className="material-symbols-outlined text-lg">qr_code_scanner</span>
+            Scan Again
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="px-4 space-y-6 max-w-md mx-auto">
@@ -95,9 +119,6 @@ function TrapContent() {
                 ? `+${result!.delta} pts earned (50% of the points at risk)`
                 : `-${Math.abs(result!.delta)} pts lost`}
             </p>
-          </div>
-          <div className="font-body text-body-md text-on-surface-variant">
-            Answer: <span className="text-on-surface font-bold">{answer}</span>
           </div>
           <div className="flex justify-center gap-3">
             <Link
@@ -148,7 +169,7 @@ function TrapContent() {
                 </p>
                 <p className="font-body text-body-md text-on-surface-variant mt-0.5">
                   Answer correctly to earn {challenge.at_risk != null ? `50% of ${challenge.at_risk} pts` : "points"}. A wrong
-                  answer costs {challenge.at_risk != null ? `-${challenge.at_risk} pts` : "points"}.
+                  answer costs {challenge.at_risk != null ? `-${challenge.at_risk} pts` : "points"}. Answers are case-insensitive.
                 </p>
               </div>
             </div>

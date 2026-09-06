@@ -2,42 +2,33 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
-
-interface TeamEntry {
-  id: string;
-  name: string;
-  invite_code: string;
-  game_id: string;
-  game_title: string;
-  total_score: number;
-  eliminated: boolean;
-  member_count: number;
-}
-
-interface MiniGame {
-  id: string;
-  title: string;
-  elimination_pct: number;
-}
+import { ErrorState } from "@/components/ui/error-state";
+import type { MentorTeamEntry, MiniGame } from "@/lib/types/api-responses";
 
 const REFRESH_MS = 10000;
 
 export default function MentorTeamsPage() {
-  const [teams, setTeams] = useState<TeamEntry[]>([]);
+  const [teams, setTeams] = useState<MentorTeamEntry[]>([]);
   const [games, setGames] = useState<MiniGame[]>([]);
   const [selectedGame, setSelectedGame] = useState("all");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
+    let active = true;
     async function loadGames() {
       try {
         const j = await apiFetch<{ success: boolean; data: MiniGame[] }>("/api/v1/admin/games");
-        if (j.success) setGames(j.data);
+        if (active && j.success) setGames(j.data);
       } catch {
         // keep defaults
       }
     }
     loadGames();
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -47,10 +38,13 @@ export default function MentorTeamsPage() {
         const url = selectedGame !== "all"
           ? `/api/v1/admin/teams?game_id=${selectedGame}`
           : "/api/v1/admin/teams";
-        const j = await apiFetch<{ success: boolean; data: TeamEntry[] }>(url);
-        if (active && j.success) setTeams(j.data);
-      } catch {
-        // keep last good data
+        const j = await apiFetch<{ success: boolean; data: MentorTeamEntry[] }>(url);
+        if (active && j.success) {
+          setTeams(j.data);
+          setError(null);
+        }
+      } catch (err) {
+        if (active) setError(err instanceof Error ? err.message : "Failed to load teams");
       } finally {
         if (active) setLoading(false);
       }
@@ -61,7 +55,7 @@ export default function MentorTeamsPage() {
       active = false;
       clearInterval(id);
     };
-  }, [selectedGame]);
+  }, [selectedGame, retryKey]);
 
   const rankedTeams = teams.map((t, i) => ({ ...t, rank: i + 1 }));
   const activeCount = rankedTeams.filter((t) => !t.eliminated).length;
@@ -131,7 +125,13 @@ export default function MentorTeamsPage() {
       )}
 
       <div className="space-y-3">
-        {loading ? (
+        {error && teams.length === 0 ? (
+          <ErrorState
+            title="Failed to load teams"
+            message={error}
+            onRetry={() => setRetryKey((k) => k + 1)}
+          />
+        ) : loading ? (
           <div className="bg-surface-container rounded-xl border border-outline-variant/30 p-8 text-center">
             <p className="font-body text-body-md text-on-surface-variant animate-pulse">Loading teams...</p>
           </div>

@@ -2,62 +2,60 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
-
-interface ScanEntry {
-  id: string;
-  index_label: string;
-  points_earned: number;
-  scanned_at: string;
-  location_name?: string | null;
-}
-
-interface GameData {
-  id: string;
-  title: string;
-  current_round: number;
-}
-
-interface PlayerData {
-  total_score: number;
-  team: { total_score: number } | null;
-}
+import { ErrorState } from "@/components/ui/error-state";
+import type { ActiveGameView, PlayerMeView, ScanLogEntry } from "@/lib/types/api-responses";
 
 export default function LogsPage() {
-  const [scans, setScans] = useState<ScanEntry[]>([]);
+  const [scans, setScans] = useState<ScanLogEntry[]>([]);
   const [scanTotal, setScanTotal] = useState(0);
   const [pointTotal, setPointTotal] = useState(0);
-  const [game, setGame] = useState<GameData | null>(null);
-  const [player, setPlayer] = useState<PlayerData | null>(null);
+  const [game, setGame] = useState<ActiveGameView | null>(null);
+  const [player, setPlayer] = useState<PlayerMeView | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  async function load() {
+    setLoading(true);
+    setError(null);
+    try {
+      const [scansRes, gameRes, playerRes] = await Promise.all([
+apiFetch<{ success: boolean; data?: { scans: ScanLogEntry[]; total: number; total_points: number } }>(
+        "/api/v1/players/me/scans"
+      ),
+        apiFetch<{ success: boolean; data: ActiveGameView | null }>("/api/v1/games/active"),
+        apiFetch<{ success: boolean; data: PlayerMeView }>("/api/v1/players/me"),
+      ]);
+      if (scansRes.success && scansRes.data) {
+        setScans(scansRes.data.scans);
+        setScanTotal(scansRes.data.total);
+        setPointTotal(scansRes.data.total_points);
+      }
+      if (gameRes.success && gameRes.data) setGame(gameRes.data);
+      if (playerRes.success) setPlayer(playerRes.data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load scan history");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    async function load() {
-      try {
-        const [scansRes, gameRes, playerRes] = await Promise.all([
-          apiFetch<{ success: boolean; data?: { scans: ScanEntry[]; total: number; total_points: number } }>(
-            "/api/v1/players/me/scans"
-          ),
-          apiFetch<{ success: boolean; data: GameData | null }>("/api/v1/games/active"),
-          apiFetch<{ success: boolean; data: PlayerData }>("/api/v1/players/me"),
-        ]);
-        if (scansRes.success && scansRes.data) {
-          setScans(scansRes.data.scans);
-          setScanTotal(scansRes.data.total);
-          setPointTotal(scansRes.data.total_points);
-        }
-        if (gameRes.success && gameRes.data) setGame(gameRes.data);
-        if (playerRes.success) setPlayer(playerRes.data);
-      } catch (err) {
-        console.error("Logs load error:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
+    const timer = setTimeout(load, 0);
+    return () => clearTimeout(timer);
   }, []);
 
-  const totalPoints = pointTotal;
-
+  if (error) {
+    return (
+      <div className="px-4 space-y-6 max-w-lg mx-auto pt-2">
+        <div className="text-center space-y-1">
+          <h1 className="font-headline text-headline-lg-mobile text-on-surface etched-text">
+            Scan Logs
+          </h1>
+        </div>
+        <ErrorState message={error} onRetry={load} />
+      </div>
+    );
+  }
 
   return (
     <div className="px-4 space-y-6 max-w-lg mx-auto">
@@ -81,7 +79,7 @@ export default function LogsPage() {
         </div>
         <div className="bg-surface-container rounded-lg border border-outline-variant/30 p-3 text-center">
           <p className="font-headline text-2xl text-primary font-bold">
-            {loading ? "--" : totalPoints}
+            {loading ? "--" : pointTotal}
           </p>
           <p className="font-label text-label-sm text-on-surface-variant uppercase">
             Points

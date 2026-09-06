@@ -8,16 +8,19 @@ interface LeaderboardEntry {
   eliminated: boolean;
 }
 
-interface ScanResult {
-  id: string;
-  index: string;
-  scanValue: string;
-  timestamp: string;
-  points: number;
+export interface ScanResultPayload {
+  index_label: string;
+  game_id: string;
+  points_earned: number;
+  team_total: number;
+  scan_id: string;
+  question?: string | null;
+  at_risk?: number | null;
 }
 
 interface QRState {
-  lastScanResult: ScanResult | null;
+  lastScanResult: ScanResultPayload | null;
+  scanType: "index" | "trap" | null;
   showScanResult: boolean;
   showScanError: boolean;
   showLeaderboardPreview: boolean;
@@ -26,7 +29,8 @@ interface QRState {
   leaderboard: LeaderboardEntry[];
   leaderboardConnected: boolean;
   timerConnected: boolean;
-  setLastScanResult: (result: ScanResult | null) => void;
+  setScanResult: (result: ScanResultPayload, type: "index" | "trap") => void;
+  clearScanResult: () => void;
   setShowScanResult: (show: boolean) => void;
   setShowScanError: (show: boolean) => void;
   setShowLeaderboardPreview: (show: boolean) => void;
@@ -40,6 +44,7 @@ interface QRState {
 
 export const useQRStore = create<QRState>((set) => ({
   lastScanResult: null,
+  scanType: null,
   showScanResult: false,
   showScanError: false,
   showLeaderboardPreview: false,
@@ -49,7 +54,10 @@ export const useQRStore = create<QRState>((set) => ({
   leaderboardConnected: false,
   timerConnected: false,
 
-  setLastScanResult: (result) => set({ lastScanResult: result }),
+  setScanResult: (result, type) =>
+    set({ lastScanResult: result, scanType: type, showScanResult: true }),
+  clearScanResult: () =>
+    set({ lastScanResult: null, scanType: null, showScanResult: false }),
   setShowScanResult: (show) => set({ showScanResult: show }),
   setShowScanError: (show) => set({ showScanError: show }),
   setShowLeaderboardPreview: (show) => set({ showLeaderboardPreview: show }),
@@ -62,6 +70,7 @@ export const useQRStore = create<QRState>((set) => ({
   resetScanUI: () =>
     set({
       lastScanResult: null,
+      scanType: null,
       showScanResult: false,
       showScanError: false,
       scanAnimation: false,

@@ -94,6 +94,7 @@ export default function PlayerShell({
                 key={item.href}
                 href={item.href}
                 aria-label={`${item.label} page`}
+                aria-current={active ? "page" : undefined}
                 className="flex flex-col items-center justify-center -mt-6"
               >
                 <div className="w-14 h-14 rounded-full bg-primary-container flex items-center justify-center shadow-[0_0_20px_rgba(217,119,7,0.6)] border-4 border-surface-container-high animate-flicker-amber">

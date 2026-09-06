@@ -4,26 +4,21 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useCamera } from "@/hooks/use-camera";
 import { useQRStore } from "@/stores/qr-store";
 import { useRouter } from "next/navigation";
-import { apiFetch } from "@/lib/api-client";
-
-interface ActiveGame {
-  id: string;
-  title: string;
-  current_round: number;
-}
+import { apiFetch, ApiError } from "@/lib/api-client";
+import type { ActiveGameView } from "@/lib/types/api-responses";
 
 export default function ScanPage() {
   const router = useRouter();
-  const { showScanError, setShowScanError } = useQRStore();
+  const { showScanError, setShowScanError, setScanResult } = useQRStore();
   const [scanStatus, setScanStatus] = useState<"idle" | "scanning" | "found">("idle");
-  const [game, setGame] = useState<ActiveGame | null>(null);
+  const [game, setGame] = useState<ActiveGameView | null>(null);
   const [gameLoading, setGameLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const scanInFlightRef = useRef(false);
 
   useEffect(() => {
-    apiFetch<{ success: boolean; data: ActiveGame | null }>("/api/v1/games/active")
+    apiFetch<{ success: boolean; data: ActiveGameView | null }>("/api/v1/games/active")
       .then((j) => {
         if (j.success && j.data) setGame(j.data);
       })
@@ -66,8 +61,8 @@ export default function ScanPage() {
         }
 
         const type = j.data.index.type === "trap" ? "trap" : "index";
-        const payload = encodeURIComponent(
-          JSON.stringify({
+        setScanResult(
+          {
             index_label: j.data.index.label,
             game_id: game.id,
             points_earned: j.data.points_earned,
@@ -75,11 +70,17 @@ export default function ScanPage() {
             scan_id: j.data.scan_id,
             question: j.data.question ?? null,
             at_risk: j.data.at_risk ?? null,
-          })
+          },
+          type
         );
-        router.push(`/scan-result?type=${type}&data=${payload}`);
+        router.push(`/scan-result?type=${type}`);
       } catch (err) {
-        const message = err instanceof Error ? err.message : "Failed to process scan";
+        const message =
+          err instanceof ApiError
+            ? err.message
+            : err instanceof Error
+              ? err.message
+              : "Failed to process scan";
         setSubmitError(message);
         setScanStatus("idle");
       } finally {
@@ -87,7 +88,7 @@ export default function ScanPage() {
         scanInFlightRef.current = false;
       }
     },
-    [game, router]
+    [game, router, setScanResult]
   );
 
   const handleError = useCallback(

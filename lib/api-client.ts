@@ -1,5 +1,14 @@
 "use client";
 
+export class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
 let refreshPromise: Promise<boolean> | null = null;
 
 async function tryRefresh(): Promise<boolean> {
@@ -17,7 +26,7 @@ async function tryRefresh(): Promise<boolean> {
     } finally {
       setTimeout(() => {
         refreshPromise = null;
-      }, 0);
+      }, 500);
     }
   })();
 
@@ -56,6 +65,17 @@ export async function apiFetch<T = unknown>(
     } else if (typeof window !== "undefined") {
       window.location.assign("/login");
     }
+  }
+
+  if (!res.ok) {
+    let message: string;
+    try {
+      const errBody = await res.json();
+      message = errBody.message ?? errBody.error ?? `Request failed (${res.status})`;
+    } catch {
+      message = `Request failed with status ${res.status}`;
+    }
+    throw new ApiError(message, res.status);
   }
 
   return res.json() as Promise<T>;

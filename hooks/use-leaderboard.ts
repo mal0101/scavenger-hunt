@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useCallback, useState } from "react";
-import { useRouter } from "next/navigation";
 
 interface LeaderboardEntry {
   rank: number;
@@ -18,17 +17,20 @@ interface UseLeaderboardOptions {
   onLeaderboardUpdate?: (teams: LeaderboardEntry[]) => void;
 }
 
+const MAX_BACKOFF_MS = 30_000;
+const INITIAL_BACKOFF_MS = 1_000;
+
 export function useLeaderboard({
   gameId,
   enabled = true,
   onLeaderboardUpdate,
 }: UseLeaderboardOptions) {
   const [connected, setConnected] = useState(false);
+  const [reconnecting, setReconnecting] = useState(false);
   const [teams, setTeams] = useState<LeaderboardEntry[]>([]);
   const eventSourceRef = useRef<EventSource | null>(null);
   const callbackRef = useRef(onLeaderboardUpdate);
-  const consecutiveErrorsRef = useRef(0);
-  const router = useRouter();
+  const backoffRef = useRef(INITIAL_BACKOFF_MS);
 
   useEffect(() => {
     callbackRef.current = onLeaderboardUpdate;
@@ -56,14 +58,17 @@ export function useLeaderboard({
         eventSourceRef.current = es;
 
         es.onopen = () => {
-          if (!cancelled) setConnected(true);
+          if (!cancelled) {
+            setConnected(true);
+            setReconnecting(false);
+            backoffRef.current = INITIAL_BACKOFF_MS;
+          }
         };
 
         es.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
             if (data.type === "leaderboard" && data.teams) {
-              consecutiveErrorsRef.current = 0;
               setTeams(data.teams);
               callbackRef.current?.(data.teams);
             }
@@ -76,15 +81,18 @@ export function useLeaderboard({
           if (cancelled) return;
           setConnected(false);
           es.close();
-          consecutiveErrorsRef.current += 1;
-          if (consecutiveErrorsRef.current >= 5) {
-            router.replace("/login");
-            return;
-          }
-          setTimeout(connect, 3000);
+          setReconnecting(true);
+          const delay = backoffRef.current;
+          backoffRef.current = Math.min(backoffRef.current * 2, MAX_BACKOFF_MS);
+          setTimeout(connect, delay);
         };
       } catch {
-        if (!cancelled) setTimeout(connect, 3000);
+        if (!cancelled) {
+          setReconnecting(true);
+          const delay = backoffRef.current;
+          backoffRef.current = Math.min(backoffRef.current * 2, MAX_BACKOFF_MS);
+          setTimeout(connect, delay);
+        }
       }
     };
 
@@ -94,7 +102,7 @@ export function useLeaderboard({
       cancelled = true;
       disconnect();
     };
-  }, [gameId, enabled, disconnect, router]);
+  }, [gameId, enabled, disconnect]);
 
-  return { connected, teams, disconnect };
+  return { connected, reconnecting, teams, disconnect };
 }

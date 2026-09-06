@@ -169,7 +169,7 @@ test.describe("QR camera scan", () => {
     expect(new URL(page.url()).pathname).toBe("/scan");
   });
 
-  test("a re-scanned (depleted) QR is rejected as already claimed", async ({
+  test("a re-scanned QR drains 33% of the original value for a second team", async ({
     page,
     context,
   }) => {
@@ -181,18 +181,18 @@ test.describe("QR camera scan", () => {
     const url = await qrDataUrl(encoded);
     await context.addInitScript(syntheticCameraInitScript(url));
 
-    // First scan claims the code and awards full points.
+    // First scan claims the code for the full original value.
     await page.goto("/scan");
     await page.getByRole("button", { name: "Start Scanner" }).click();
     await page.waitForURL("**/scan-result?type=*&data=*", { timeout: 45000 });
 
-    // Second scan of the same code: the server must report it as fully claimed.
+    // A second scan (this player already has a scan for the index) is rejected.
     const res = await api<{ success: boolean; error?: string }>(
       page,
       `/api/v1/games/${gameId}/scan`,
       { method: "POST", body: { qr_data: encoded } }
     );
     expect(res.json.success).toBe(false);
-    expect(res.json.error).toBe("QR_DEPLETED");
+    expect(res.json.error).toBe("ALREADY_SCANNED");
   });
 });

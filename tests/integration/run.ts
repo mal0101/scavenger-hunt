@@ -541,9 +541,21 @@ async function s4ScanMatrix(): Promise<string[]> {
   check(res.status === 200 && res.json?.data?.passed_challenges === 1, "dashboard reports 1 passed challenge after scan");
   check(typeof res.json?.data?.team_rank === "number" && res.json?.data?.team_rank >= 1, "dashboard reports a numeric team rank (DB fallback)");
 
-  // The code is now depleted: re-scanning it is rejected outright.
+  // The same player cannot re-claim the same index.
   res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: happy }, jar: jars[0] });
-  check(res.status === 400 && res.json?.error === "QR_DEPLETED", "second scan of a claimed code rejected (QR_DEPLETED)");
+  check(res.status === 400 && res.json?.error === "ALREADY_SCANNED", "same player re-scan rejected (ALREADY_SCANNED)");
+
+  // A second player/team can still claim the code but earns 33% less than the
+  // original value (rounded, 67% of `points`), and that reduced rate is stable.
+  const reduced = Math.max(1, Math.round(index.points * 0.67));
+  const drainer = uniqueUsername("s4c").slice(0, 28);
+  usernames.push(drainer);
+  await provisionUser(drainer, SEED_PLAYER_PASSWORD);
+  const drainJar: Jar = new Map();
+  await signIn(drainJar, drainer, SEED_PLAYER_PASSWORD);
+  await api("/api/v1/players/me/team", { method: "POST", body: { team_name: "QA-Scan-Team-2" }, jar: drainJar });
+  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: happy }, jar: drainJar });
+  check(res.status === 200 && res.json?.data?.points_earned === reduced, `second scan earns ${reduced} pts (33% off the original)`);
 
   // Negative cases use a *second* index so the depleted-code guard can't
   // short-circuit the validation path under test.

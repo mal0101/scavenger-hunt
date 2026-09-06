@@ -149,19 +149,28 @@ export async function POST(
       );
     }
 
-    // Single-claim model: the first valid scan atomically drains the pool and
-    // depletes the code. updateMany + the ACTIVE status guard make the claim
-    // atomic, so a concurrent scan loses the race and sees QR_DEPLETED.
-    const claimed = await db.qrCode.updateMany({
+    // Reduced pool model: the FIRST scan pays the full original value, but
+    // from the SECOND scan onward every claim pays the reduced value (33% off
+    // the ORIGINAL points), and stays at that reduced rate for all subsequent
+    // scans — it does not keep shrinking. Rewriting the pool also makes it
+    // clear to re-scanners that the lower value is now the current one.
+    const reduced = Math.max(1, Math.round(qrCode.points * 0.67));
+
+    const score =
+      qrCode.pool_value === qrCode.points ? qrCode.points : reduced;
+
+    // Set the shared pool to the reduced value (first scan only touches pool
+    // bookkeeping, not the value paid out), so the value is durable for any
+    // later scan.
+    await db.qrCode.updateMany({
       where: { id: qrCode.id, status: "ACTIVE" },
-      data: { status: "DEPLETED", pool_value: 0, first_scanned_at: new Date() },
+      data: {
+        pool_value: reduced,
+        ...(qrCode.pool_value === qrCode.points
+          ? { first_scanned_at: new Date() }
+          : {}),
+      },
     });
-
-    if (claimed.count === 0) {
-      return apiError("This QR code has already been fully claimed", "QR_DEPLETED");
-    }
-
-    const score = qrCode.pool_value;
 
     const scan = await db.scan.create({
       data: {

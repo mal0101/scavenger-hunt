@@ -171,12 +171,13 @@ attaches the same collectors to extra pages (e.g. the second SSE context).
 - `generateQrImage`/`generateQrSvg` from the admin `indexes/[id]/qr` and `indexes/generate`
   routes **provision** a QrCode row (upsert) and embed its `code_id`; the response returns
   `code_id`, `pool_value`, and `status`.
-- The scan route (`app/api/v1/games/[id]/scan`) looks up the QrCode by `code_id`, rejects
-  unknown/depleted codes (`QR_UNKNOWN_CODE` / `QR_DEPLETED`), and **atomically claims** the
-  code via `updateMany({ status: "ACTIVE" }) → status DEPLETED, pool_value 0,
-  first_scanned_at`. It awards the full `pool_value` (no time-based multiplier) and
-  increments player + team scores and Redis/SSE as before.
-- `tests/browser/global-setup.ts` re-arms all seed QR codes to ACTIVE + full pool each run.
+- The scan route (`app/api/v1/games/[id]/scan`) looks up the QrCode by `code_id` and rejects
+  unknown/depleted codes (`QR_UNKNOWN_CODE` / `QR_DEPLETED`). Value is a **stable reduced
+  pool**: the FIRST scan pays the full original `points`; from the SECOND scan onward every
+  claim pays the reduced value (67% of the original `points`, i.e. 33% off) and stays at that
+  value for all subsequent scans — it does not keep shrinking. The shared `pool_value` is set
+  to the reduced amount so later scans know the current rate. Player + team scores and
+  Redis/SSE are updated per scan.
 
 ### Teams (M2)
 - `Team.captain_id` (created player becomes captain). **M2 added the full captain

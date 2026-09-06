@@ -15,7 +15,7 @@ interface RuntimeData {
     elimination_pct: number;
     max_scans_per_minute: number;
   };
-  mentor: { id: string; phone: string };
+  mentor: { id: string; username: string };
   sse: { heartbeat_interval: number; timer_sync_interval: number };
 }
 
@@ -180,7 +180,7 @@ export default function MentorSettingsPage() {
           <Section title="Session">
             <div className="space-y-3">
               <Row label="Mentor ID" value={runtime.mentor.id.slice(0, 12) + "…"} accent />
-              <Row label="Phone" value={runtime.mentor.phone} accent />
+              <Row label="Username" value={runtime.mentor.username} accent />
               <button
                 onClick={handleSignOut}
                 disabled={signingOut}

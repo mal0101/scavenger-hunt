@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useUIStore } from "@/stores/ui-store";
+import { Toast } from "@/components/ui/toast";
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const setHydrated = useUIStore((s) => s.setHydrated);
@@ -20,5 +21,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  return <>{children}</>;
+  return (
+    <>
+      {children}
+      <Toast />
+    </>
+  );
 }

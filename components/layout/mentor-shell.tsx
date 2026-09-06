@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
 import { MENTOR_NAV_ITEMS } from "@/lib/utils/navigation";
 
 export default function MentorShell({
@@ -10,9 +11,22 @@ export default function MentorShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [signingOut, setSigningOut] = useState(false);
 
   function isActive(href: string) {
     return pathname === href || pathname.startsWith(href + "/");
+  }
+
+  async function handleSignOut() {
+    setSigningOut(true);
+    try {
+      await fetch("/api/v1/auth/logout", { method: "POST" });
+    } catch {
+      // proceed regardless
+    } finally {
+      router.replace("/login");
+    }
   }
 
   return (
@@ -60,7 +74,7 @@ export default function MentorShell({
           })}
         </nav>
 
-        <div className="p-4 border-t border-outline-variant/30">
+        <div className="p-4 border-t border-outline-variant/30 space-y-2">
           <Link
             href="/dock"
             className="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors"
@@ -72,6 +86,18 @@ export default function MentorShell({
               Player View
             </span>
           </Link>
+          <button
+            onClick={handleSignOut}
+            disabled={signingOut}
+            className="flex items-center gap-2 text-on-surface-variant hover:text-error transition-colors w-full"
+          >
+            <span className="material-symbols-outlined text-lg">
+              logout
+            </span>
+            <span className="font-label text-label-sm uppercase">
+              {signingOut ? "Signing out..." : "Sign Out"}
+            </span>
+          </button>
         </div>
       </aside>
 
@@ -87,6 +113,16 @@ export default function MentorShell({
             Mentor Panel
           </span>
         </div>
+        <button
+          onClick={handleSignOut}
+          disabled={signingOut}
+          className="text-on-surface-variant hover:text-error transition-colors"
+          aria-label="Sign out"
+        >
+          <span className="material-symbols-outlined text-xl">
+            logout
+          </span>
+        </button>
       </div>
 
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-surface-container-high/95 backdrop-blur-md border-t border-primary-container/40 h-16 flex items-center justify-around px-2 shadow-[0_-8px_24px_rgba(217,119,7,0.06)]" aria-label="Mentor navigation">

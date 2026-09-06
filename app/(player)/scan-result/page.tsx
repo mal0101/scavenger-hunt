@@ -2,35 +2,63 @@
 
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Suspense } from "react";
+import { Suspense, useEffect } from "react";
+import { useQRStore, type ScanResultPayload } from "@/stores/qr-store";
 
 function ScanResultContent() {
   const searchParams = useSearchParams();
-  const data = searchParams.get("data");
   const type = searchParams.get("type") ?? "index";
+  const { lastScanResult, scanType, clearScanResult } = useQRStore();
 
-  let scanResult: {
-    index_label?: string;
-    points_earned?: number;
-    team_total?: number;
-    question?: string | null;
-    at_risk?: number;
-  } = {};
-  if (data) {
-    try {
-      scanResult = JSON.parse(decodeURIComponent(data));
-    } catch {
-      // static display
-    }
+  const isTrap = type === "trap" && scanType === "trap";
+
+  useEffect(() => {
+    return () => {
+      clearScanResult();
+    };
+  }, [clearScanResult]);
+
+  const scanResult: ScanResultPayload = lastScanResult ?? {
+    index_label: "",
+    game_id: "",
+    points_earned: 0,
+    team_total: 0,
+    scan_id: "",
+  };
+
+  const hasData = lastScanResult !== null;
+
+  if (!hasData) {
+    return (
+      <div className="px-4 space-y-4 max-w-lg mx-auto">
+        <div className="bg-surface-container rounded-xl p-8 text-center border border-outline-variant/30">
+          <span className="material-symbols-outlined text-on-surface-variant text-4xl mb-3 block">
+            error_outline
+          </span>
+          <p className="font-headline text-lg text-on-surface mb-2">
+            No Scan Data
+          </p>
+          <p className="font-body text-body-md text-on-surface-variant mb-4">
+            Scan result data is no longer available. This may happen if you navigated
+            here directly or refreshed the page.
+          </p>
+          <Link
+            href="/scan"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-primary-container text-on-primary-container font-label text-label-sm font-bold uppercase tracking-widest rounded-lg hover:shadow-[0_0_20px_rgba(217,119,7,0.4)] transition-all"
+          >
+            <span className="material-symbols-outlined text-lg">qr_code_scanner</span>
+            Scan Again
+          </Link>
+        </div>
+      </div>
+    );
   }
-
-  const isTrap = type === "trap";
 
   return (
     <div className="px-4 space-y-4 max-w-lg mx-auto">
       <div className="space-y-4">
         {isTrap ? (
-          <Link href={`/trap?data=${searchParams.get("data") ?? ""}`} className="block">
+          <Link href="/trap" className="block">
             <div className="bg-surface-container-highest rounded-xl p-6 space-y-4 border-t-error border-l border-r border-b border-outline-variant hover:scale-[1.02] transition-transform cursor-pointer relative overflow-hidden ambient-glow">
               <div
                 className="absolute inset-0 opacity-5 pointer-events-none"
@@ -107,22 +135,18 @@ function ScanResultContent() {
                 CHECKPOINT SECURED
               </h2>
               <p className="font-label text-label-sm text-on-surface-variant uppercase tracking-widest mt-1">
-                {scanResult.index_label ?? "Index Found"}
+                {scanResult.index_label || "Index Found"}
               </p>
             </div>
 
-            {scanResult.points_earned != null && (
-              <div className="bg-surface/50 border border-outline-variant rounded-lg p-4 text-center space-y-1 brass-plate">
-                <p className="font-headline text-xl text-primary font-bold etched-text">
-                  +{scanResult.points_earned} pts
-                </p>
-                {scanResult.team_total != null && (
-                  <p className="font-label text-label-sm text-on-surface-variant">
-                    Team total: {scanResult.team_total}
-                  </p>
-                )}
-              </div>
-            )}
+            <div className="bg-surface/50 border border-outline-variant rounded-lg p-4 text-center space-y-1 brass-plate">
+              <p className="font-headline text-xl text-primary font-bold etched-text">
+                +{scanResult.points_earned} pts
+              </p>
+              <p className="font-label text-label-sm text-on-surface-variant">
+                Team total: {scanResult.team_total}
+              </p>
+            </div>
 
             <Link
               href="/dock"

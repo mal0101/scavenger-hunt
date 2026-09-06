@@ -3,53 +3,33 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api-client";
-
-interface Game {
-  id: string;
-  title: string;
-  status: string;
-  current_round: number;
-  team_count: number;
-  round_count: number;
-  created_at: string;
-}
-
-interface GameTeam {
-  id: string;
-  name: string;
-  total_score: number;
-  eliminated: boolean;
-  member_count: number;
-  rank: number;
-}
-
-interface GameDetail {
-  id: string;
-  title: string;
-  status: string;
-  current_round?: number;
-  team_count: number;
-  teams: GameTeam[];
-}
+import { useUIStore } from "@/stores/ui-store";
+import type {
+  MentorGameCard,
+  MentorGameDetail,
+} from "@/lib/types/api-responses";
 
 export default function MentorDashboardPage() {
-  const [games, setGames] = useState<Game[]>([]);
-  const [activeDetail, setActiveDetail] = useState<GameDetail | null>(null);
+  const [games, setGames] = useState<MentorGameCard[]>([]);
+  const [activeDetail, setActiveDetail] = useState<MentorGameDetail | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [lastSync, setLastSync] = useState<Date | null>(null);
+  const showToast = useUIStore((s) => s.showToast);
 
   useEffect(() => {
     let mounted = true;
 
     async function load() {
       try {
-        const res = await apiFetch<{ success: boolean; data: Game[] }>("/api/v1/admin/games");
+        const res = await apiFetch<{ success: boolean; data: MentorGameCard[] }>("/api/v1/admin/games");
         if (!mounted) return;
         if (res.success) {
           setGames(res.data);
+          setError(null);
           const theActive = res.data.find((g) => g.status === "ACTIVE");
           if (theActive) {
-            const detail = await apiFetch<{ success: boolean; data: GameDetail }>(
+            const detail = await apiFetch<{ success: boolean; data: MentorGameDetail }>(
               `/api/v1/admin/games/${theActive.id}`
             );
             if (mounted && detail.success) setActiveDetail(detail.data);
@@ -58,8 +38,11 @@ export default function MentorDashboardPage() {
           }
           setLastSync(new Date());
         }
-      } catch {
-        // keep previous state
+      } catch (err) {
+        if (mounted) {
+          setError(err instanceof Error ? err.message : "Failed to load data");
+          showToast("Failed to refresh dashboard", "error");
+        }
       } finally {
         if (mounted) setLoading(false);
       }
@@ -71,7 +54,7 @@ export default function MentorDashboardPage() {
       mounted = false;
       clearInterval(interval);
     };
-  }, []);
+  }, [showToast]);
 
   const activeGame = games.find((g) => g.status === "ACTIVE");
   const totalTeams = games.reduce((sum, g) => sum + g.team_count, 0);
@@ -101,9 +84,15 @@ export default function MentorDashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-2 text-on-surface-variant">
-          <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+          <span className={`w-2 h-2 rounded-full ${error ? "bg-error" : lastSync ? "bg-primary animate-pulse" : "bg-outline"}`} />
           <span className="font-label text-label-sm uppercase">
-            {lastSync ? `Synced ${lastSync.toLocaleTimeString()}` : "LIVE"}
+            {error
+              ? "Connection error"
+              : lastSync
+                ? `Synced ${lastSync.toLocaleTimeString()}`
+                : loading
+                  ? "Connecting..."
+                  : "LIVE"}
           </span>
         </div>
       </div>

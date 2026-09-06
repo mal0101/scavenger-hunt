@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useCallback, useState } from "react";
-import { useRouter } from "next/navigation";
 
 interface TimerData {
   remaining: number;
@@ -18,6 +17,9 @@ interface UseTimerOptions {
   onExpire?: () => void;
 }
 
+const MAX_BACKOFF_MS = 30_000;
+const INITIAL_BACKOFF_MS = 1_000;
+
 export function useTimer({
   gameId,
   enabled = true,
@@ -25,6 +27,7 @@ export function useTimer({
   onExpire,
 }: UseTimerOptions) {
   const [connected, setConnected] = useState(false);
+  const [reconnecting, setReconnecting] = useState(false);
   const [timer, setTimer] = useState<TimerData | null>(null);
   const eventSourceRef = useRef<EventSource | null>(null);
   const tickCallbackRef = useRef(onTick);
@@ -32,8 +35,7 @@ export function useTimer({
   const lastServerTimerRef = useRef<TimerData | null>(null);
   const localIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timerStateRef = useRef<TimerData | null>(null);
-  const consecutiveErrorsRef = useRef(0);
-  const router = useRouter();
+  const backoffRef = useRef(INITIAL_BACKOFF_MS);
 
   useEffect(() => {
     tickCallbackRef.current = onTick;
@@ -73,14 +75,17 @@ export function useTimer({
         eventSourceRef.current = es;
 
         es.onopen = () => {
-          if (!cancelled) setConnected(true);
+          if (!cancelled) {
+            setConnected(true);
+            setReconnecting(false);
+            backoffRef.current = INITIAL_BACKOFF_MS;
+          }
         };
 
         es.onmessage = (event) => {
           try {
             const data = JSON.parse(event.data);
             if (data.type === "timer" && data.round) {
-              consecutiveErrorsRef.current = 0;
               const timerData: TimerData = {
                 remaining: data.round.remaining,
                 total: data.round.total,
@@ -100,16 +105,10 @@ export function useTimer({
           if (cancelled) return;
           setConnected(false);
           es.close();
-          consecutiveErrorsRef.current += 1;
-          if (consecutiveErrorsRef.current >= 5) {
-            if (localIntervalRef.current) {
-              clearInterval(localIntervalRef.current);
-              localIntervalRef.current = null;
-            }
-            router.replace("/login");
-            return;
-          }
-          setTimeout(connect, 3000);
+          setReconnecting(true);
+          const delay = backoffRef.current;
+          backoffRef.current = Math.min(backoffRef.current * 2, MAX_BACKOFF_MS);
+          setTimeout(connect, delay);
         };
 
         if (localIntervalRef.current) clearInterval(localIntervalRef.current);
@@ -125,7 +124,12 @@ export function useTimer({
           }
         }, 1000);
       } catch {
-        if (!cancelled) setTimeout(connect, 3000);
+        if (!cancelled) {
+          setReconnecting(true);
+          const delay = backoffRef.current;
+          backoffRef.current = Math.min(backoffRef.current * 2, MAX_BACKOFF_MS);
+          setTimeout(connect, delay);
+        }
       }
     };
 
@@ -135,7 +139,7 @@ export function useTimer({
       cancelled = true;
       disconnect();
     };
-  }, [gameId, enabled, disconnect, pushTimer, router]);
+  }, [gameId, enabled, disconnect, pushTimer]);
 
-  return { connected, timer, disconnect };
+  return { connected, reconnecting, timer, disconnect };
 }

@@ -4,58 +4,25 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
-
-interface GameTeam {
-  id: string;
-  name: string;
-  total_score: number;
-  eliminated: boolean;
-  member_count: number;
-  rank: number;
-}
-
-interface GameDetail {
-  id: string;
-  title: string;
-  description: string | null;
-  status: string;
-  max_rounds: number;
-  round_duration: number;
-  elimination_pct: number;
-  team_count: number;
-  current_round?: number;
-  teams?: GameTeam[];
-  rounds: Array<{
-    id: string;
-    round_number: number;
-    status: string;
-    started_at: string | null;
-  }>;
-  indexes: Array<{
-    id: string;
-    label: string;
-    description: string | null;
-    points: number;
-    location_name: string | null;
-    enigma_type: string | null;
-  }>;
-}
+import { useUIStore } from "@/stores/ui-store";
+import type { MentorGameDetail } from "@/lib/types/api-responses";
 
 export default function MentorGameDetailPage() {
   const params = useParams();
   const gameId = params.id as string;
-  const [game, setGame] = useState<GameDetail | null>(null);
+  const [game, setGame] = useState<MentorGameDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState("");
   const [editingConfig, setEditingConfig] = useState(false);
   const [configError, setConfigError] = useState("");
   const [config, setConfig] = useState({ max_rounds: 3, round_duration: 1800, elimination_pct: 0.2 });
+  const showToast = useUIStore((s) => s.showToast);
 
   useEffect(() => {
     async function load() {
       try {
-        const j = await apiFetch<{ success: boolean; data: GameDetail }>(
+        const j = await apiFetch<{ success: boolean; data: MentorGameDetail }>(
           `/api/v1/admin/games/${gameId}`
         );
         if (j.success) setGame(j.data);
@@ -72,20 +39,23 @@ export default function MentorGameDetailPage() {
     setActionLoading(true);
     setActionError("");
     try {
-      const j = await apiFetch<{ success: boolean; message?: string; data?: GameDetail }>(
+      const j = await apiFetch<{ success: boolean; message?: string; data?: MentorGameDetail }>(
         `/api/v1/admin/games/${gameId}/state`,
         { method: "POST", body: { action } }
       );
       if (j.success) {
-        const rj = await apiFetch<{ success: boolean; data: GameDetail }>(
+        const rj = await apiFetch<{ success: boolean; data: MentorGameDetail }>(
           `/api/v1/admin/games/${gameId}`
         );
         if (rj.success) setGame(rj.data);
+        showToast(`Game ${action.replace(/_/g, " ")} complete`, "success");
       } else {
         setActionError(j.message || "Action failed");
+        showToast(j.message || "Action failed", "error");
       }
-    } catch {
-      setActionError("Network error performing action");
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Network error performing action");
+      showToast(err instanceof Error ? err.message : "Network error performing action", "error");
     } finally {
       setActionLoading(false);
     }
@@ -96,15 +66,17 @@ export default function MentorGameDetailPage() {
     setConfigError("");
     setActionLoading(true);
     try {
-      const j = await apiFetch<{ success: boolean; message?: string; data?: GameDetail }>(
+      const j = await apiFetch<{ success: boolean; message?: string; data?: MentorGameDetail }>(
         `/api/v1/admin/games/${gameId}`,
         { method: "PUT", body: config }
       );
       if (j.success) {
         setGame((prev) => (prev ? { ...prev, ...config } : prev));
         setEditingConfig(false);
+        showToast("Configuration saved", "success");
       } else {
         setConfigError(j.message || "Failed to update configuration");
+        showToast(j.message || "Failed to update configuration", "error");
       }
     } catch {
       setConfigError("Network error updating configuration");
@@ -307,7 +279,7 @@ export default function MentorGameDetailPage() {
                   max={50}
                   step={5}
                   value={Math.round(config.elimination_pct * 100)}
-                  onChange={(e) => setConfig({ ...config, elimination_pct: Number(e.target.value) / 100 })}
+                  onChange={(e) => setConfig({ ...config, elimination_pct: Math.round(Number(e.target.value)) / 100 })}
                   className="w-full px-4 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg font-body text-body-md text-on-surface focus:outline-none focus:border-primary"
                 />
               </div>

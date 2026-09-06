@@ -4,20 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api-client";
 import { GAME_CONSTANTS } from "@/lib/utils/constants";
-
-interface Game {
-  id: string;
-  title: string;
-  description: string | null;
-  status: string;
-  max_rounds: number;
-  round_duration: number;
-  elimination_pct: number;
-  current_round: number;
-  team_count: number;
-  round_count: number;
-  created_at: string;
-}
+import { useUIStore } from "@/stores/ui-store";
+import type { MentorGameCard } from "@/lib/types/api-responses";
 
 const STATE_COLORS: Record<string, string> = {
   PENDING: "bg-surface-container-high text-on-surface-variant",
@@ -27,22 +15,24 @@ const STATE_COLORS: Record<string, string> = {
 };
 
 export default function MentorGamesPage() {
-  const [games, setGames] = useState<Game[]>([]);
+  const [games, setGames] = useState<MentorGameCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [formError, setFormError] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [maxRounds, setMaxRounds] = useState<number>(GAME_CONSTANTS.DEFAULT_MAX_ROUNDS);
   const [roundDuration, setRoundDuration] = useState<number>(GAME_CONSTANTS.DEFAULT_ROUND_DURATION);
   const [eliminationPct, setEliminationPct] = useState<number>(GAME_CONSTANTS.DEFAULT_ELIMINATION_PCT);
+  const showToast = useUIStore((s) => s.showToast);
 
   useEffect(() => {
     async function load() {
       try {
-        const j = await apiFetch<{ success: boolean; data: Game[] }>("/api/v1/admin/games");
+        const j = await apiFetch<{ success: boolean; data: MentorGameCard[] }>("/api/v1/admin/games");
         if (j.success) setGames(j.data);
       } catch {
         // keep defaults
@@ -53,12 +43,21 @@ export default function MentorGamesPage() {
     load();
   }, []);
 
+  useEffect(() => {
+    if (!deleteTarget) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setDeleteTarget(null);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [deleteTarget]);
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault();
     setCreating(true);
     setFormError("");
     try {
-      const j = await apiFetch<{ success: boolean; data?: Game; message?: string }>(
+      const j = await apiFetch<{ success: boolean; data?: { id: string; title: string; status: string }; message?: string }>(
         "/api/v1/admin/games",
         {
           method: "POST",
@@ -90,6 +89,7 @@ export default function MentorGamesPage() {
         setShowCreate(false);
         setTitle("");
         setDescription("");
+        showToast("Game created", "success");
       } else {
         setFormError(j.message || "Failed to create game");
       }
@@ -100,16 +100,23 @@ export default function MentorGamesPage() {
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm("Delete this game? This cannot be undone.")) return;
+  function requestDelete(id: string) {
+    setDeleteTarget(id);
+  }
+
+  async function performDelete() {
+    if (!deleteTarget) return;
+    const id = deleteTarget;
     setDeleting(id);
     try {
       await apiFetch(`/api/v1/admin/games/${id}`, { method: "DELETE" });
       setGames((prev) => prev.filter((g) => g.id !== id));
+      showToast("Game deleted", "success");
     } catch {
-      // keep row on failure
+      showToast("Failed to delete game", "error");
     } finally {
       setDeleting(null);
+      setDeleteTarget(null);
     }
   }
 
@@ -204,7 +211,7 @@ export default function MentorGamesPage() {
                 max={50}
                 step={5}
                 value={Math.round(eliminationPct * 100)}
-                onChange={(e) => setEliminationPct(Number(e.target.value) / 100)}
+                onChange={(e) => setEliminationPct(Math.round(Number(e.target.value)) / 100)}
                 className="w-full px-4 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg font-body text-body-md text-on-surface focus:outline-none focus:border-primary"
               />
             </div>
@@ -285,7 +292,7 @@ export default function MentorGamesPage() {
                   </div>
                 </Link>
                 <button
-                  onClick={() => handleDelete(game.id)}
+                  onClick={() => requestDelete(game.id)}
                   disabled={deleting === game.id}
                   title="Delete game"
                   className="p-2 rounded-lg text-on-surface-variant hover:text-error border border-transparent hover:border-error/30 transition-all disabled:opacity-50"
@@ -299,6 +306,53 @@ export default function MentorGamesPage() {
           ))
         )}
       </div>
+
+      {deleteTarget && (
+        <div
+          className="fixed inset-0 bg-black/70 flex items-center justify-center z-[60] p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-game-title"
+          aria-describedby="delete-game-message"
+          onClick={() => setDeleteTarget(null)}
+        >
+          <div
+            className="bg-surface-container rounded-2xl border border-primary/40 p-6 max-w-sm w-full space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-14 h-14 rounded-full bg-error-container/20 border border-error/40 flex items-center justify-center mx-auto">
+              <span className="material-symbols-outlined text-error text-2xl" aria-hidden="true">
+                warning
+              </span>
+            </div>
+            <div className="text-center">
+              <h2 id="delete-game-title" className="font-headline text-lg text-on-surface">
+                Delete Game?
+              </h2>
+              <p id="delete-game-message" className="font-body text-body-md text-on-surface-variant mt-1">
+                This cannot be undone. All teams, indexes, and scans for this game will be removed.
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                disabled={!!deleting}
+                autoFocus
+                className="flex-1 py-2.5 bg-surface-container-high border border-outline-variant text-on-surface font-label text-label-sm font-bold uppercase tracking-widest rounded-lg hover:bg-surface-container-highest transition-all disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={performDelete}
+                disabled={!!deleting}
+                className="flex-1 py-2.5 bg-error text-on-error font-label text-label-sm font-bold uppercase tracking-widest rounded-lg hover:opacity-90 transition-all disabled:opacity-50"
+              >
+                {deleting ? "Deleting..." : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

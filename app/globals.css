@@ -71,6 +71,7 @@
   --text-body-md: 16px;
   --text-label-md: 14px;
   --text-label-sm: 12px;
+  --text-label-xs: 10px;
 
   /* ── Line Heights ── */
   --leading-headline-xl: 56px;
@@ -80,6 +81,7 @@
   --leading-body-md: 24px;
   --leading-label-md: 20px;
   --leading-label-sm: 16px;
+  --leading-label-xs: 14px;
 
   /* ── Spacing ── */
   --spacing-unit: 8px;
@@ -272,6 +274,21 @@ body::before {
 
 .animate-fade-in-up {
   animation: fade-in-up 0.4s ease-out both;
+}
+
+@keyframes toast-in {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -12px);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.animate-toast-in {
+  animation: toast-in 0.3s ease-out both;
 }
 
 @keyframes pulse-danger-soft {

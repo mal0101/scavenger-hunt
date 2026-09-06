@@ -2,26 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
-
-interface IndexEntry {
-  id: string;
-  game_id: string;
-  game_title: string;
-  label: string;
-  points: number;
-  location_name: string | null;
-  enigma_type: string | null;
-  question: string | null;
-  scan_count: number;
-}
-
-interface MiniGame {
-  id: string;
-  title: string;
-}
+import { useUIStore } from "@/stores/ui-store";
+import type { MentorIndexEntry, MiniGame } from "@/lib/types/api-responses";
 
 export default function MentorIndexesPage() {
-  const [indexes, setIndexes] = useState<IndexEntry[]>([]);
+  const [indexes, setIndexes] = useState<MentorIndexEntry[]>([]);
   const [games, setGames] = useState<MiniGame[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedGame, setSelectedGame] = useState("all");
@@ -31,7 +16,7 @@ export default function MentorIndexesPage() {
   const [formError, setFormError] = useState("");
   const [qrBusy, setQrBusy] = useState(false);
   const [qrResult, setQrResult] = useState<Array<{ index_id?: string; label: string; format?: string; svg?: string; data_url?: string }>>([]);
-  const [activeQr, setActiveQr] = useState<IndexEntry | null>(null);
+  const [activeQr, setActiveQr] = useState<MentorIndexEntry | null>(null);
   const [activeQrData, setActiveQrData] = useState<string | null>(null);
   const [activeQrLoading, setActiveQrLoading] = useState(false);
   const [form, setForm] = useState({
@@ -44,6 +29,7 @@ export default function MentorIndexesPage() {
     question: "",
     answer: "",
   });
+  const showToast = useUIStore((s) => s.showToast);
 
   useEffect(() => {
     async function load() {
@@ -52,7 +38,7 @@ export default function MentorIndexesPage() {
         const url = selectedGame !== "all"
           ? `/api/v1/admin/indexes?game_id=${selectedGame}`
           : "/api/v1/admin/indexes";
-        const j = await apiFetch<{ success: boolean; data: IndexEntry[] }>(url);
+        const j = await apiFetch<{ success: boolean; data: MentorIndexEntry[] }>(url);
         if (j.success) setIndexes(j.data);
       } catch {
         // keep defaults
@@ -94,8 +80,10 @@ export default function MentorIndexesPage() {
       });
       if (j.success) {
         setShowCreate(false);
-        setForm({ game_id: "", label: "", description: "", points: 25, location_name: "", enigma_type: "", question: "", answer: "" });
+        const preservedGame = form.game_id;
+        setForm({ game_id: preservedGame, label: "", description: "", points: 25, location_name: "", enigma_type: "", question: "", answer: "" });
         setRefreshKey((k) => k + 1);
+        showToast("Index created", "success");
       } else {
         setFormError(j.message || "Failed to create index");
       }
@@ -119,6 +107,7 @@ export default function MentorIndexesPage() {
         body: { game_id: selectedGame },
       });
       setQrResult(j.data?.codes ?? []);
+      showToast(`Generated ${j.data?.codes?.length ?? 0} QR codes`, "success");
     } catch {
       setQrResult([]);
     } finally {
@@ -126,7 +115,7 @@ export default function MentorIndexesPage() {
     }
   }
 
-  async function handleOpenQr(index: IndexEntry) {
+  async function handleOpenQr(index: MentorIndexEntry) {
     setActiveQr(index);
     setActiveQrData(null);
     setActiveQrLoading(true);

@@ -3,34 +3,11 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch } from "@/lib/api-client";
-
-interface TeamMember {
-  id: string;
-  user_id: string;
-  username: string;
-  nickname: string | null;
-  total_score: number;
-  status: string;
-  is_captain: boolean;
-  is_me: boolean;
-}
-
-interface TeamData {
-  id: string;
-  name: string;
-  invite_code: string;
-  total_score: number;
-  eliminated: boolean;
-  game_id: string;
-  captain_id: string | null;
-  is_captain: boolean;
-  member_count: number;
-  members: TeamMember[];
-}
+import type { PlayerTeamDetail, TeamMemberView } from "@/lib/types/api-responses";
 
 interface TeamResponse {
   success: boolean;
-  data: { team: TeamData | null };
+  data: { team: PlayerTeamDetail | null };
   error?: { message: string; code: string };
 }
 
@@ -39,15 +16,23 @@ interface ApiResult {
   error?: { message: string; code: string };
 }
 
+interface ConfirmRequest {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  onConfirm: () => void;
+}
+
 export default function TeamPage() {
   const router = useRouter();
-  const [team, setTeam] = useState<TeamData | null>(null);
+  const [team, setTeam] = useState<PlayerTeamDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [teamName, setTeamName] = useState("");
   const [invite, setInvite] = useState("");
+  const [confirm, setConfirm] = useState<ConfirmRequest | null>(null);
 
   async function fetchTeam() {
     try {
@@ -71,6 +56,15 @@ export default function TeamPage() {
     }
     load();
   }, []);
+
+  useEffect(() => {
+    if (!confirm) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setConfirm(null);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [confirm]);
 
   async function handleCreateTeam(e: React.FormEvent) {
     e.preventDefault();
@@ -118,9 +112,8 @@ export default function TeamPage() {
     }
   }
 
-  async function handleLeave() {
+  async function performDestroy() {
     if (!team || busy) return;
-    if (!window.confirm("Leave this team? You must rejoin via an invite code.")) return;
     setBusy(true);
     setError(null);
     try {
@@ -140,17 +133,27 @@ export default function TeamPage() {
     }
   }
 
-  async function handleKick(memberId: string) {
+  function confirmDestroy(mode: "leave" | "disband") {
     if (!team || busy) return;
-    const member = team.members.find((m) => m.id === memberId);
-    if (!member) return;
-    if (
-      !window.confirm(
-        `Remove ${member.nickname ?? member.username} from "${team.name}"?`
-      )
-    ) {
-      return;
-    }
+    setConfirm(
+      mode === "disband"
+        ? {
+            title: "Disband Team?",
+            message: `This permanently dissolves "${team.name}". Crewmates will need a new invite code to rejoin.`,
+            confirmLabel: "Disband",
+            onConfirm: performDestroy,
+          }
+        : {
+            title: "Leave Team?",
+            message: "You must rejoin via an invite code. Your progress in this team is lost.",
+            confirmLabel: "Leave",
+            onConfirm: performDestroy,
+          }
+    );
+  }
+
+  async function performKick(memberId: string) {
+    if (!team || busy) return;
     setBusy(true);
     setError(null);
     try {
@@ -170,17 +173,20 @@ export default function TeamPage() {
     }
   }
 
-  async function handleTransfer(memberId: string) {
+  function confirmKick(memberId: string) {
     if (!team || busy) return;
     const member = team.members.find((m) => m.id === memberId);
     if (!member) return;
-    if (
-      !window.confirm(
-        `Transfer leadership to ${member.nickname ?? member.username}?`
-      )
-    ) {
-      return;
-    }
+    setConfirm({
+      title: "Remove Crewmate?",
+      message: `Remove ${displayName(member)} from "${team.name}"? They will need the invite code to rejoin.`,
+      confirmLabel: "Remove",
+      onConfirm: () => performKick(memberId),
+    });
+  }
+
+  async function performTransfer(memberId: string) {
+    if (!team || busy) return;
     setBusy(true);
     setError(null);
     try {
@@ -200,6 +206,18 @@ export default function TeamPage() {
     }
   }
 
+  function confirmTransfer(memberId: string) {
+    if (!team || busy) return;
+    const member = team.members.find((m) => m.id === memberId);
+    if (!member) return;
+    setConfirm({
+      title: "Transfer Leadership?",
+      message: `Make ${displayName(member)} the new captain of "${team.name}"? You will become a regular crewmate.`,
+      confirmLabel: "Transfer",
+      onConfirm: () => performTransfer(memberId),
+    });
+  }
+
   async function handleCopyInvite() {
     if (!team) return;
     try {
@@ -211,7 +229,7 @@ export default function TeamPage() {
     }
   }
 
-  function displayName(m: TeamMember) {
+  function displayName(m: TeamMemberView) {
     return m.nickname ?? m.username;
   }
 
@@ -371,7 +389,7 @@ export default function TeamPage() {
                 {team.is_captain && !member.is_captain && (
                   <div className="flex items-center gap-2 shrink-0">
                     <button
-                      onClick={() => handleTransfer(member.id)}
+                      onClick={() => confirmTransfer(member.id)}
                       disabled={busy}
                       className="px-2 py-1 rounded-full border border-primary/40 text-primary font-label text-label-xs uppercase tracking-widest hover:bg-primary-container/20 transition-all"
                       title="Transfer leadership"
@@ -379,7 +397,7 @@ export default function TeamPage() {
                       <span className="material-symbols-outlined text-base" aria-hidden="true">swap_horiz</span>
                     </button>
                     <button
-                      onClick={() => handleKick(member.id)}
+                      onClick={() => confirmKick(member.id)}
                       disabled={busy}
                       className="px-2 py-1 rounded-full border border-error/50 text-error font-label text-label-xs uppercase tracking-widest hover:bg-error/10 transition-all"
                       title="Remove from team"
@@ -394,7 +412,7 @@ export default function TeamPage() {
           <div className="engraved-separator my-1" />
           {!team.is_captain && (
             <button
-              onClick={handleLeave}
+              onClick={() => confirmDestroy("leave")}
               disabled={busy}
               className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-outline-variant/60 text-on-surface-variant font-label text-label-sm uppercase tracking-widest hover:border-error hover:text-error transition-all"
             >
@@ -405,16 +423,86 @@ export default function TeamPage() {
         </div>
       )}
 
-      {team && team.is_captain && (
+      {team && team.is_captain && team.members.length === 1 && (
+        <div className="bg-surface-container border-t-2 border-error border-x border-b border-outline-variant/50 rounded-xl p-5">
+          <p className="font-label text-label-sm text-on-surface-variant uppercase tracking-widest">
+            Captain Controls
+          </p>
+          <p className="font-body text-sm text-on-surface-variant pt-1 pb-3">
+            You are the last member of this crew. You can disband the team or wait for new
+            crewmates to join using your invite code.
+          </p>
+          <button
+            onClick={() => confirmDestroy("disband")}
+            disabled={busy}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2 rounded-lg border border-error/60 text-error font-label text-label-sm uppercase tracking-widest hover:bg-error/10 transition-all disabled:opacity-50"
+          >
+            <span className="material-symbols-outlined text-base" aria-hidden="true">delete_forever</span>
+            Disband Team
+          </button>
+        </div>
+      )}
+
+      {team && team.is_captain && team.members.length > 1 && (
         <div className="bg-surface-container border-t-2 border-primary-container border-x border-b border-outline-variant/50 rounded-xl p-5">
           <p className="font-label text-label-sm text-on-surface-variant uppercase tracking-widest">
             Captain Controls
           </p>
           <p className="font-body text-sm text-on-surface-variant pt-1">
             You lead this crew. Kick crewmates or hand over leadership using the buttons
-            next to each member. If you&#39;re the last member, you can leave (and the team
-            is disbanded).
+            next to each member.
           </p>
+        </div>
+      )}
+
+      {confirm && (
+        <div
+          className="fixed inset-0 bg-black/70 flex items-center justify-center z-[60] p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="confirm-title"
+          aria-describedby="confirm-message"
+          onClick={() => setConfirm(null)}
+        >
+          <div
+            className="bg-surface-container rounded-2xl border border-primary/40 p-6 max-w-sm w-full space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-14 h-14 rounded-full bg-error-container/20 border border-error/40 flex items-center justify-center mx-auto">
+              <span className="material-symbols-outlined text-error text-2xl" aria-hidden="true">
+                warning
+              </span>
+            </div>
+            <div className="text-center">
+              <h2 id="confirm-title" className="font-headline text-lg text-on-surface">
+                {confirm.title}
+              </h2>
+              <p id="confirm-message" className="font-body text-body-md text-on-surface-variant mt-1">
+                {confirm.message}
+              </p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirm(null)}
+                disabled={busy}
+                autoFocus
+                className="flex-1 py-2.5 bg-surface-container-high border border-outline-variant text-on-surface font-label text-label-sm font-bold uppercase tracking-widest rounded-lg hover:bg-surface-container-highest transition-all disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const { onConfirm } = confirm;
+                  setConfirm(null);
+                  onConfirm();
+                }}
+                disabled={busy}
+                className="flex-1 py-2.5 bg-error text-on-error font-label text-label-sm font-bold uppercase tracking-widest rounded-lg hover:opacity-90 transition-all disabled:opacity-50"
+              >
+                {confirm.confirmLabel}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

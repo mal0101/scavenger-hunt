@@ -37,7 +37,7 @@ export function validateQrCode(
     return { valid: false, error: "QR_GAME_MISMATCH" };
   }
 
-  const timestamp = Number(payload.timestamp);
+  const timestamp = new Date(payload.timestamp).getTime();
   const now = Date.now();
   const diffMs = now - timestamp;
   const diffHours = diffMs / (1000 * 60 * 60);

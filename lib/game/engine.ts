@@ -13,7 +13,6 @@ const VALID_TRANSITIONS: GameStateTransition[] = [
   { from: "PENDING", to: "ACTIVE", action: "start" },
   { from: "ACTIVE", to: "ELIMINATING", action: "eliminate" },
   { from: "ELIMINATING", to: "ACTIVE", action: "next_round" },
-  { from: "ACTIVE", to: "FINISHED", action: "finish" },
   { from: "ELIMINATING", to: "FINISHED", action: "finish" },
   { from: "FINISHED", to: "PENDING", action: "reset" },
 ];

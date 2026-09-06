@@ -4,7 +4,6 @@ import { loginAs, api } from "../helpers/auth";
 import { createUser } from "../helpers/db";
 import {
   getActiveGame,
-  getRoundForGame,
   getIndexesForGame,
   getQrCodeForIndex,
   resetActiveRoundClock,
@@ -72,11 +71,10 @@ test.describe("SSE live updates", () => {
     collect(pageB);
 
     const game = await getActiveGame();
-    const round = await getRoundForGame(game.id, game.current_round);
-    const indexes = await getIndexesForGame(game.id, round.id);
+    const indexes = await getIndexesForGame(game.id);
     // Single-claim seeded codes: index 0/1 are reserved by scan.spec.
     const index = indexes[2];
-    const qrCode = await getQrCodeForIndex(index.id, round.id);
+    const qrCode = await getQrCodeForIndex(index.id);
 
     await authPlayer(pageA, A);
     await authPlayer(pageB, B);
@@ -100,7 +98,7 @@ test.describe("SSE live updates", () => {
     // Use A's session (cookies in ctxA) to scan a checkpoint: this awards
     // points to team A and, on the very next leaderboard SSE poll, B's board
     // must show the higher score — with no reload/navigation.
-    const payload = encodeQrPayload(createQrPayload(index.id, game.id, round.id, qrCode.id));
+    const payload = encodeQrPayload(createQrPayload(index.id, game.id, qrCode.id));
     const res = await api<{ success: boolean; data?: { points_earned: number } }>(
       pageA,
       `/api/v1/games/${game.id}/scan`,

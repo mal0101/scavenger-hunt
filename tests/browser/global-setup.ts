@@ -17,34 +17,20 @@ export default async function globalSetup(): Promise<void> {
     data: { status: "ACTIVE", current_round: 1 },
   });
 
-  const round = await db.round.findFirst({
-    where: { game_id: SEED_GAME_ID, round_number: 1 },
+  // Re-arm the seeded game's QR codes so every scan spec starts from a
+  // fully-charged, active pool.
+  await db.qrCode.updateMany({
+    where: { game_id: SEED_GAME_ID },
+    data: { status: "ACTIVE", first_scanned_at: null },
+  });
+  const codes = await db.qrCode.findMany({
+    where: { game_id: SEED_GAME_ID },
     select: { id: true },
   });
-  if (round) {
-    await db.index.updateMany({
-      where: {
-        game_id: SEED_GAME_ID,
-        round_id: { not: round.id },
-      },
-      data: { round_id: round.id },
-    });
-
-    // Re-arm the seeded game's QR codes so every scan spec starts from a
-    // fully-charged, active pool.
-    await db.qrCode.updateMany({
-      where: { game_id: SEED_GAME_ID, round_id: round.id },
-      data: { status: "ACTIVE", first_scanned_at: null },
-    });
-    const codes = await db.qrCode.findMany({
-      where: { game_id: SEED_GAME_ID },
-      select: { id: true },
-    });
-    for (const code of codes) {
-      await db.$executeRawUnsafe(
-        `UPDATE qr_codes SET pool_value = qr_codes.points WHERE id = '${code.id}'`
-      );
-    }
+  for (const code of codes) {
+    await db.$executeRawUnsafe(
+      `UPDATE qr_codes SET pool_value = qr_codes.points WHERE id = '${code.id}'`
+    );
   }
 
   // Clean up any QA artifacts from a previous browser run.

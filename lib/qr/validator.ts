@@ -22,7 +22,6 @@ export function validateQrCode(
     payload.code_id,
     payload.index_id,
     payload.game_id,
-    payload.round_id,
     payload.timestamp
   );
 

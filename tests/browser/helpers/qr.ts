@@ -15,10 +15,9 @@ export function hmacSign(
   codeId: string,
   indexId: string,
   gameId: string,
-  roundId: string,
   timestamp: string
 ): string {
-  const payload = `${codeId}:${indexId}:${gameId}:${roundId}:${timestamp}`;
+  const payload = `${codeId}:${indexId}:${gameId}:${timestamp}`;
   return crypto.createHmac("sha256", getHmacSecret()).update(payload).digest("hex");
 }
 
@@ -27,7 +26,6 @@ export interface QrPayload {
   code_id: string;
   index_id: string;
   game_id: string;
-  round_id: string;
   timestamp: string;
   signature: string;
 }
@@ -35,12 +33,11 @@ export interface QrPayload {
 export function createQrPayload(
   indexId: string,
   gameId: string,
-  roundId: string,
   codeId: string,
   timestamp = new Date().toISOString()
 ): QrPayload {
-  const signature = hmacSign(codeId, indexId, gameId, roundId, timestamp);
-  return { code_id: codeId, index_id: indexId, game_id: gameId, round_id: roundId, timestamp, signature };
+  const signature = hmacSign(codeId, indexId, gameId, timestamp);
+  return { code_id: codeId, index_id: indexId, game_id: gameId, timestamp, signature };
 }
 
 export function encodeQrPayload(payload: QrPayload): string {

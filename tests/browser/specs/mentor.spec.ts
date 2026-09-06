@@ -4,7 +4,6 @@ import { loginAs, SEED_ADMIN_USERNAME, SEED_ADMIN_PASSWORD } from "../helpers/au
 import {
   createQaGame,
   getActiveGame,
-  getRoundForGame,
   getIndexesForGame,
 } from "../helpers/db";
 
@@ -99,10 +98,7 @@ test.describe("mentor admin UI", () => {
     await page.waitForURL("**/mentor/indexes");
 
     // Expected index count for the seeded active game.
-    const indexes = await getIndexesForGame(
-      gameId,
-      (await getRoundForGame(gameId, (await getActiveGame()).current_round)).id
-    );
+    const indexes = await getIndexesForGame(gameId);
 
     // Select the seeded game by its stable id so batch QR is enabled. The
     // filter <select> is the first select on the page (the create-form select

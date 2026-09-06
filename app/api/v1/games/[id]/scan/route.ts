@@ -82,10 +82,6 @@ export async function POST(
       return apiError("No active round", "NO_ACTIVE_ROUND");
     }
 
-    if (payload!.round_id !== activeRound.id) {
-      return apiError("QR code is not valid for the current round", "QR_ROUND_MISMATCH");
-    }
-
     const qrCode = await db.qrCode.findUnique({
       where: { id: payload!.code_id },
     });
@@ -93,8 +89,7 @@ export async function POST(
     if (
       !qrCode ||
       qrCode.index_id !== payload!.index_id ||
-      qrCode.game_id !== gameId ||
-      qrCode.round_id !== activeRound.id
+      qrCode.game_id !== gameId
     ) {
       return apiError("QR code does not match a registered checkpoint", "QR_UNKNOWN_CODE");
     }

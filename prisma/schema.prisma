@@ -88,8 +88,6 @@ model Round {
   ended_at     DateTime?
 
   game    Game    @relation(fields: [game_id], references: [id], onDelete: Cascade)
-  indexes Index[]
-  qrCodes QrCode[]
 
   @@unique([game_id, round_number])
   @@index([game_id, status])
@@ -99,7 +97,6 @@ model Round {
 model Index {
   id            String   @id @default(uuid())
   game_id       String
-  round_id      String?
   label         String
   description   String?
   points        Int      @default(25)
@@ -112,7 +109,6 @@ model Index {
   created_at    DateTime @default(now())
 
   game    Game     @relation(fields: [game_id], references: [id], onDelete: Cascade)
-  round   Round?   @relation(fields: [round_id], references: [id], onDelete: SetNull)
   scans   Scan[]
   qrCodes QrCode[]
 
@@ -159,9 +155,8 @@ model Team {
 
 model QrCode {
   id               String    @id @default(uuid())
-  index_id         String
+  index_id         String    @unique
   game_id          String
-  round_id         String
   points           Int
   pool_value       Int
   status           QrStatus  @default(ACTIVE)
@@ -170,11 +165,8 @@ model QrCode {
 
   index Index @relation(fields: [index_id], references: [id], onDelete: Cascade)
   game  Game  @relation(fields: [game_id], references: [id], onDelete: Cascade)
-  round Round @relation(fields: [round_id], references: [id], onDelete: Cascade)
 
-  @@unique([index_id, round_id])
   @@index([game_id])
-  @@index([round_id])
   @@map("qr_codes")
 }
 

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Providers } from "@/components/providers";
+import { AmbientBackdrop } from "@/components/steampunk/ambient-backdrop";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -48,6 +49,7 @@ export default function RootLayout({
         />
       </head>
         <body className="bg-surface text-on-surface font-body antialiased min-h-dvh">
+          <AmbientBackdrop />
           <Providers>{children}</Providers>
         </body>
     </html>

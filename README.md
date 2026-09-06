@@ -1,4 +1,4 @@
-# Aether Compass — Steampunk Scavenger Hunt
+# Gadz'arts Compass — Steampunk Scavenger Hunt
 
 A real-time, code-scanning **scavenger hunt** platform with a "Steampunk Amber Mariner"
 theme, built for team events (e.g. an ENSAM Casablanca campus hunt). Mentors create

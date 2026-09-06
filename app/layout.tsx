@@ -3,14 +3,14 @@ import { Providers } from "@/components/providers";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Aether Compass — Scavenger Hunt",
+  title: "Gadz'arts Compass — Scavenger Hunt",
   description:
     "Gamified QR Code Treasure Hunt Platform — ENSAM Casablanca Kick-Off Week",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Aether Compass",
+    title: "Gadz'arts Compass",
   },
   formatDetection: {
     telephone: true,

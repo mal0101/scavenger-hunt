@@ -36,7 +36,7 @@ export default function NotFound() {
 
         <p className="font-body text-body-md text-on-surface-variant">
           The coordinates you seek do not match any known checkpoint in the
-          Aether Compass network. Perhaps the currents have shifted your
+          Gadz&apos;arts Compass network. Perhaps the currents have shifted your
           position.
         </p>
 

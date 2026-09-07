@@ -65,10 +65,12 @@ fn fbm(p: vec2f) -> f32 {
   let well = 0.10 / (pow(pd, 1.4) + 0.09);
 
   let n2 = n * n;
-  let base = n2 * 1.5 + well * 0.5;
-  let col = mix(vec3f(0.23, 0.08, 0.04), vec3f(0.85, 0.47, 0.03), min(base, 1.0));
-  let a = clamp(n2 * 1.6 + (d1 + d2) * 0.06 + well * 0.10, 0.0, 0.9);
-  return vec4f(col * a, a);
+  // Opaque, dimmed output: no CSS blend/opacity tricks in the compositor.
+  // The base is the surface dark (#1c110c ≈ 0.11,0.07,0.05); embers add up
+  // to the amber highlight, bakes the historic 0.35 screen-blend intensity.
+  let k = clamp(n2 * 0.55 + (d1 + d2) * 0.02 + well * 0.035, 0.0, 1.0);
+  let col = mix(vec3f(0.11, 0.07, 0.05), vec3f(0.85, 0.47, 0.03), k);
+  return vec4f(col, 1.0);
 }
 `;
 
@@ -122,10 +124,11 @@ void main() {
   float d1 = 0.08 / (distance(uv, o1) + 0.05);
   float d2 = 0.06 / (distance(uv, o2) + 0.05);
   float n2 = n * n;
-  vec3 col = mix(vec3(0.23, 0.08, 0.04), vec3(0.85, 0.47, 0.03), min(n2 * 1.5, 1.0));
-  col += vec3(1.0, 0.55, 0.12) * (d1 + d2) * 0.09;
-  float a = clamp(n2 * 1.6 + (d1 + d2) * 0.06, 0.0, 0.9);
-  gl_FragColor = vec4(col * a, a);
+  // Opaque, dimmed output: no CSS blend/opacity tricks in the compositor.
+  // Base ≈ surface dark (#1c110c); embers add up to the amber highlight.
+  float k = clamp(n2 * 0.55 + (d1 + d2) * 0.03, 0.0, 1.0);
+  vec3 col = mix(vec3(0.11, 0.07, 0.05), vec3(0.85, 0.47, 0.03), k);
+  gl_FragColor = vec4(col, 1.0);
 }
 `;
 
@@ -170,15 +173,17 @@ function startGLSL(canvas: HTMLCanvasElement): AtmosphereHandle {
   const uRes = gl.getUniformLocation(prog, "u_res");
   const uTime = gl.getUniformLocation(prog, "u_time");
 
-  const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
   const draw = (time: number) => {
     if (gl.isContextLost()) return;
     gl.uniform1f(uTime, time);
     gl.drawArrays(gl.TRIANGLES, 0, 6);
   };
+  // Half-resolution rendering: the embers are soft and diffuse, so downsizing
+  // the draw surface 2x (4x fewer pixels) is imperceptible and keeps the
+  // fallback cheap on CPU/SwiftShader compositors.
   const resize = () => {
-    const w = Math.max(1, Math.floor(canvas.clientWidth * dpr));
-    const h = Math.max(1, Math.floor(canvas.clientHeight * dpr));
+    const w = Math.max(2, Math.floor(canvas.clientWidth / 2));
+    const h = Math.max(2, Math.floor(canvas.clientHeight / 2));
     if (canvas.width === w && canvas.height === h) return;
     canvas.width = w;
     canvas.height = h;
@@ -193,11 +198,17 @@ function startGLSL(canvas: HTMLCanvasElement): AtmosphereHandle {
     return { dispose: () => gl.getExtension("WEBGL_lose_context")?.loseContext() };
   }
 
+  // 30fps cap (mirrors the WebGPU path) to bound per-frame raster cost.
+  const FRAME_MS = 1000 / 30;
   let raf = 0;
   let running = false;
+  let lastT = 0;
   const loop = (t: number) => {
     if (!running) return;
-    draw(t * 0.001);
+    if (t - lastT >= FRAME_MS) {
+      lastT = t;
+      draw(t * 0.001);
+    }
     raf = requestAnimationFrame(loop);
   };
   const start = () => {
@@ -366,7 +377,7 @@ export function AmbientBackdrop({ className = "" }: { className?: string }) {
       className={`fixed inset-0 -z-10 pointer-events-none overflow-hidden ${className}`}
       aria-hidden="true"
     >
-      <canvas ref={ref} className="w-full h-full opacity-35 mix-blend-screen" />
+      <canvas ref={ref} className="w-full h-full" />
     </div>
   );
 }

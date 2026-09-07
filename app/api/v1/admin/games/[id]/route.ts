@@ -62,6 +62,8 @@ export async function GET(
         points: i.points,
         location_name: i.location_name,
         enigma_type: i.enigma_type,
+        hint: i.hint,
+        sequence_order: i.sequence_order,
       })),
     });
   } catch (error) {

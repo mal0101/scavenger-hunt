@@ -83,6 +83,22 @@ npm run db:studio    # open Prisma Studio GUI
 6. **Live UI.** Leaderboards and timers are refreshed client-side via SSE or polling
    (see `hooks/use-leaderboard.ts`, `hooks/use-timer.ts`).
 
+### Sequenced courses & traps
+
+- Each index carries a `sequence_order` (0 = unsequenced). When a game uses sequenced
+  indexes, teams must scan them **in order**: a marker is locked until every previous
+  step has been scanned by the team (any team member's scan counts — the gate is
+  per-team). A locked scan returns `SEQUENCE_LOCKED` and awards nothing.
+- A hint (`hint`, ≤500 chars) is only revealed **after** a marker is secured, pointing
+  at the next step.
+- **Trap** indexes impose a penalty instead of a reward. `points` is the penalty
+  magnitude; a scan puts that many points "at risk" (`at_risk`). Answering the trap's
+  question correctly halves the penalty (`-round(points × 0.5)`); a wrong answer costs
+  the full `-points`. Traps may define `answer_options` to render as multiple choice —
+  submitting anything outside the accepted options is rejected (`ANSWER_NOT_OPTION`).
+- The seed (`prisma/seed.ts`) installs a 20-marker course (16 safe + 4 traps) with
+  `sequence_order` 1..20 for local development.
+
 ---
 
 ## Quick start (local dev)

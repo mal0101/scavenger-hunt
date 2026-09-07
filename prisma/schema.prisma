@@ -97,18 +97,21 @@ model Round {
 }
 
 model Index {
-  id            String   @id @default(uuid())
-  game_id       String
-  label         String
-  description   String?
-  points        Int      @default(25)
-  location_name String?
-  location_lat  Float?
-  location_lng  Float?
-  enigma_type   String?
-  question      String?
-  answer        String?
-  created_at    DateTime @default(now())
+  id             String   @id @default(uuid())
+  game_id        String
+  label          String
+  description    String?
+  points         Int      @default(25)
+  location_name  String?
+  location_lat   Float?
+  location_lng   Float?
+  enigma_type    String?
+  question       String?
+  answer         String?
+  hint           String?
+  sequence_order Int      @default(0)
+  answer_options String?
+  created_at     DateTime @default(now())
 
   game    Game     @relation(fields: [game_id], references: [id], onDelete: Cascade)
   scans   Scan[]

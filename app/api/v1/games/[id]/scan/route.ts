@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db/postgres";
 import { apiSuccess, apiError, apiInternal } from "@/lib/types/api";
-import { scanSchema } from "@/lib/utils/validation";
+import { scanSchema, parseAnswerOptions } from "@/lib/utils/validation";
 import { validateQrCode } from "@/lib/qr/validator";
 import { publishEvent } from "@/lib/db/pubsub";
 import { redis } from "@/lib/db/redis";
@@ -127,6 +127,29 @@ export async function POST(
       return apiError("You have already scanned this index", "ALREADY_SCANNED");
     }
 
+    // Sequential course: a checkpoint with sequence_order > 0 only unlocks once
+    // the team has scanned every earlier step (any member's scan counts). This
+    // keeps a single hunt ordered end-to-end while leaving unsequenced indexes
+    // scannable at any time.
+    const targetOrder = index.sequence_order ?? 0;
+    if (targetOrder > 0) {
+      const priorSteps = await db.scan.findMany({
+        where: {
+          team_id: teamId,
+          index: { sequence_order: { gt: 0, lt: targetOrder } },
+        },
+        distinct: ["index_id"],
+        select: { index_id: true },
+      });
+
+      if (priorSteps.length < targetOrder - 1) {
+        return apiError(
+          "Previous checkpoint not scanned yet",
+          "SEQUENCE_LOCKED"
+        );
+      }
+    }
+
     const isTrap = index.enigma_type === "trap";
 
     // Traps: create a pending scan whose points are only settled once the
@@ -156,6 +179,7 @@ export async function POST(
           points_earned: 0,
           pending: true,
           question: index.question ?? null,
+          answer_options: parseAnswerOptions(index.answer_options),
           at_risk: index.points,
           team_total: player.total_score,
         },
@@ -237,8 +261,10 @@ export async function POST(
           id: index.id,
           label: index.label,
           type: index.enigma_type,
+          sequence_order: index.sequence_order,
         },
         points_earned: score,
+        hint: index.hint ?? null,
         team_total: team.total_score,
       },
       "Scan recorded successfully"

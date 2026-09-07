@@ -123,6 +123,22 @@ export async function resetActiveRoundClock(gameId: string): Promise<void> {
   });
 }
 
+/** Re-arm every QR code for a game so its pool_value pays the full original
+ *  points on the first claim of the next spec run. Playwright specs claim the
+ *  seeded codes across the run, and the reduced-pool model would otherwise
+ *  make every subsequent spec read a smaller payout than the (static) test
+ *  fixtures expect. Call once in each spec's `beforeAll`. */
+export async function rearmSeededCodes(gameId: string): Promise<void> {
+  const db = dbInstance();
+  await db.qrCode.updateMany({
+    where: { game_id: gameId },
+    data: { status: "ACTIVE", first_scanned_at: null },
+  });
+  await db.$executeRawUnsafe(
+    `UPDATE qr_codes SET pool_value = points WHERE game_id = '${gameId}'`
+  );
+}
+
 export async function getActiveGame(): Promise<{
   id: string;
   title: string;
@@ -166,6 +182,9 @@ export async function getIndexesForGame(
     question: string | null;
     answer: string | null;
     enigma_type: string | null;
+    sequence_order: number;
+    hint: string | null;
+    answer_options: string | null;
   }>
 > {
   const db = dbInstance();
@@ -178,6 +197,9 @@ export async function getIndexesForGame(
       question: true,
       answer: true,
       enigma_type: true,
+      sequence_order: true,
+      hint: true,
+      answer_options: true,
     },
   });
 }

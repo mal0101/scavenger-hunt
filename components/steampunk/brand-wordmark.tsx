@@ -14,25 +14,18 @@ export function BrandBadge({
 
   return (
     <div
-      className={`${iconClasses} rounded-full bg-primary-container flex items-center justify-center ${glow} animate-flicker-amber`}
+      className={`${iconClasses} rounded-full bg-primary-container flex items-center justify-center ${glow} animate-flicker-amber overflow-hidden`}
       aria-hidden="true"
     >
-      <svg
-        viewBox="0 0 48 48"
-        className="w-3/5 h-3/5 text-on-primary-container"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="3"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <circle cx="24" cy="24" r="15" strokeWidth="2.5" />
-        <polygon points="24,7 25,21 24,26 23,21" fill="currentColor" stroke="none" />
-        <polygon points="7,24 21,23 26,24 21,25" fill="currentColor" stroke="none" />
-        <polygon points="24,41 25,27 24,22 23,27" fill="currentColor" stroke="none" />
-        <polygon points="41,24 27,25 22,24 27,23" fill="currentColor" stroke="none" />
-        <circle cx="24" cy="24" r="2.5" fill="currentColor" stroke="none" />
-      </svg>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src="/branding/ade_logo_medallion.webp"
+        alt=""
+        width={48}
+        height={48}
+        draggable={false}
+        className="w-full h-full object-cover"
+      />
     </div>
   );
 }

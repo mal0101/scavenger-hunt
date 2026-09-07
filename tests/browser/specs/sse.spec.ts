@@ -7,6 +7,7 @@ import {
   getIndexesForGame,
   getQrCodeForIndex,
   resetActiveRoundClock,
+  rearmSeededCodes,
 } from "../helpers/db";
 import { createQrPayload, encodeQrPayload } from "../helpers/qr";
 
@@ -57,6 +58,10 @@ test.afterAll(async () => {
   createdUsernames = [];
 });
 
+test.beforeAll(async () => {
+  await rearmSeededCodes((await getActiveGame()).id);
+});
+
 test.describe("SSE live updates", () => {
   test("leaderboard propagates a teammate score to another session without a reload", async ({
     browser,
@@ -80,6 +85,22 @@ test.describe("SSE live updates", () => {
     await authPlayer(pageB, B);
     await joinTeam(pageA, TEAM_A);
     await joinTeam(pageB, TEAM_B);
+
+    // index 2 is sequence step 3, so team A unlocks it by scanning steps 1-2
+    // first (the sequential-course gate would otherwise refuse with
+    // SEQUENCE_LOCKED).
+    const prior = indexes
+      .filter((i) => i.sequence_order > 0 && i.sequence_order < index.sequence_order)
+      .sort((a, b) => a.sequence_order - b.sequence_order);
+    for (const p of prior) {
+      const pQr = await getQrCodeForIndex(p.id);
+      const pr = await api<{ success: boolean; error?: string }>(
+        pageA,
+        `/api/v1/games/${game.id}/scan`,
+        { method: "POST", body: { qr_data: encodeQrPayload(createQrPayload(p.id, game.id, pQr.id)) } }
+      );
+      expect(pr.json.success).toBe(true);
+    }
 
     // Both players watch the same active game's live leaderboard.
     await pageA.goto("/leaderboard");

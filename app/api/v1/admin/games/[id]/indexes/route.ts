@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db/postgres";
 import { apiSuccess, apiCreated, apiError, apiInternal } from "@/lib/types/api";
-import { indexSchema } from "@/lib/utils/validation";
+import { indexSchema, validateIndexEnigma } from "@/lib/utils/validation";
 import { requireMentor } from "@/lib/auth/guard";
 
 export async function GET(
@@ -32,6 +32,8 @@ export async function GET(
         location_lat: i.location_lat,
         location_lng: i.location_lng,
         enigma_type: i.enigma_type,
+        hint: i.hint,
+        sequence_order: i.sequence_order,
         scan_count: i._count.scans,
       }))
     );
@@ -57,6 +59,11 @@ export async function POST(
       return apiError("Invalid index data", "VALIDATION_ERROR");
     }
 
+    const enigmaError = validateIndexEnigma(parsed.data);
+    if (enigmaError) {
+      return apiError(enigmaError, "VALIDATION_ERROR");
+    }
+
     const index = await db.index.create({
       data: {
         game_id: gameId,
@@ -69,6 +76,11 @@ export async function POST(
         enigma_type: parsed.data.enigma_type,
         question: parsed.data.question,
         answer: parsed.data.answer,
+        hint: parsed.data.hint,
+        sequence_order: parsed.data.sequence_order,
+        answer_options: parsed.data.answer_options
+          ? JSON.stringify(parsed.data.answer_options.map((o) => o.trim()))
+          : undefined,
       },
     });
 

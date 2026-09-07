@@ -6,6 +6,7 @@ import {
   getIndexesForGame,
   getQrCodeForIndex,
   createUser,
+  rearmSeededCodes,
 } from "../helpers/db";
 import { createQrPayload, encodeQrPayload } from "../helpers/qr";
 
@@ -15,9 +16,9 @@ const P1 = `qa_trp_p1_${SUF}`;
 const P2 = `qa_trp_p2_${SUF}`;
 let createdUsernames: string[] = [];
 
-// A seeded trap (40 pt "The Pressure Gauge", answer "steam"). We pick it by
-// enigma_type instead of a positional offset because QA indexes created by the
-// mentor specs share the same round and shift array positions.
+// The seeded 20-pt trap "The Pressure Gauge", answer "steam", sequence step 5.
+// Picked by enigma_type + question (never by offset) because QA indexes created
+// by the mentor state-machine specs share the same round/shift positions.
 const TRAP_QUESTION = "What moves steam through the city below?";
 
 async function authPlayer(page: Page, username: string): Promise<void> {
@@ -33,14 +34,19 @@ test.afterAll(async () => {
   createdUsernames = [];
 });
 
+test.beforeAll(async () => {
+  await rearmSeededCodes((await getActiveGame()).id);
+});
+
 async function setup() {
   const game = await getActiveGame();
   const indexes = await getIndexesForGame(game.id);
   const index = indexes.find(
     (idx) => idx.enigma_type === "trap" && idx.question === TRAP_QUESTION
   );
-  const qrCode = await getQrCodeForIndex(index!.id);
-  return { gameId: game.id, index: index!, codeId: qrCode.id };
+  if (!index) throw new Error(`Seed trap "${TRAP_QUESTION}" not found`);
+  const qrCode = await getQrCodeForIndex(index.id);
+  return { gameId: game.id, index, codeId: qrCode.id, indexes };
 }
 
 async function joinTeam(page: Page): Promise<void> {
@@ -54,13 +60,47 @@ async function joinTeam(page: Page): Promise<void> {
   }
 }
 
+/** Walk the sequential course up to (but not including) `targetOrder` so the
+ *  trap unlocks for this team. Returns the total the team actually banked —
+ *  read from the profile live, because previously-claimed steps may pay out
+ *  the reduced pool value instead of the full fixture points. */
+async function unlockPriorSteps(
+  page: Page,
+  gameId: string,
+  indexes: Awaited<ReturnType<typeof getIndexesForGame>>,
+  targetOrder: number
+): Promise<number> {
+  const prior = indexes
+    .filter((i) => i.sequence_order > 0 && i.sequence_order < targetOrder)
+    .sort((a, b) => a.sequence_order - b.sequence_order);
+  for (const idx of prior) {
+    const qr = await getQrCodeForIndex(idx.id);
+    const res = await api<{ success: boolean; error?: string }>(
+      page,
+      `/api/v1/games/${gameId}/scan`,
+      { method: "POST", body: { qr_data: encodeQrPayload(createQrPayload(idx.id, gameId, qr.id)) } }
+    );
+    if (!res.json?.success) {
+      throw new Error(`Pre-scan of step ${idx.sequence_order} failed: ${JSON.stringify(res.json)}`);
+    }
+  }
+  const profile = await api<{
+    success: boolean;
+    data: { total_score: number } | null;
+  }>(page, "/api/v1/players/me");
+  if (!profile.json?.success || profile.json.data === null) {
+    throw new Error(`Could not read banked total: ${JSON.stringify(profile.json)}`);
+  }
+  return profile.json.data.total_score;
+}
+
 /** POST the signed trap QR through the API (the same validator the camera
  *  path drives) and return the pending trap scan response. */
 async function scanTrapViaApi(page: Page, gameId: string, index: { id: string }, codeId: string) {
   const encoded = encodeQrPayload(createQrPayload(index.id, gameId, codeId));
   const res = await api<{
     success: boolean;
-    data?: { scan_id: string; index?: { label: string; type: string | null }; pending?: boolean; question?: string | null; at_risk?: number };
+    data?: { scan_id: string; index?: { label: string; type: string | null }; pending?: boolean; question?: string | null; at_risk?: number; answer_options?: string[] | null };
     message?: string;
     error?: string;
   }>(page, `/api/v1/games/${gameId}/scan`, { method: "POST", body: { qr_data: encoded } });
@@ -73,7 +113,8 @@ test.describe("trap challenge", () => {
   }) => {
     await authPlayer(page, P1);
     await joinTeam(page);
-    const { gameId, index, codeId } = await setup();
+    const { gameId, index, codeId, indexes } = await setup();
+    const stepsTotal = await unlockPriorSteps(page, gameId, indexes, index.sequence_order);
     const { res } = await scanTrapViaApi(page, gameId, index, codeId);
 
     // A trap yields no immediate points and stays pending.
@@ -81,6 +122,9 @@ test.describe("trap challenge", () => {
     expect(res.json.data?.pending).toBe(true);
     expect(res.json.data?.question).toBeTruthy();
     expect(res.json.data?.at_risk).toBe(index.points);
+    expect(res.json.data?.answer_options).toEqual(
+      JSON.parse(index.answer_options ?? "null")
+    );
     const scanId = res.json.data!.scan_id;
 
     // Navigate through the app like the camera flow would: scan-result with
@@ -90,10 +134,11 @@ test.describe("trap challenge", () => {
         index_label: index.label,
         game_id: gameId,
         points_earned: 0,
-        team_total: 0,
+        team_total: stepsTotal,
         scan_id: scanId,
         question: res.json.data?.question,
         at_risk: index.points,
+        answer_options: res.json.data?.answer_options,
       })
     );
 
@@ -102,38 +147,42 @@ test.describe("trap challenge", () => {
     await expect(page.getByText("TRAP TRIGGERED")).toBeVisible();
     await expect(page.getByText(res.json.data!.question!, { exact: false })).toBeVisible();
 
-    // Player/team balance is untouched until the answer settles.
+    // Player/team balance reflects only the pre-scan steps until the answer settles.
     const before = await api<{
       success: boolean;
       data: { total_score: number; team: { total_score: number } | null };
     }>(page, "/api/v1/players/me");
-    expect(before.json?.data?.total_score).toBe(0);
+    expect(before.json?.data?.total_score).toBe(stepsTotal);
 
     // Engage the trap page and answer WRONG.
     await page.getByText("Engage Manual Override").click();
     await page.waitForURL("**/trap?data=*");
     await expect(page.getByText("Tidal Trap")).toBeVisible();
-    await page.getByPlaceholder("Enter your answer…").fill("wrong");
+
+    // The trap is multiple choice — the proposed options render as buttons.
+    await expect(page.getByRole("radiogroup")).toBeVisible();
+    await page.getByRole("radio", { name: /coal/i }).click();
     await page.getByRole("button", { name: "Seal the Bulkhead" }).click();
 
     await expect(page.getByText("MANIFOLD BREACHED")).toBeVisible({ timeout: 10000 });
     await expect(page.getByText(`-${index.points} pts lost`)).toBeVisible();
 
-    // Balance dropped by the full trap points.
+    // Balance dropped by the full trap points (on top of the prior steps).
     const after = await api<{
       success: boolean;
       data: { total_score: number; team: { total_score: number } | null };
     }>(page, "/api/v1/players/me");
-    expect(after.json?.data?.total_score).toBe(-index.points);
-    expect(after.json?.data?.team?.total_score).toBe(-index.points);
+    expect(after.json?.data?.total_score).toBe(stepsTotal - index.points);
+    expect(after.json?.data?.team?.total_score).toBe(stepsTotal - index.points);
   });
 
-  test("a trap QR stays scannable for another team and a correct answer earns 50% of the risk", async ({
+  test("a trap QR stays scannable for another team and a correct answer only halved the penalty", async ({
     page,
   }) => {
     await authPlayer(page, P2);
     await joinTeam(page);
-    const { gameId, index, codeId } = await setup();
+    const { gameId, index, codeId, indexes } = await setup();
+    const stepsTotal = await unlockPriorSteps(page, gameId, indexes, index.sequence_order);
 
     // The same trap code is NOT depleted for a second team.
     const { res } = await scanTrapViaApi(page, gameId, index, codeId);
@@ -142,7 +191,9 @@ test.describe("trap challenge", () => {
     expect(res.json.data?.question).toBeTruthy();
     expect(res.json.data?.at_risk).toBe(index.points);
 
-    // Answer correctly through the API: earns half of the points at risk.
+    // Answer correctly through the API: only half the points at risk are
+    // deducted (the penalty is halved, it is no longer a reward).
+    const half = -Math.round(index.points * 0.5);
     const answer = await api<{
       success: boolean;
       data?: { correct: boolean; delta: number; team_total: number };
@@ -155,13 +206,13 @@ test.describe("trap challenge", () => {
     );
     expect(answer.json.success).toBe(true);
     expect(answer.json.data?.correct).toBe(true);
-    expect(answer.json.data?.delta).toBe(Math.round(index.points * 0.5));
+    expect(answer.json.data?.delta).toBe(half);
 
     const profile = await api<{
       success: boolean;
       data: { total_score: number; team: { total_score: number } | null };
     }>(page, "/api/v1/players/me");
-    expect(profile.json?.data?.total_score).toBe(Math.round(index.points * 0.5));
+    expect(profile.json?.data?.total_score).toBe(stepsTotal + half);
 
     // Re-answering the same scan is rejected.
     const again = await api<{ success: boolean; error?: string }>(

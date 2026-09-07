@@ -65,6 +65,7 @@ export async function POST(request: NextRequest) {
         pool_value: qrCode.pool_value,
         status: qrCode.status,
         location_name: index.location_name,
+        sequence_order: index.sequence_order,
       };
 
       if (format === "svg") {

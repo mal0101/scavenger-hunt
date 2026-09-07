@@ -136,7 +136,7 @@ test.describe("mentor admin UI", () => {
     await row.getByRole("button", { name: "QR" }).click();
     const modal = page.locator("div.fixed");
     await expect(modal.getByText(label)).toBeVisible();
-    await expect(modal.locator("img")).toBeVisible({ timeout: 15000 });
+    await expect(modal.getByRole("img", { name: label })).toBeVisible({ timeout: 15000 });
     await expect(modal.getByText(/Scan this code with the player app\./)).toBeVisible();
   });
 });

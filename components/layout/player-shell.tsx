@@ -32,7 +32,7 @@ export default function PlayerShell({
   }
 
   return (
-    <div className="min-h-dvh bg-surface relative">
+    <div className="min-h-dvh relative">
       <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-surface-container-high/95 backdrop-blur-md border-b-2 border-primary-container/50 flex items-center justify-between px-4 shadow-[0_4px_20px_rgba(217,119,7,0.1)]">
         <BrandWordmark href="/dock" size="sm" hideTextOnMobile />
 

@@ -31,7 +31,7 @@ export default function MentorShell({
   }
 
   return (
-    <div className="min-h-dvh bg-surface flex">
+    <div className="min-h-dvh flex">
       <aside className="hidden lg:flex flex-col w-64 bg-surface-container-low border-r border-outline-variant/30 fixed top-0 left-0 bottom-0 z-50 shadow-[2px_0_24px_rgba(217,119,7,0.08)]">
         <div className="h-16 flex items-center px-5 border-b border-outline-variant/30 w-full">
           <BrandWordmark href="/mentor/dashboard" size="sm" caption="Mentor Panel" />

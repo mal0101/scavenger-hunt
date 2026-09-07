@@ -13,7 +13,7 @@ export function CouncilMedallion({
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src="/branding/ade_logo_medallion.png"
+        src="/branding/ade_logo_medallion.webp"
         alt=""
         width={size}
         height={size}

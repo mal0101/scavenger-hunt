@@ -15,7 +15,7 @@ export default function MentorIndexesPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [formError, setFormError] = useState("");
   const [qrBusy, setQrBusy] = useState(false);
-  const [qrResult, setQrResult] = useState<Array<{ index_id?: string; label: string; format?: string; svg?: string; data_url?: string }>>([]);
+  const [qrResult, setQrResult] = useState<Array<{ index_id?: string; label: string; format?: string; svg?: string; data_url?: string; sequence_order?: number }>>([]);
   const [activeQr, setActiveQr] = useState<MentorIndexEntry | null>(null);
   const [activeQrData, setActiveQrData] = useState<string | null>(null);
   const [activeQrLoading, setActiveQrLoading] = useState(false);
@@ -28,6 +28,9 @@ export default function MentorIndexesPage() {
     enigma_type: "",
     question: "",
     answer: "",
+    hint: "",
+    sequence_order: "",
+    answer_options: "",
   });
   const showToast = useUIStore((s) => s.showToast);
 
@@ -71,17 +74,23 @@ export default function MentorIndexesPage() {
         body: {
           ...form,
           points: Number(form.points),
+          sequence_order: form.sequence_order === "" ? undefined : Number(form.sequence_order),
+          answer_options:
+            form.enigma_type === "trap" && form.answer_options.trim() !== ""
+              ? form.answer_options.split(",").map((o) => o.trim()).filter(Boolean)
+              : undefined,
           location_name: form.location_name || undefined,
           enigma_type: form.enigma_type || undefined,
           question: form.question || undefined,
           answer: form.answer || undefined,
+          hint: form.hint || undefined,
           description: form.description || undefined,
         },
       });
       if (j.success) {
         setShowCreate(false);
         const preservedGame = form.game_id;
-        setForm({ game_id: preservedGame, label: "", description: "", points: 25, location_name: "", enigma_type: "", question: "", answer: "" });
+        setForm({ game_id: preservedGame, label: "", description: "", points: 25, location_name: "", enigma_type: "", question: "", answer: "", hint: "", sequence_order: "", answer_options: "" });
         setRefreshKey((k) => k + 1);
         showToast("Index created", "success");
       } else {
@@ -101,7 +110,7 @@ export default function MentorIndexesPage() {
     try {
       const j = await apiFetch<{
         success: boolean;
-        data: { codes?: Array<{ index_id: string; label: string; format: string; data_url?: string; svg?: string }> };
+        data: { codes?: Array<{ index_id: string; label: string; format: string; data_url?: string; svg?: string; sequence_order?: number }> };
       }>("/api/v1/admin/indexes/generate", {
         method: "POST",
         body: { game_id: selectedGame },
@@ -197,7 +206,9 @@ export default function MentorIndexesPage() {
               />
             </div>
             <div>
-              <label className="font-label text-label-sm text-on-surface-variant uppercase block mb-2">Points</label>
+              <label className="font-label text-label-sm text-on-surface-variant uppercase block mb-2">
+                {form.enigma_type === "trap" ? "Penalty Points (risk)" : "Points"}
+              </label>
               <input
                 type="number"
                 value={form.points}
@@ -214,6 +225,28 @@ export default function MentorIndexesPage() {
                 value={form.location_name}
                 onChange={(e) => setForm({ ...form, location_name: e.target.value })}
                 placeholder="Main Building"
+                className="w-full px-4 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg font-body text-body-md text-on-surface focus:outline-none focus:border-primary"
+              />
+            </div>
+            <div>
+              <label className="font-label text-label-sm text-on-surface-variant uppercase block mb-2">Sequence Position</label>
+              <input
+                type="number"
+                value={form.sequence_order}
+                onChange={(e) => setForm({ ...form, sequence_order: e.target.value })}
+                min={0}
+                max={500}
+                placeholder="0 (unsequenced = always scannable)"
+                className="w-full px-4 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg font-body text-body-md text-on-surface focus:outline-none focus:border-primary"
+              />
+            </div>
+            <div>
+              <label className="font-label text-label-sm text-on-surface-variant uppercase block mb-2">Hint (revealed after scan)</label>
+              <textarea
+                value={form.hint}
+                onChange={(e) => setForm({ ...form, hint: e.target.value })}
+                placeholder="Points to the next marker, e.g. “Follow the brass pipes to the steam whistle.”"
+                rows={2}
                 className="w-full px-4 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg font-body text-body-md text-on-surface focus:outline-none focus:border-primary"
               />
             </div>
@@ -243,6 +276,16 @@ export default function MentorIndexesPage() {
                     value={form.question}
                     onChange={(e) => setForm({ ...form, question: e.target.value })}
                     placeholder="What moves steam through the city below?"
+                    className="w-full px-4 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg font-body text-body-md text-on-surface focus:outline-none focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="font-label text-label-sm text-on-surface-variant uppercase block mb-2">Answer Options (comma-separated)</label>
+                  <input
+                    type="text"
+                    value={form.answer_options}
+                    onChange={(e) => setForm({ ...form, answer_options: e.target.value })}
+                    placeholder="steam, coal, water, wind"
                     className="w-full px-4 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg font-body text-body-md text-on-surface focus:outline-none focus:border-primary"
                   />
                 </div>
@@ -339,7 +382,7 @@ export default function MentorIndexesPage() {
                 )}
                 <p className="font-label text-sm text-neutral-800 font-bold text-center">{code.label}</p>
                 <p className="font-label text-xs text-neutral-500 text-center">
-                  Index #{i + 1}
+                  {code.sequence_order ? `Step ${code.sequence_order}` : `Index #${i + 1}`}
                 </p>
               </div>
             ))}
@@ -416,8 +459,13 @@ export default function MentorIndexesPage() {
                 <span className="material-symbols-outlined text-primary text-xl">qr_code</span>
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <p className="font-headline text-sm text-on-surface">{index.label}</p>
+                  {index.sequence_order > 0 && (
+                    <span className="px-2 py-0.5 rounded-full bg-primary-container/15 border border-primary/40 font-label text-label-sm text-primary font-bold">
+                      STEP {index.sequence_order}
+                    </span>
+                  )}
                   {index.enigma_type && (
                     <span className={`px-2 py-0.5 rounded font-label text-label-sm font-bold uppercase ${
                       index.enigma_type === "trap"
@@ -431,6 +479,12 @@ export default function MentorIndexesPage() {
                 <p className="font-label text-label-sm text-on-surface-variant">
                   {index.game_title} · {index.location_name ?? "No location"} · {index.points} pts · {index.scan_count} scans
                 </p>
+                {index.hint && (
+                  <p className="font-body text-body-sm text-primary/80 mt-1 flex items-start gap-1">
+                    <span className="material-symbols-outlined text-sm mt-0.5">route</span>
+                    Hint: {index.hint}
+                  </p>
+                )}
                 {index.enigma_type === "trap" && index.question && (
                   <p className="font-body text-body-sm text-error/80 mt-1">Q: {index.question}</p>
                 )}

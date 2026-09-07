@@ -706,13 +706,15 @@ async function s5Admin(): Promise<string[]> {
   usernames.push(provisionedUser);
 
   // Batch QR generation (svg field shape)
+  const seedIndexCount = await db.index.count({ where: { game_id: SEED_GAME_ID } });
+  check(seedIndexCount >= 20, "seeded game holds the 20-marker course");
   res = await api("/api/v1/admin/indexes/generate", {
     method: "POST", jar: mentorJar,
     body: { game_id: SEED_GAME_ID, format: "svg" },
   });
   check(res.status === 200 && Array.isArray(res.json?.data?.codes), "batch QR generation returns codes");
   const codes = res.json?.data?.codes ?? [];
-  check(codes.length === 5, "batch QR generates one code per seeded index");
+  check(codes.length === seedIndexCount, `batch QR generates one code per seeded index (${seedIndexCount})`);
   check(codes.every((c: Record<string, unknown>) => typeof c.svg === "string" && (c.svg as string).startsWith("<svg")), "svg payload under `svg` field");
   check(codes.every((c: Record<string, unknown>) => !("data" in c)), "no legacy `data` field leaked");
   check(codes.every((c: Record<string, unknown>) => typeof c.code_id === "string" && c.status === "ACTIVE" && Number(c.pool_value) === Number(c.points)), "each code reports its code_id, ACTIVE status and full pool");

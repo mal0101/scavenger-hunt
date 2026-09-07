@@ -6,6 +6,7 @@ import { publishEvent } from "@/lib/db/pubsub";
 import { redis } from "@/lib/db/redis";
 import { requirePlayer } from "@/lib/auth/guard";
 import { checkRateLimit, generalLimiter } from "@/lib/utils/rate-limiter";
+import { parseAnswerOptions } from "@/lib/utils/validation";
 
 const answerSchema = z.object({
   answer: z.string().min(1).max(500),
@@ -62,14 +63,28 @@ export async function POST(
       return apiError("This team has been eliminated and cannot play", "TEAM_ELIMINATED");
     }
 
-    const correct =
-      parsed.data.answer.trim().toLowerCase() ===
-      scan.index.answer.trim().toLowerCase();
+    const answerText = parsed.data.answer.trim();
+    const expected = scan.index.answer?.trim().toLowerCase() ?? "";
 
-    // Wrong answer costs the full trap points; a correct answer earns half of
-    // what would have been lost.
+    // QCM traps carry a fixed set of options; the submitted answer must be one
+    // of them (case-insensitive) when options are present.
+    const options = parseAnswerOptions(scan.index.answer_options);
+    if (
+      options &&
+      !options.some((o) => o.trim().toLowerCase() === answerText.toLowerCase())
+    ) {
+      return apiError(
+        "The answer must be one of the proposed options",
+        "ANSWER_NOT_OPTION"
+      );
+    }
+
+    const correct = answerText.toLowerCase() === expected;
+
+    // Traps are pure penalties: a wrong answer costs the full points at risk,
+    // a correct answer only half of it (the player "seals the breach" early).
     const pointDelta = correct
-      ? Math.round(scan.index.points * 0.5)
+      ? -Math.round(scan.index.points * 0.5)
       : -scan.index.points;
 
     const [, , team] = await db.$transaction([

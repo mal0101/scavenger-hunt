@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { db } from "@/lib/db/postgres";
 import { apiSuccess, apiError, apiInternal } from "@/lib/types/api";
 import { requireMentor } from "@/lib/auth/guard";
-import { indexSchema } from "@/lib/utils/validation";
+import { indexSchema, validateIndexEnigma } from "@/lib/utils/validation";
 
 export async function PUT(
   request: NextRequest,
@@ -21,6 +21,11 @@ export async function PUT(
       return apiError("Invalid index data", "VALIDATION_ERROR");
     }
 
+    const enigmaError = validateIndexEnigma(parsed.data);
+    if (enigmaError) {
+      return apiError(enigmaError, "VALIDATION_ERROR");
+    }
+
     const index = await db.index.update({
       where: { id },
       data: {
@@ -33,6 +38,13 @@ export async function PUT(
         ...(parsed.data.enigma_type !== undefined && { enigma_type: parsed.data.enigma_type }),
         ...(parsed.data.question !== undefined && { question: parsed.data.question }),
         ...(parsed.data.answer !== undefined && { answer: parsed.data.answer }),
+        ...(parsed.data.hint !== undefined && { hint: parsed.data.hint }),
+        ...(parsed.data.sequence_order !== undefined && { sequence_order: parsed.data.sequence_order }),
+        ...(parsed.data.answer_options !== undefined && {
+          answer_options: parsed.data.answer_options
+            ? JSON.stringify(parsed.data.answer_options.map((o) => o.trim()))
+            : null,
+        }),
       },
     });
 

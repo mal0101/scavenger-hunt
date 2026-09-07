@@ -126,6 +126,8 @@ export interface MentorGameIndex {
   points: number;
   location_name: string | null;
   enigma_type: string | null;
+  hint: string | null;
+  sequence_order: number;
 }
 
 export interface MentorGameDetail {
@@ -167,6 +169,8 @@ export interface MentorIndexEntry {
   location_name: string | null;
   enigma_type: string | null;
   question: string | null;
+  hint: string | null;
+  sequence_order: number;
   scan_count: number;
 }
 

@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { db } from "@/lib/db/postgres";
 import { apiSuccess, apiCreated, apiError, apiInternal, apiNotFound } from "@/lib/types/api";
-import { indexSchema } from "@/lib/utils/validation";
+import { indexSchema, validateIndexEnigma } from "@/lib/utils/validation";
 import { requireMentor } from "@/lib/auth/guard";
 
 export async function GET(request: NextRequest) {
@@ -34,6 +34,8 @@ export async function GET(request: NextRequest) {
         location_name: idx.location_name,
         enigma_type: idx.enigma_type,
         question: idx.question,
+        hint: idx.hint,
+        sequence_order: idx.sequence_order,
         scan_count: idx._count.scans,
       }))
     );
@@ -55,6 +57,11 @@ export async function POST(request: NextRequest) {
       return apiError("Invalid index data", "VALIDATION_ERROR");
     }
 
+    const enigmaError = validateIndexEnigma(parsed.data);
+    if (enigmaError) {
+      return apiError(enigmaError, "VALIDATION_ERROR");
+    }
+
     const game = await db.game.findUnique({
       where: { id: parsed.data.game_id },
     });
@@ -72,6 +79,11 @@ export async function POST(request: NextRequest) {
         enigma_type: parsed.data.enigma_type,
         question: parsed.data.question,
         answer: parsed.data.answer,
+        hint: parsed.data.hint,
+        sequence_order: parsed.data.sequence_order,
+        answer_options: parsed.data.answer_options
+          ? JSON.stringify(parsed.data.answer_options.map((o) => o.trim()))
+          : undefined,
       },
     });
 

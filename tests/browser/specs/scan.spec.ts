@@ -6,6 +6,7 @@ import {
   getIndexesForGame,
   getQrCodeForIndex,
   createUser,
+  rearmSeededCodes,
 } from "../helpers/db";
 import { createQrPayload, encodeQrPayload, qrDataUrl } from "../helpers/qr";
 import { syntheticCameraInitScript } from "../helpers/camera";
@@ -33,6 +34,10 @@ test.afterAll(async () => {
   const mod = await import("../helpers/db");
   await mod.cleanupUsers(createdUsernames);
   createdUsernames = [];
+});
+
+test.beforeAll(async () => {
+  await rearmSeededCodes((await getActiveGame()).id);
 });
 
 interface IndexRow {
@@ -173,6 +178,19 @@ test.describe("QR camera scan", () => {
     const { gameId, index, codeId } = await setup(INDEX_DEPLETED);
     await authPlayer(page, P3);
     await joinTeam(page);
+
+    // INDEX_DEPLETED is sequence step 2, so the team must scan step 1 first or
+    // the sequential-course gate returns SEQUENCE_LOCKED.
+    const indexes = await getIndexesForGame(gameId);
+    const step1 = indexes.find((i) => i.sequence_order === 1);
+    if (!step1) throw new Error("Seeded game has no sequence_order=1 index");
+    const step1Qr = await getQrCodeForIndex(step1.id);
+    const step1Res = await api<{ success: boolean; error?: string }>(
+      page,
+      `/api/v1/games/${gameId}/scan`,
+      { method: "POST", body: { qr_data: encodeQrPayload(createQrPayload(step1.id, gameId, step1Qr.id)) } }
+    );
+    expect(step1Res.json.success).toBe(true);
 
     const encoded = encodeQrPayload(createQrPayload(index.id, gameId, codeId));
     const url = await qrDataUrl(encoded);

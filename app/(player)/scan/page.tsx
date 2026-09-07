@@ -64,8 +64,10 @@ export default function ScanPage() {
             team_total: number;
             pending?: boolean;
             question?: string | null;
+            answer_options?: string[] | null;
+            hint?: string | null;
             at_risk?: number;
-            index: { id: string; label: string; type: string | null };
+            index: { id: string; label: string; type: string | null; sequence_order?: number };
           };
           message?: string;
           error?: string;
@@ -82,6 +84,10 @@ export default function ScanPage() {
             setSubmitError("Your team has been eliminated and cannot scan.");
           } else if (j.error === "NO_TEAM") {
             setSubmitError("You must be in a team to scan");
+          } else if (j.error === "SEQUENCE_LOCKED") {
+            setSubmitError(
+              "Checkpoint locked — scan the previous marker in the sequence first."
+            );
           } else {
             setSubmitError(j.message || "Scan validation failed");
           }
@@ -97,6 +103,8 @@ export default function ScanPage() {
           team_total: j.data.team_total,
           scan_id: j.data.scan_id,
           question: j.data.question ?? null,
+          answer_options: j.data.answer_options ?? null,
+          hint: j.data.hint ?? null,
           at_risk: j.data.at_risk ?? null,
         };
         setScanResult(payload, type);

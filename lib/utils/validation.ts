@@ -55,7 +55,61 @@ export const indexSchema = z.object({
   enigma_type: z.string().max(50).optional(),
   question: z.string().max(500).optional(),
   answer: z.string().max(500).optional(),
+  hint: z.string().max(500).optional(),
+  sequence_order: z.number().int().min(0).max(500).optional(),
+  answer_options: z
+    .array(z.string().min(1).max(200))
+    .min(1)
+    .max(8)
+    .optional(),
 });
+
+/** Decode a stored JSON string-array of QCM answer options, tolerating
+ *  legacy rows (null/corrupt → null) so callers can fall back to free text. */
+export function parseAnswerOptions(
+  raw: string | null | undefined
+): string[] | null {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    if (
+      Array.isArray(parsed) &&
+      parsed.every((o) => typeof o === "string")
+    ) {
+      return parsed;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/** Cross-field coherence for an index payload. Used by the create handlers
+ *  (full payloads) and tolerates partial updates (PUT) by only validating the
+ *  fields that are actually present. Returns an error message or null. */
+export function validateIndexEnigma(input: Partial<IndexInput>): string | null {
+  if (input.enigma_type === "trap") {
+    if (input.question !== undefined && !input.question.trim()) {
+      return "Trap indexes require a question";
+    }
+    if (input.answer !== undefined && !input.answer.trim()) {
+      return "Trap indexes require a correct answer";
+    }
+  }
+
+  if (input.answer_options && input.answer_options.length > 0) {
+    const normalized = input.answer_options.map((o) => o.trim()).filter(Boolean);
+    if (normalized.length < 2) {
+      return "QCM traps require at least two answer options";
+    }
+    const answer = input.answer?.trim().toLowerCase();
+    if (answer && !normalized.some((o) => o.toLowerCase() === answer)) {
+      return "The correct answer must be one of the answer options";
+    }
+  }
+
+  return null;
+}
 
 export const scanSchema = z.object({
   qr_data: z.string().min(1),

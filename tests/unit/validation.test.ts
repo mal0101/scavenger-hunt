@@ -9,6 +9,8 @@ import {
   indexSchema,
   scanSchema,
   stateTransitionSchema,
+  validateIndexEnigma,
+  parseAnswerOptions,
 } from "@/lib/utils/validation";
 
 test("credentialsSchema accepts valid username/password pairs", () => {
@@ -141,4 +143,81 @@ test("stateTransitionSchema accepts only the five engine actions", () => {
   for (const action of ["pause", "STOP", "begin", ""]) {
     assert.equal(stateTransitionSchema.safeParse({ action }).success, false, action);
   }
+});
+
+test("indexSchema accepts hint, sequence_order, and answer_options with bounds", () => {
+  const trap = {
+    game_id: "00000000-0000-0000-0000-000000000001",
+    label: "Gauge",
+    enigma_type: "trap",
+    question: "What moves steam?",
+    answer: "steam",
+    hint: "Follow the pipes",
+    sequence_order: 5,
+    answer_options: ["steam", "coal", "water"],
+  };
+  assert.equal(indexSchema.safeParse(trap).success, true);
+
+  assert.equal(
+    indexSchema.safeParse({ ...trap, hint: "x".repeat(501) }).success,
+    false,
+    "hint longer than 500 chars"
+  );
+  assert.equal(indexSchema.safeParse({ ...trap, sequence_order: -1 }).success, false, "negative sequence");
+  assert.equal(indexSchema.safeParse({ ...trap, sequence_order: 501 }).success, false, "sequence above max");
+  assert.equal(indexSchema.safeParse({ ...trap, answer_options: [] }).success, false, "empty options");
+  assert.equal(
+    indexSchema.safeParse({ ...trap, answer_options: ["x".repeat(201)] }).success,
+    false,
+    "option longer than 200 chars"
+  );
+  assert.equal(
+    indexSchema.safeParse({ ...trap, answer_options: ["a", "b", "c", "d", "e", "f", "g", "h", "i"] }).success,
+    false,
+    "more than 8 options"
+  );
+  assert.equal(indexSchema.safeParse({ ...trap, sequence_order: 0, hint: undefined, answer_options: undefined }).success, true);
+});
+
+test("validateIndexEnigma enforces trap question/answer and QCM answer membership", () => {
+  // Safe indexes need nothing extra regardless of stray question/answer fields.
+  assert.equal(validateIndexEnigma({ enigma_type: "visual", question: "x", answer: "y" }), null);
+
+  assert.equal(
+    validateIndexEnigma({ enigma_type: "trap", question: " ", answer: "a" }),
+    "Trap indexes require a question"
+  );
+  assert.equal(
+    validateIndexEnigma({ enigma_type: "trap", question: "Q", answer: "  " }),
+    "Trap indexes require a correct answer"
+  );
+  assert.equal(validateIndexEnigma({ enigma_type: "trap", question: "Q", answer: "a" }), null);
+
+  assert.equal(
+    validateIndexEnigma({ enigma_type: "trap", question: "Q", answer: "a", answer_options: ["a"] }),
+    "QCM traps require at least two answer options"
+  );
+  assert.equal(
+    validateIndexEnigma({ enigma_type: "trap", question: "Q", answer: "c", answer_options: ["a", "b", "c"] }),
+    null,
+    "answer is among the options"
+  );
+  assert.equal(
+    validateIndexEnigma({ enigma_type: "trap", question: "Q", answer: "z", answer_options: ["a", "b"] }),
+    "The correct answer must be one of the answer options"
+  );
+  assert.equal(
+    validateIndexEnigma({ answer_options: ["a", "b"] }),
+    null,
+    "options alone (partial PUT) with no answer is fine"
+  );
+});
+
+test("parseAnswerOptions decodes stored JSON arrays and tolerates garbage", () => {
+  assert.deepEqual(parseAnswerOptions('["steam","coal"]'), ["steam", "coal"]);
+  assert.equal(parseAnswerOptions(null), null);
+  assert.equal(parseAnswerOptions(undefined), null);
+  assert.equal(parseAnswerOptions("not json"), null);
+  assert.equal(parseAnswerOptions('{"a":1}'), null);
+  assert.deepEqual(parseAnswerOptions("[]"), []);
 });

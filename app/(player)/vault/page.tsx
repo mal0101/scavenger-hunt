@@ -70,10 +70,16 @@ export default function VaultPage() {
               Team Vault
             </p>
 
-            <div className="relative z-10 w-40 h-40 rounded-full bg-primary-container border-4 border-secondary-container flex items-center justify-center shadow-[0_0_30px_rgba(217,119,7,0.2)]">
-              <span className="material-symbols-outlined text-[80px] text-primary-fixed-dim drop-shadow-[0_0_10px]">
-                {player?.team ? "group" : "person_add"}
-              </span>
+            <div className="relative z-10 w-40 h-40 rounded-full bg-primary-container border-4 border-secondary-container flex items-center justify-center shadow-[0_0_30px_rgba(217,119,7,0.2)] overflow-hidden">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/branding/ade_logo_medallion.webp"
+                alt=""
+                width={160}
+                height={160}
+                draggable={false}
+                className="w-full h-full object-cover"
+              />
             </div>
 
             <div className="mt-6 text-center z-10">

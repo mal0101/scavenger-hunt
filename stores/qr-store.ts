@@ -7,6 +7,8 @@ export interface ScanResultPayload {
   team_total: number;
   scan_id: string;
   question?: string | null;
+  answer_options?: string[] | null;
+  hint?: string | null;
   at_risk?: number | null;
 }
 

@@ -16,6 +16,7 @@ function TrapContent() {
     | {
         index_label: string;
         question: string | null;
+        answer_options: string[] | null;
         game_id: string;
         scan_id: string;
         at_risk: number | null;
@@ -29,6 +30,7 @@ function TrapContent() {
       challenge = {
         index_label: parsed.index_label,
         question: parsed.question ?? null,
+        answer_options: parsed.answer_options ?? null,
         game_id: parsed.game_id,
         scan_id: parsed.scan_id,
         at_risk: parsed.at_risk ?? null,
@@ -43,6 +45,7 @@ function TrapContent() {
     challenge = {
       index_label: lastScanResult.index_label,
       question: lastScanResult.question ?? null,
+      answer_options: lastScanResult.answer_options ?? null,
       game_id: lastScanResult.game_id,
       scan_id: lastScanResult.scan_id,
       at_risk: lastScanResult.at_risk ?? null,
@@ -59,8 +62,10 @@ function TrapContent() {
   } | null>(null);
   const [error, setError] = useState("");
 
-  const submit = async () => {
+  const submit = async (submittedAnswer?: string) => {
+    const finalAnswer = submittedAnswer ?? answer;
     if (!challenge?.game_id || !challenge.scan_id || submitting) return;
+    if (!finalAnswer.trim()) return;
     setSubmitting(true);
     setError("");
     try {
@@ -70,7 +75,7 @@ function TrapContent() {
         message?: string;
       }>(`/api/v1/games/${challenge.game_id}/trap/${challenge.scan_id}/answer`, {
         method: "POST",
-        body: { answer },
+        body: { answer: finalAnswer },
       });
       if (!j.success || !j.data) {
         setError(j.message || "Failed to submit answer");
@@ -146,7 +151,7 @@ function TrapContent() {
             </h3>
             <p className="font-label text-label-sm text-on-surface-variant uppercase tracking-widest mt-1">
               {result!.correct
-                ? `+${result!.delta} pts earned (50% of the points at risk)`
+                ? `Penalty halved — ${Math.abs(result!.delta)} pts deducted`
                 : `-${Math.abs(result!.delta)} pts lost`}
             </p>
           </div>
@@ -198,8 +203,13 @@ function TrapContent() {
                   PRESSURE VAULT QUERY
                 </p>
                 <p className="font-body text-body-md text-on-surface-variant mt-0.5">
-                  Answer correctly to earn {challenge.at_risk != null ? `50% of ${challenge.at_risk} pts` : "points"}. A wrong
-                  answer costs {challenge.at_risk != null ? `-${challenge.at_risk} pts` : "points"}. Answers are case-insensitive.
+                  Answer right to cut the penalty in half — only{" "}
+                  {challenge.at_risk != null ? Math.round(challenge.at_risk * 0.5) : "half"}{" "}
+                  pts are deducted. A wrong answer costs the full{" "}
+                  {challenge.at_risk ?? "points"} pts.
+                  {!!challenge.answer_options?.length
+                    ? " Pick one of the proposed options."
+                    : " Answers are case-insensitive."}
                 </p>
               </div>
             </div>
@@ -208,20 +218,54 @@ function TrapContent() {
                 {challenge.question ?? "No question available for this trap."}
               </p>
             </div>
-            <label htmlFor="trap-answer" className="sr-only">
-              Trap answer
-            </label>
-            <input
-              id="trap-answer"
-              type="text"
-              value={answer}
-              onChange={(e) => setAnswer(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") submit();
-              }}
-              placeholder="Enter your answer…"
-              className="w-full px-4 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg font-body text-body-md text-on-surface focus:outline-none focus:border-error"
-            />
+            {challenge.answer_options?.length ? (
+              <div className="grid grid-cols-1 gap-2" role="radiogroup" aria-label="Answer options">
+                {challenge.answer_options.map((option) => {
+                  const selected = answer === option;
+                  return (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => setAnswer(option)}
+                      aria-checked={selected}
+                      role="radio"
+                      className={`w-full px-4 py-2.5 rounded-lg border font-body text-body-md text-left transition-all flex items-center justify-between gap-3 ${
+                        selected
+                          ? "bg-primary-container/20 border-error text-on-surface shadow-[0_0_12px_rgba(255,180,171,0.25)]"
+                          : "bg-surface-container-low border-outline-variant text-on-surface-variant hover:border-error/60 hover:text-on-surface"
+                      }`}
+                    >
+                      <span>{option}</span>
+                      <span
+                        className={`material-symbols-outlined text-lg ${
+                          selected ? "text-error" : "text-outline-variant"
+                        }`}
+                        style={{ fontVariationSettings: "'FILL' 1" }}
+                      >
+                        {selected ? "radio_button_checked" : "radio_button_unchecked"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <>
+                <label htmlFor="trap-answer" className="sr-only">
+                  Trap answer
+                </label>
+                <input
+                  id="trap-answer"
+                  type="text"
+                  value={answer}
+                  onChange={(e) => setAnswer(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") submit();
+                  }}
+                  placeholder="Enter your answer…"
+                  className="w-full px-4 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg font-body text-body-md text-on-surface focus:outline-none focus:border-error"
+                />
+              </>
+            )}
             {error && (
               <div className="bg-error-container/20 border border-error/40 rounded-lg p-3 flex items-center gap-3">
                 <span className="material-symbols-outlined text-error">error</span>
@@ -229,7 +273,7 @@ function TrapContent() {
               </div>
             )}
             <button
-              onClick={submit}
+              onClick={() => submit()}
               disabled={!answer.trim() || submitting || !challenge.scan_id}
               className="w-full py-3.5 bg-error text-on-error font-label text-label-sm font-bold uppercase tracking-widest rounded-lg hover:opacity-90 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
             >

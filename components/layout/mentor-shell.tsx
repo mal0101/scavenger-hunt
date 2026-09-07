@@ -89,11 +89,16 @@ export default function MentorShell({
 
       <div className="lg:hidden fixed top-0 left-0 right-0 z-50 h-14 bg-surface-container-high/95 backdrop-blur-md border-b border-primary-container/40 flex items-center justify-between px-4 shadow-[0_4px_20px_rgba(217,119,7,0.08)]">
         <div className="flex items-center gap-2">
-          <span
-            className="material-symbols-outlined text-primary text-xl animate-flicker-amber"
-            style={{ fontVariationSettings: "'FILL' 1" }}
-          >
-            compass_calibration
+          <span className="w-7 h-7 rounded-full overflow-hidden shadow-[0_0_12px_rgba(217,119,7,0.5)] animate-flicker-amber">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/branding/ade_logo_medallion.webp"
+              alt=""
+              width={28}
+              height={28}
+              draggable={false}
+              className="w-full h-full object-cover"
+            />
           </span>
           <span className="font-headline text-sm text-on-surface">
             Mentor Panel

@@ -121,7 +121,9 @@ function ScanResultContent() {
                     {scanResult.question}
                   </p>
                   <p className="font-label text-label-sm text-on-surface-variant mt-2">
-                    Answer right to earn 50% of the points at risk.
+                    {scanResult.answer_options?.length
+                      ? "This is a multiple choice question — pick one of the proposed options."
+                      : "Answer right to cut the penalty in half; a wrong answer costs the full points."}
                   </p>
                 </div>
               )}
@@ -165,6 +167,18 @@ function ScanResultContent() {
                 Team total: {scanResult.team_total}
               </p>
             </div>
+
+            {scanResult.hint && (
+              <div className="bg-primary-container/15 border border-primary/30 rounded-lg p-4 space-y-1 text-left">
+                <p className="font-label text-label-sm text-primary uppercase tracking-widest flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-base">route</span>
+                  Next Checkpoint Hint
+                </p>
+                <p className="font-body text-body-md text-on-surface">
+                  {scanResult.hint}
+                </p>
+              </div>
+            )}
 
             <Link
               href="/dock"

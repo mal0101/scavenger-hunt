@@ -116,6 +116,11 @@ export function useTimer({
           const base = lastServerTimerRef.current;
           if (!base || base.expired || base.status !== "ACTIVE") return;
           const remaining = Math.max(0, base.remaining - 1);
+          // Persist the decrement so the local countdown compounds every
+          // second instead of re-reading the last server snapshot (which only
+          // refreshes on the ~10s SSE resync). The next server push snaps the
+          // value back to true wall-clock time if we ever drift.
+          lastServerTimerRef.current = { ...base, remaining };
           const data: TimerData = { ...base, remaining };
           if (remaining === 0 && !base.expired) {
             pushTimer({ ...data, expired: true });

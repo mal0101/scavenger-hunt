@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
       codes: generated,
     }, `Generated ${generated.length} QR code(s)`);
   } catch (error) {
-    console.error("Batch QR generation error:", error);
+    console.error("Batch QR generation error:", error instanceof Error ? error.message : "unknown");
     return apiInternal("Failed to generate QR codes");
   }
 }

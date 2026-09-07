@@ -256,7 +256,7 @@ function startGLSL(canvas: HTMLCanvasElement): AtmosphereHandle {
 async function startVgpu(canvas: HTMLCanvasElement): Promise<AtmosphereHandle | null> {
   if (typeof navigator === "undefined" || !("gpu" in navigator)) return null;
 
-  const { init, surface, effect, clock, frameLoop } = await import("vgpu");
+  const { init, surface, effect, clock, frameLoop, frame } = await import("vgpu");
 
   const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
@@ -290,7 +290,6 @@ async function startVgpu(canvas: HTMLCanvasElement): Promise<AtmosphereHandle | 
   };
 
   if (reduceMotion) {
-    const { frame } = await import("vgpu");
     frame(gpu, (f) => f.pass(renderFrame(), ember));
     return {
       dispose: () => {

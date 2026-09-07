@@ -208,7 +208,11 @@ function TrapContent() {
                 {challenge.question ?? "No question available for this trap."}
               </p>
             </div>
+            <label htmlFor="trap-answer" className="sr-only">
+              Trap answer
+            </label>
             <input
+              id="trap-answer"
               type="text"
               value={answer}
               onChange={(e) => setAnswer(e.target.value)}
@@ -216,7 +220,6 @@ function TrapContent() {
                 if (e.key === "Enter") submit();
               }}
               placeholder="Enter your answer…"
-              autoFocus
               className="w-full px-4 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg font-body text-body-md text-on-surface focus:outline-none focus:border-error"
             />
             {error && (

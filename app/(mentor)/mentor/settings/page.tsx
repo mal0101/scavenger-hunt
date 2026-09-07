@@ -61,13 +61,15 @@ export default function MentorSettingsPage() {
     async function load() {
       try {
         const j = await apiFetch<{ success: boolean; data: RuntimeData }>("/api/v1/admin/runtime");
-        if (j.success) setRuntime(j.data);
-        else setStatus("error");
+        if (j.success) {
+          setRuntime(j.data);
+          setStatus("ready");
+        } else {
+          setStatus("error");
+        }
       } catch (err) {
         console.error("Runtime load error:", err);
         setStatus("error");
-      } finally {
-        setStatus("ready");
       }
     }
     load();

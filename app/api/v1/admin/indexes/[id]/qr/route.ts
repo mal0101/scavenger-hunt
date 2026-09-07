@@ -67,7 +67,7 @@ export async function POST(
       "QR code generated"
     );
   } catch (error) {
-    console.error("Generate QR error:", error);
+    console.error("Generate QR error:", error instanceof Error ? error.message : "unknown");
     return apiInternal("Failed to generate QR code");
   }
 }

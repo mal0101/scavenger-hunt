@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
       }))
     );
   } catch (error) {
-    console.error("List teams error:", error);
+    console.error("List teams error:", error instanceof Error ? error.message : "unknown");
     return apiInternal("Failed to list teams");
   }
 }

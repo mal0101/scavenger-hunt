@@ -1,4 +1,5 @@
 import { NextRequest } from "next/server";
+import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db/postgres";
 import { apiSuccess, apiError, apiInternal } from "@/lib/types/api";
 import { scanSchema } from "@/lib/utils/validation";
@@ -56,9 +57,18 @@ export async function POST(
       });
     }
 
+    if (player.game_id !== gameId) {
+      return apiError(
+        "This account is not registered for this game",
+        "GAME_MISMATCH"
+      );
+    }
+
     if (!player.team_id) {
       return apiError("You must be in a team to scan", "NO_TEAM");
     }
+
+    const teamId = player.team_id;
 
     const teamRow = await db.team.findUnique({
       where: { id: player.team_id },
@@ -160,63 +170,64 @@ export async function POST(
     // clear to re-scanners that the lower value is now the current one.
     const reduced = Math.max(1, Math.round(qrCode.points * 0.67));
 
-    const score =
-      qrCode.pool_value === qrCode.points ? qrCode.points : reduced;
+    // All writes that settle a scan commit atomically: decrementing the QR
+    // pool, recording the scan, and crediting player + team scores happen in
+    // a single transaction. The pool claim is atomic too — only the scan that
+    // observes the pool at its original value may take the full payout and
+    // stamp first_scanned_at; a concurrent first scan loses the claim and is
+    // paid the reduced value instead (the full value is never paid twice).
+    const [score, scan, team] = await db.$transaction(async (tx) => {
+      const claim = await tx.qrCode.updateMany({
+        where: { id: qrCode.id, status: "ACTIVE", pool_value: qrCode.points },
+        data: {
+          pool_value: reduced,
+          first_scanned_at: new Date(),
+        },
+      });
 
-    // Set the shared pool to the reduced value (first scan only touches pool
-    // bookkeeping, not the value paid out), so the value is durable for any
-    // later scan.
-    await db.qrCode.updateMany({
-      where: { id: qrCode.id, status: "ACTIVE" },
-      data: {
-        pool_value: reduced,
-        ...(qrCode.pool_value === qrCode.points
-          ? { first_scanned_at: new Date() }
-          : {}),
-      },
+      const earned = claim.count === 1 ? qrCode.points : reduced;
+
+      const created = await tx.scan.create({
+        data: {
+          player_id: player.id,
+          team_id: teamId,
+          index_id: payload!.index_id,
+          game_id: gameId,
+          round_id: activeRound.id,
+          points_earned: earned,
+        },
+      });
+
+      await tx.player.update({
+        where: { id: player.id },
+        data: { total_score: { increment: earned } },
+      });
+
+      const updated = await tx.team.update({
+        where: { id: teamId },
+        data: { total_score: { increment: earned } },
+      });
+
+      return [earned, created, updated] as const;
     });
 
-    const scan = await db.scan.create({
-      data: {
-        player_id: player.id,
-        team_id: player.team_id,
-        index_id: payload!.index_id,
-        game_id: gameId,
-        round_id: activeRound.id,
-        points_earned: score,
-      },
-    });
-
-    await db.player.update({
-      where: { id: player.id },
-      data: { total_score: { increment: score } },
-    });
-
-    await db.team.update({
-      where: { id: player.team_id },
-      data: { total_score: { increment: score } },
-    });
-
-    const team = await db.team.findUnique({ where: { id: player.team_id } });
-    if (team) {
-      try {
-        await redis.zadd(`leaderboard:${gameId}`, {
-          score: team.total_score,
-          member: team.id,
-        });
-      } catch (error) {
-        console.warn(
-          `[Scan] Redis leaderboard sync skipped for team ${team.id}:`,
-          error instanceof Error ? error.message : "unknown"
-        );
-      }
+    try {
+      await redis.zadd(`leaderboard:${gameId}`, {
+        score: team.total_score,
+        member: team.id,
+      });
+    } catch (error) {
+      console.warn(
+        `[Scan] Redis leaderboard sync skipped for team ${team.id}:`,
+        error instanceof Error ? error.message : "unknown"
+      );
     }
 
     await publishEvent(gameId, "leaderboard", {
       type: "scan",
       team_id: player.team_id,
       score,
-      total_score: team?.total_score ?? 0,
+      total_score: team.total_score,
     });
 
     return apiSuccess(
@@ -228,11 +239,17 @@ export async function POST(
           type: index.enigma_type,
         },
         points_earned: score,
-        team_total: team?.total_score ?? 0,
+        team_total: team.total_score,
       },
       "Scan recorded successfully"
     );
   } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      return apiError("You have already scanned this index", "ALREADY_SCANNED");
+    }
     console.error("Scan error:", error instanceof Error ? error.message : "unknown");
     return apiInternal("Failed to process scan");
   }

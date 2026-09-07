@@ -359,9 +359,9 @@ All styling lives in Tailwind v4 (`@theme` + plain CSS) in **`app/globals.css`**
 | `ambient-glow`, `engraved-separator` | vignette / riveted divider |
 
 **Built-in primitives** under `components/ui/` (exported from `components/ui/index.ts`):
-`Gauge`, `Gear`, `Pipe`, `Porthole`, `CountdownTimer`, `SteamToggle`, `SteamCard`,
-`ArchPanel`, `Card`, `Toggle`. Check whether a primitive already exists before hand-rolling
-inline styles.
+`Skeleton` (`StatSkeleton`, `CardSkeleton`, `LeaderboardSkeleton`, `ScanSkeleton`,
+`TeamCardSkeleton`), `ErrorState`, `Toast`. Check whether a primitive already exists
+before hand-rolling inline styles.
 
 **Brand assets & ambient atmosphere**
 - Logos live in `public/branding/` as **WebP** (keep them ≤512²; they are displayed at most

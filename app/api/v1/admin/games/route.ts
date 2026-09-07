@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
       }))
     );
   } catch (error) {
-    console.error("List games error:", error);
+    console.error("List games error:", error instanceof Error ? error.message : "unknown");
     return apiInternal("Failed to list games");
   }
 }
@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
       "Game created successfully"
     );
   } catch (error) {
-    console.error("Create game error:", error);
+    console.error("Create game error:", error instanceof Error ? error.message : "unknown");
     return apiInternal("Failed to create game");
   }
 }

@@ -34,6 +34,8 @@ export function useTimer({
   const expireCallbackRef = useRef(onExpire);
   const lastServerTimerRef = useRef<TimerData | null>(null);
   const localIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const expiredHandledRef = useRef(false);
   const timerStateRef = useRef<TimerData | null>(null);
   const backoffRef = useRef(INITIAL_BACKOFF_MS);
 
@@ -42,12 +44,20 @@ export function useTimer({
     expireCallbackRef.current = onExpire;
   }, [onTick, onExpire]);
 
+  // Fire onExpire exactly once per expiry, even though every SSE resync and
+  // local tick carries an expired snapshot. A fresh, un-expired timer (new
+  // round) re-arms the guard so the next expiry is announced again.
   const pushTimer = useCallback((data: TimerData) => {
     timerStateRef.current = data;
     setTimer(data);
     tickCallbackRef.current?.(data);
     if (data.expired) {
-      expireCallbackRef.current?.();
+      if (!expiredHandledRef.current) {
+        expiredHandledRef.current = true;
+        expireCallbackRef.current?.();
+      }
+    } else {
+      expiredHandledRef.current = false;
     }
   }, []);
 
@@ -59,6 +69,10 @@ export function useTimer({
     if (localIntervalRef.current) {
       clearInterval(localIntervalRef.current);
       localIntervalRef.current = null;
+    }
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
     }
     setConnected(false);
   }, []);
@@ -83,6 +97,7 @@ export function useTimer({
         };
 
         es.onmessage = (event) => {
+          if (cancelled) return;
           try {
             const data = JSON.parse(event.data);
             if (data.type === "timer" && data.round) {
@@ -108,7 +123,8 @@ export function useTimer({
           setReconnecting(true);
           const delay = backoffRef.current;
           backoffRef.current = Math.min(backoffRef.current * 2, MAX_BACKOFF_MS);
-          setTimeout(connect, delay);
+          if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+          reconnectTimeoutRef.current = setTimeout(connect, delay);
         };
 
         if (localIntervalRef.current) clearInterval(localIntervalRef.current);
@@ -133,7 +149,8 @@ export function useTimer({
           setReconnecting(true);
           const delay = backoffRef.current;
           backoffRef.current = Math.min(backoffRef.current * 2, MAX_BACKOFF_MS);
-          setTimeout(connect, delay);
+          if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+          reconnectTimeoutRef.current = setTimeout(connect, delay);
         }
       }
     };

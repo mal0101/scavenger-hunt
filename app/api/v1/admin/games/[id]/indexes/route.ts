@@ -36,7 +36,7 @@ export async function GET(
       }))
     );
   } catch (error) {
-    console.error("List indexes error:", error);
+    console.error("List indexes error:", error instanceof Error ? error.message : "unknown");
     return apiInternal("Failed to list indexes");
   }
 }
@@ -66,6 +66,9 @@ export async function POST(
         location_name: parsed.data.location_name,
         location_lat: parsed.data.location_lat,
         location_lng: parsed.data.location_lng,
+        enigma_type: parsed.data.enigma_type,
+        question: parsed.data.question,
+        answer: parsed.data.answer,
       },
     });
 
@@ -75,7 +78,7 @@ export async function POST(
       points: index.points,
     }, "Index created successfully");
   } catch (error) {
-    console.error("Create index error:", error);
+    console.error("Create index error:", error instanceof Error ? error.message : "unknown");
     return apiInternal("Failed to create index");
   }
 }

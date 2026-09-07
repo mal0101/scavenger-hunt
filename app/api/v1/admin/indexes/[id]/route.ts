@@ -30,6 +30,9 @@ export async function PUT(
         ...(parsed.data.location_name !== undefined && { location_name: parsed.data.location_name }),
         ...(parsed.data.location_lat !== undefined && { location_lat: parsed.data.location_lat }),
         ...(parsed.data.location_lng !== undefined && { location_lng: parsed.data.location_lng }),
+        ...(parsed.data.enigma_type !== undefined && { enigma_type: parsed.data.enigma_type }),
+        ...(parsed.data.question !== undefined && { question: parsed.data.question }),
+        ...(parsed.data.answer !== undefined && { answer: parsed.data.answer }),
       },
     });
 
@@ -39,7 +42,7 @@ export async function PUT(
       points: index.points,
     }, "Index updated successfully");
   } catch (error) {
-    console.error("Update index error:", error);
+    console.error("Update index error:", error instanceof Error ? error.message : "unknown");
     return apiInternal("Failed to update index");
   }
 }
@@ -58,7 +61,7 @@ export async function DELETE(
 
     return apiSuccess(null, "Index deleted successfully");
   } catch (error) {
-    console.error("Delete index error:", error);
+    console.error("Delete index error:", error instanceof Error ? error.message : "unknown");
     return apiInternal("Failed to delete index");
   }
 }

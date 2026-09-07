@@ -51,6 +51,7 @@ model User {
 
   player Player?
 
+  @@index([phone_number])
   @@map("users")
 }
 
@@ -76,6 +77,7 @@ model Game {
   qrCodes QrCode[]
 
   @@index([status])
+  @@index([created_at])
   @@map("games")
 }
 
@@ -131,6 +133,7 @@ model Player {
   captainTeams Team[] @relation("TeamCaptain")
   scans       Scan[]
 
+  @@index([game_id])
   @@map("players")
 }
 

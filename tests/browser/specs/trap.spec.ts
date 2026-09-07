@@ -100,7 +100,7 @@ async function scanTrapViaApi(page: Page, gameId: string, index: { id: string },
   const encoded = encodeQrPayload(createQrPayload(index.id, gameId, codeId));
   const res = await api<{
     success: boolean;
-    data?: { scan_id: string; index?: { label: string; type: string | null }; pending?: boolean; question?: string | null; at_risk?: number; answer_options?: string[] | null };
+    data?: { scan_id: string; index?: { label: string; type: string | null }; pending?: boolean; question?: string | null; at_risk?: number; answer_options?: string[] | null; hint?: string | null };
     message?: string;
     error?: string;
   }>(page, `/api/v1/games/${gameId}/scan`, { method: "POST", body: { qr_data: encoded } });
@@ -125,6 +125,8 @@ test.describe("trap challenge", () => {
     expect(res.json.data?.answer_options).toEqual(
       JSON.parse(index.answer_options ?? "null")
     );
+    // The trap is an index too — its hint must ride along in the scan payload.
+    expect(res.json.data?.hint).toBe(index.hint);
     const scanId = res.json.data!.scan_id;
 
     // Navigate through the app like the camera flow would: scan-result with
@@ -139,6 +141,7 @@ test.describe("trap challenge", () => {
         question: res.json.data?.question,
         at_risk: index.points,
         answer_options: res.json.data?.answer_options,
+        hint: res.json.data?.hint,
       })
     );
 
@@ -146,6 +149,9 @@ test.describe("trap challenge", () => {
     await page.goto(`/scan-result?type=trap&data=${payload}`);
     await expect(page.getByText("TRAP TRIGGERED")).toBeVisible();
     await expect(page.getByText(res.json.data!.question!, { exact: false })).toBeVisible();
+    // The trap's hint is revealed on the scan-result card.
+    await expect(page.getByText("Next Checkpoint Hint")).toBeVisible();
+    await expect(page.getByText(index.hint!, { exact: false })).toBeVisible();
 
     // Player/team balance reflects only the pre-scan steps until the answer settles.
     const before = await api<{
@@ -158,6 +164,9 @@ test.describe("trap challenge", () => {
     await page.getByText("Engage Manual Override").click();
     await page.waitForURL("**/trap?data=*");
     await expect(page.getByText("Tidal Trap")).toBeVisible();
+    // The challenge page carries the hint through the same payload.
+    await expect(page.getByText("Next Checkpoint Hint")).toBeVisible();
+    await expect(page.getByText(index.hint!, { exact: false })).toBeVisible();
 
     // The trap is multiple choice — the proposed options render as buttons.
     await expect(page.getByRole("radiogroup")).toBeVisible();

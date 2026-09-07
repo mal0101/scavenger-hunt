@@ -128,6 +128,18 @@ function ScanResultContent() {
                 </div>
               )}
 
+              {scanResult.hint && (
+                <div className="bg-primary-container/15 border border-primary/30 rounded-lg p-4 space-y-1 text-left relative z-10">
+                  <p className="font-label text-label-sm text-primary uppercase tracking-widest flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-base">route</span>
+                    Next Checkpoint Hint
+                  </p>
+                  <p className="font-body text-body-md text-on-surface">
+                    {scanResult.hint}
+                  </p>
+                </div>
+              )}
+
               <button className="w-full py-3 bg-surface-container-lowest border border-error text-error font-label text-label-sm font-bold uppercase tracking-widest rounded-lg hover:bg-error/10 transition-all flex items-center justify-center gap-2 relative z-10">
                 Engage Manual Override
                 <span className="material-symbols-outlined text-lg">build</span>

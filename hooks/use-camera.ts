@@ -23,7 +23,37 @@ export function useCamera({ onScan, onError }: UseCameraOptions) {
     // container and the decoder can never read frames — the camera would
     // preview but never detect a QR.
     setScanning(true);
+
+    const mediaDevices =
+      typeof navigator !== "undefined" ? navigator.mediaDevices : undefined;
+    const hasGetUserMedia =
+      mediaDevices && typeof mediaDevices.getUserMedia === "function";
+    const hasEnumerate =
+      mediaDevices && typeof mediaDevices.enumerateDevices === "function";
+
+    // Deterministic no-camera detection (surface it before html5-qrcode
+    // wraps the low-level error, whose name/message varies across browsers).
+    const cameraAbsent = async (): Promise<boolean> => {
+      if (!hasGetUserMedia) return true;
+      if (hasEnumerate) {
+        try {
+          const devices = await mediaDevices!.enumerateDevices();
+          return !devices.some((d) => d.kind === "videoinput");
+        } catch {
+          return false;
+        }
+      }
+      return false;
+    };
+
     try {
+      if (await cameraAbsent()) {
+        callbackRef.current.onError?.("Camera not available on this device.");
+        setHasCamera(false);
+        setScanning(false);
+        return;
+      }
+
       const { Html5Qrcode } = await import("html5-qrcode");
 
       if (html5QrCodeRef.current) {
@@ -55,13 +85,36 @@ export function useCamera({ onScan, onError }: UseCameraOptions) {
         }
       );
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : String(err);
-      if (message.includes("NotAllowedError")) {
+      const sender = err as Error & { name?: string };
+      const name = typeof sender.name === "string" ? sender.name : "";
+      const message =
+        sender instanceof Error ? sender.message : String(err);
+      if (
+        name === "NotAllowedError" ||
+        message.includes("NotAllowedError") ||
+        message.includes("Permission denied")
+      ) {
         callbackRef.current.onError?.(
           "Camera permission denied. Please enable camera access."
         );
         setHasCamera(false);
-      } else if (message.includes("NotFoundError")) {
+      } else if (
+        name === "NotFoundError" ||
+        name === "NotSupportedError" ||
+        name === "TypeError" ||
+        message.includes("NotFoundError") ||
+        message.includes("NotSupportedError") ||
+        message.includes("Not supported") ||
+        message.includes("Cannot read properties of undefined") ||
+        /not found|no camera|no available|unavailable|deviceId mismatch/i.test(
+          message
+        )
+      ) {
+        callbackRef.current.onError?.(
+          "Camera not available on this device."
+        );
+        setHasCamera(false);
+      } else if (await cameraAbsent()) {
         callbackRef.current.onError?.(
           "Camera not available on this device."
         );

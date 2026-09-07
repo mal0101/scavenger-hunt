@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { PLAYER_NAV_ITEMS } from "@/lib/utils/navigation";
+import { BrandWordmark } from "@/components/steampunk/brand-wordmark";
 
 export default function PlayerShell({
   children,
@@ -31,22 +32,9 @@ export default function PlayerShell({
   }
 
   return (
-    <div className="min-h-dvh bg-surface relative">
+    <div className="min-h-dvh relative">
       <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-surface-container-high/95 backdrop-blur-md border-b-2 border-primary-container/50 flex items-center justify-between px-4 shadow-[0_4px_20px_rgba(217,119,7,0.1)]">
-        <Link href="/dock" className="flex items-center gap-2 group" aria-label="Return to dock">
-          <div className="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center shadow-[0_0_12px_rgba(217,119,7,0.5)] group-hover:shadow-[0_0_18px_rgba(217,119,7,0.8)] transition-all animate-flicker-amber">
-            <span
-              className="material-symbols-outlined text-on-primary-container text-lg"
-              style={{ fontVariationSettings: "'FILL' 1" }}
-              aria-hidden="true"
-            >
-              compass_calibration
-            </span>
-          </div>
-          <span className="font-headline text-sm text-on-surface hidden sm:inline">
-            Aether Compass
-          </span>
-        </Link>
+        <BrandWordmark href="/dock" size="sm" hideTextOnMobile />
 
         <div className="flex items-center gap-3">
           <Link

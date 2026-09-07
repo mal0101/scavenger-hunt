@@ -1,4 +1,4 @@
-# Aether Compass — Steampunk Scavenger Hunt
+# Gadz'arts Compass — Steampunk Scavenger Hunt
 
 A real-time, code-scanning **scavenger hunt** platform with a "Steampunk Amber Mariner"
 theme, built for team events (e.g. an ENSAM Casablanca campus hunt). Mentors create
@@ -362,6 +362,22 @@ All styling lives in Tailwind v4 (`@theme` + plain CSS) in **`app/globals.css`**
 `Gauge`, `Gear`, `Pipe`, `Porthole`, `CountdownTimer`, `SteamToggle`, `SteamCard`,
 `ArchPanel`, `Card`, `Toggle`. Check whether a primitive already exists before hand-rolling
 inline styles.
+
+**Brand assets & ambient atmosphere**
+- Logos live in `public/branding/` as **WebP** (keep them ≤512²; they are displayed at most
+  ~420 CSS px and are not cached by the service worker, see `STATIC_PREFIXES` in `public/sw.js`):
+  - `ade_logo_medallion.webp` — the council seal rendered by `CouncilMedallion` (login lockup).
+  - `ade_logo_kickoff_alpha.webp` — transparent kickoff seal, used as a faint watermark
+    behind the auth card (`app/(auth)/layout.tsx`).
+  - `ade_logo_kickoff.jpeg` — original shared logo (source master; not wired into the UI).
+- `AmbientBackdrop` (`components/steampunk/ambient-backdrop.tsx`) paints a fixed, full-viewport
+  ember/steam atmosphere in the root layout: **VGpu (WebGPU)** shader when available, raw-WebGL
+  fallback otherwise. It is screen-blended (`mix-blend-screen`, 35% opacity), so page roots must
+  keep **transparent** backgrounds (only `body` paints an opaque base) — never add opaque
+  page-level backgrounds or the atmosphere disappears behind them.
+- Motion budget: the backdrop auto-suspends while offscreen/tab-hidden, caps at 30fps, and renders
+  a single static frame under `prefers-reduced-motion` (global reduced-motion CSS at the bottom of
+  `globals.css`).
 
 > **Updating the theme:** change the `@theme` color variables in `globals.css` and every
 > component using those tokens updates automatically. To add a texture/motion, add a

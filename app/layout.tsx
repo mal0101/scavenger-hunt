@@ -1,19 +1,28 @@
 import type { Metadata, Viewport } from "next";
 import { Providers } from "@/components/providers";
+import { AmbientBackdrop } from "@/components/steampunk/ambient-backdrop";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Aether Compass — Scavenger Hunt",
+  title: "Gadz'arts Compass — Scavenger Hunt",
   description:
     "Gamified QR Code Treasure Hunt Platform — ENSAM Casablanca Kick-Off Week",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Aether Compass",
+    title: "Gadz'arts Compass",
   },
   formatDetection: {
     telephone: true,
+  },
+  icons: {
+    icon: [
+      { url: "/icons/icon-192x192.svg", type: "image/svg+xml" },
+      { url: "/icons/icon-192x192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512x512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/icons/icon-192x192.png" }],
   },
 };
 
@@ -48,6 +57,7 @@ export default function RootLayout({
         />
       </head>
         <body className="bg-surface text-on-surface font-body antialiased min-h-dvh">
+          <AmbientBackdrop />
           <Providers>{children}</Providers>
         </body>
     </html>

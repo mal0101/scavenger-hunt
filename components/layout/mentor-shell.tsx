@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { MENTOR_NAV_ITEMS } from "@/lib/utils/navigation";
+import { BrandWordmark } from "@/components/steampunk/brand-wordmark";
 
 export default function MentorShell({
   children,
@@ -30,25 +31,10 @@ export default function MentorShell({
   }
 
   return (
-    <div className="min-h-dvh bg-surface flex">
+    <div className="min-h-dvh flex">
       <aside className="hidden lg:flex flex-col w-64 bg-surface-container-low border-r border-outline-variant/30 fixed top-0 left-0 bottom-0 z-50 shadow-[2px_0_24px_rgba(217,119,7,0.08)]">
-        <div className="h-16 flex items-center gap-3 px-5 border-b border-outline-variant/30">
-          <div className="w-8 h-8 rounded-full bg-primary-container flex items-center justify-center shadow-[0_0_12px_rgba(217,119,7,0.5)] animate-flicker-amber">
-            <span
-              className="material-symbols-outlined text-on-primary-container text-lg"
-              style={{ fontVariationSettings: "'FILL' 1" }}
-            >
-              compass_calibration
-            </span>
-          </div>
-          <div>
-            <p className="font-headline text-sm text-on-surface font-semibold">
-              Aether Compass
-            </p>
-            <p className="font-label text-[10px] text-on-surface-variant uppercase tracking-widest">
-              Mentor Panel
-            </p>
-          </div>
+        <div className="h-16 flex items-center px-5 border-b border-outline-variant/30 w-full">
+          <BrandWordmark href="/mentor/dashboard" size="sm" caption="Mentor Panel" />
         </div>
 
         <nav className="flex-1 py-4 space-y-1 px-3" aria-label="Mentor navigation">

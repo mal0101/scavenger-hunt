@@ -2,6 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { CouncilMedallion } from "@/components/steampunk/council-medallion";
 
 function LoginForm() {
   const router = useRouter();
@@ -63,13 +64,13 @@ function LoginForm() {
 
   return (
     <div className="glass-panel rounded-2xl p-8 border border-outline-variant/40 shadow-xl">
-      <div className="mb-6 text-center">
-        <span className="material-symbols-outlined text-primary text-5xl animate-flicker-amber inline-block">
-          explore
-        </span>
-        <h1 className="font-headline text-headline-xl text-on-surface mt-3">
-          Aether Compass
-        </h1>
+        <div className="mb-6 text-center">
+          <div className="inline-block">
+            <CouncilMedallion size={88} />
+          </div>
+          <h1 className="font-headline text-headline-xl text-on-surface mt-3">
+            Gadz&apos;arts Compass
+          </h1>
         <p className="font-label text-label-sm text-on-surface-variant uppercase tracking-widest mt-2">
           Begin Descent
         </p>

@@ -65,7 +65,7 @@ export default function RoleSelectPage() {
           Choose Your Path
         </h1>
         <p className="font-body text-body-lg text-on-surface-variant max-w-xs mx-auto">
-          How will you navigate the Aether Compass?
+          How will you navigate the Gadz&apos;arts Compass?
         </p>
       </div>
 

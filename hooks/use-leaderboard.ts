@@ -31,6 +31,7 @@ export function useLeaderboard({
   const eventSourceRef = useRef<EventSource | null>(null);
   const callbackRef = useRef(onLeaderboardUpdate);
   const backoffRef = useRef(INITIAL_BACKOFF_MS);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     callbackRef.current = onLeaderboardUpdate;
@@ -40,6 +41,10 @@ export function useLeaderboard({
     if (eventSourceRef.current) {
       eventSourceRef.current.close();
       eventSourceRef.current = null;
+    }
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
     }
     setConnected(false);
   }, []);
@@ -66,6 +71,7 @@ export function useLeaderboard({
         };
 
         es.onmessage = (event) => {
+          if (cancelled) return;
           try {
             const data = JSON.parse(event.data);
             if (data.type === "leaderboard" && data.teams) {
@@ -84,14 +90,16 @@ export function useLeaderboard({
           setReconnecting(true);
           const delay = backoffRef.current;
           backoffRef.current = Math.min(backoffRef.current * 2, MAX_BACKOFF_MS);
-          setTimeout(connect, delay);
+          if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+          reconnectTimeoutRef.current = setTimeout(connect, delay);
         };
       } catch {
         if (!cancelled) {
           setReconnecting(true);
           const delay = backoffRef.current;
           backoffRef.current = Math.min(backoffRef.current * 2, MAX_BACKOFF_MS);
-          setTimeout(connect, delay);
+          if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+          reconnectTimeoutRef.current = setTimeout(connect, delay);
         }
       }
     };

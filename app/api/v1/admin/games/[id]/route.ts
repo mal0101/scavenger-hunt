@@ -65,7 +65,7 @@ export async function GET(
       })),
     });
   } catch (error) {
-    console.error("Get game error:", error);
+    console.error("Get game error:", error instanceof Error ? error.message : "unknown");
     return apiInternal("Failed to get game");
   }
 }
@@ -103,7 +103,7 @@ export async function PUT(
       "Game updated successfully"
     );
   } catch (error) {
-    console.error("Update game error:", error);
+    console.error("Update game error:", error instanceof Error ? error.message : "unknown");
     return apiInternal("Failed to update game");
   }
 }
@@ -125,7 +125,7 @@ export async function DELETE(
 
     return apiSuccess(null, "Game deleted successfully");
   } catch (error) {
-    console.error("Delete game error:", error);
+    console.error("Delete game error:", error instanceof Error ? error.message : "unknown");
     return apiInternal("Failed to delete game");
   }
 }

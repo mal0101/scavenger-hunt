@@ -1,6 +1,7 @@
 import { type NextRequest } from "next/server";
 import { verifyAccessToken } from "@/lib/auth/jwt";
-import { apiUnauthorized, apiForbidden } from "@/lib/types/api";
+import { apiUnauthorized, apiForbidden, apiError } from "@/lib/types/api";
+import { checkRateLimit, generalLimiter } from "@/lib/utils/rate-limiter";
 
 export interface AuthPayload {
   sub: string;
@@ -13,7 +14,7 @@ export async function requireAuth(
 ): Promise<AuthPayload | Response> {
   const token =
     request.cookies.get("access_token")?.value ??
-    request.headers.get("Authorization")?.replace("Bearer ", "");
+    request.headers.get("Authorization")?.match(/^Bearer\s+(.+)$/i)?.[1];
 
   if (!token) {
     return apiUnauthorized("No authentication token provided");
@@ -46,5 +47,14 @@ export async function requireMentor(
   const auth = await requireAuth(request);
   if (auth instanceof Response) return auth;
   if (auth.role !== "MENTOR") return apiForbidden("Mentor access required");
+
+  // All admin endpoints share one general limiter; in dev/CI (LocalRedisMock
+  // or unprovisioned Upstash) the check is a pass-through, so this only
+  // throttles real deployments.
+  const rateLimitResult = await checkRateLimit(generalLimiter, auth.sub);
+  if (!rateLimitResult.success) {
+    return apiError("Too many requests. Please wait.", "RATE_LIMITED", 429);
+  }
+
   return auth;
 }

@@ -61,7 +61,7 @@ export async function GET(
       recent_scans: team.scans.length,
     });
   } catch (error) {
-    console.error("Get team telemetry error:", error);
+    console.error("Get team telemetry error:", error instanceof Error ? error.message : "unknown");
     return apiInternal("Failed to get team telemetry");
   }
 }

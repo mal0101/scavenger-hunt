@@ -138,6 +138,15 @@ export function useCamera({ onScan, onError }: UseCameraOptions) {
     setScanning(false);
   }, []);
 
+  // Release the camera stream when the consumer unmounts (e.g. the scan page
+  // navigating to the result). Without this, html5-qrcode's video track stays
+  // live and the camera indicator keeps burning on the device.
+  useEffect(() => {
+    return () => {
+      void stopScanning();
+    };
+  }, [stopScanning]);
+
   return {
     scanning,
     hasCamera,

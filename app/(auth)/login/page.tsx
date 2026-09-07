@@ -7,7 +7,13 @@ import { CouncilMedallion } from "@/components/steampunk/council-medallion";
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirect = searchParams.get("redirect") ?? "/dock";
+  const rawRedirect = searchParams.get("redirect");
+  // Only allow same-origin relative paths; reject protocol-relative (//host)
+  // and absolute URLs so a crafted ?redirect= cannot send the user off-site.
+  const redirect =
+    rawRedirect && rawRedirect.startsWith("/") && !rawRedirect.startsWith("//")
+      ? rawRedirect
+      : "/dock";
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");

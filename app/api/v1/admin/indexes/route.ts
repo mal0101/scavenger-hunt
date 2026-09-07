@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
       }))
     );
   } catch (error) {
-    console.error("List indexes error:", error);
+    console.error("List indexes error:", error instanceof Error ? error.message : "unknown");
     return apiInternal("Failed to list indexes");
   }
 }
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
       "Index created successfully"
     );
   } catch (error) {
-    console.error("Create index error:", error);
+    console.error("Create index error:", error instanceof Error ? error.message : "unknown");
     return apiInternal("Failed to create index");
   }
 }

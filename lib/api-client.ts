@@ -54,6 +54,11 @@ export async function apiFetch<T = unknown>(
         ...headers,
       },
       body: body !== undefined ? JSON.stringify(body) : undefined,
+    }).catch(() => {
+      // Network-level failures (offline, DNS, server unreachable) are not HTTP
+      // responses; surface a typed ApiError so callers can dispatch on
+      // `instanceof` instead of a raw TypeError.
+      throw new ApiError("Network error while contacting the server", 0);
     });
 
   let res = await doFetch();

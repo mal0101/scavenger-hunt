@@ -57,7 +57,7 @@ export async function middleware(request: NextRequest) {
 
   const accessToken =
     request.cookies.get("access_token")?.value ??
-    request.headers.get("Authorization")?.replace("Bearer ", "");
+    request.headers.get("Authorization")?.match(/^Bearer\s+(.+)$/i)?.[1];
 
   // Public API routes (auth endpoints) bypass JWT check
   if (isApiRoute(pathname) && isPublicApiRoute(pathname)) {

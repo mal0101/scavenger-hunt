@@ -228,7 +228,7 @@ export async function POST(
       `Game ${action} successful`
     );
   } catch (error) {
-    console.error("State transition error:", error);
+    console.error("State transition error:", error instanceof Error ? error.message : "unknown");
     return apiInternal("Failed to transition game state");
   }
 }

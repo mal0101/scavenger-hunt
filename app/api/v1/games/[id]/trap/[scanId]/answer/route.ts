@@ -5,6 +5,7 @@ import { apiSuccess, apiError, apiInternal } from "@/lib/types/api";
 import { publishEvent } from "@/lib/db/pubsub";
 import { redis } from "@/lib/db/redis";
 import { requirePlayer } from "@/lib/auth/guard";
+import { checkRateLimit, generalLimiter } from "@/lib/utils/rate-limiter";
 
 const answerSchema = z.object({
   answer: z.string().min(1).max(500),
@@ -17,6 +18,11 @@ export async function POST(
   try {
     const auth = await requirePlayer(request);
     if (auth instanceof Response) return auth;
+
+    const rateLimitResult = await checkRateLimit(generalLimiter, auth.sub);
+    if (!rateLimitResult.success) {
+      return apiError("Too many submissions. Please wait.", "RATE_LIMITED", 429);
+    }
 
     const { id: gameId, scanId } = await params;
     const body = await request.json();

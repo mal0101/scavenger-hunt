@@ -17,6 +17,7 @@ function TrapContent() {
         index_label: string;
         question: string | null;
         answer_options: string[] | null;
+        hint: string | null;
         game_id: string;
         scan_id: string;
         at_risk: number | null;
@@ -31,6 +32,7 @@ function TrapContent() {
         index_label: parsed.index_label,
         question: parsed.question ?? null,
         answer_options: parsed.answer_options ?? null,
+        hint: parsed.hint ?? null,
         game_id: parsed.game_id,
         scan_id: parsed.scan_id,
         at_risk: parsed.at_risk ?? null,
@@ -46,6 +48,7 @@ function TrapContent() {
       index_label: lastScanResult.index_label,
       question: lastScanResult.question ?? null,
       answer_options: lastScanResult.answer_options ?? null,
+      hint: lastScanResult.hint ?? null,
       game_id: lastScanResult.game_id,
       scan_id: lastScanResult.scan_id,
       at_risk: lastScanResult.at_risk ?? null,
@@ -265,6 +268,17 @@ function TrapContent() {
                   className="w-full px-4 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg font-body text-body-md text-on-surface focus:outline-none focus:border-error"
                 />
               </>
+            )}
+            {challenge.hint && (
+              <div className="bg-primary-container/15 border border-primary/30 rounded-lg p-4 space-y-1 text-left">
+                <p className="font-label text-label-sm text-primary uppercase tracking-widest flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-base">route</span>
+                  Next Checkpoint Hint
+                </p>
+                <p className="font-body text-body-md text-on-surface">
+                  {challenge.hint}
+                </p>
+              </div>
             )}
             {error && (
               <div className="bg-error-container/20 border border-error/40 rounded-lg p-3 flex items-center gap-3">

@@ -180,6 +180,7 @@ export async function POST(
           pending: true,
           question: index.question ?? null,
           answer_options: parseAnswerOptions(index.answer_options),
+          hint: index.hint ?? null,
           at_risk: index.points,
           team_total: player.total_score,
         },

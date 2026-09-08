@@ -175,13 +175,19 @@ openssl rand -hex 32
 
 `npm run db:seed` (via `prisma/seed.ts`) upserts:
 
-- A **MENTOR** user: phone `+212600000001`, nickname `Admin Mentor`.
-- A game: `ESCAPE ROOM — Kick-off Week 2026` (3 rounds, 1800s, 20% cut) — status
-  `ACTIVE`, round 1 active.
-- 5 indexes with a `round_id` (so **QR generation works immediately**) — e.g.
-  *The Clocktower (50pt, visual)*, *The Enigma Vault (75pt, logic)*.
+- A **MENTOR** user `mentor` and dev players `player1..player4`. Admin/player
+  passwords come from `CREDENTIALS_SEED_ADMIN_PASSWORD` /
+  `CREDENTIALS_SEED_PLAYER_PASSWORD`; seeding refuses to run against a
+  production `NODE_ENV` without them.
+- A game: `ESCAPE ROOM — Kick-off Week 2026` (3 rounds, 1800s, 20% cut) — staged
+  **`PENDING`** (no active round yet).
+- The 20-marker hunt: 16 safe indexes + 4 QCM traps with sequenced
+  `sequence_order` (1–20), each with a `hint` (`answer_options` on the traps),
+  plus a matching scannable `QrCode` row per index (so mentor QR generation +
+  printing works immediately, even while the game is PENDING).
 
-Use the mentor phone above (+ any `000000` code) to log in as mentor after seeding.
+To go live, log in as the mentor and press **Start Game** — that's what
+activates round 1 and unlocks team formation + scanning.
 
 ---
 

@@ -9,6 +9,17 @@ const ADMIN_PASSWORD =
 const PLAYER_PASSWORD =
   process.env.CREDENTIALS_SEED_PLAYER_PASSWORD ?? "DevPass_2026!";
 
+if (
+  process.env.NODE_ENV === "production" &&
+  (!process.env.CREDENTIALS_SEED_ADMIN_PASSWORD ||
+    !process.env.CREDENTIALS_SEED_PLAYER_PASSWORD)
+) {
+  throw new Error(
+    "Refusing to seed a production database with default credentials. " +
+      "Set CREDENTIALS_SEED_ADMIN_PASSWORD and CREDENTIALS_SEED_PLAYER_PASSWORD."
+  );
+}
+
 async function main() {
   console.log("Seeding database...");
 
@@ -31,6 +42,8 @@ async function main() {
   });
   console.log(`Mentor: ${mentor.username} (${mentor.phone_number})`);
 
+  // The hunt is staged PENDING (no active round): the mentor starts it from
+  // the dashboard when the event goes live, which is what creates round 1.
   const game = await db.game.upsert({
     where: { id: "00000000-0000-0000-0000-000000000001" },
     update: {},
@@ -42,31 +55,11 @@ async function main() {
       round_duration: 1800,
       elimination_pct: 0.2,
       created_by: mentor.id,
-      status: "ACTIVE",
-      current_round: 1,
-      started_at: new Date(),
+      status: "PENDING",
+      current_round: 0,
     },
   });
-  console.log(`Game: ${game.id} (${game.title})`);
-
-  const existingActive = await db.round.findFirst({
-    where: { game_id: game.id, status: "ACTIVE" },
-    select: { id: true },
-  });
-
-  const round1 = await db.round.upsert({
-    where: { game_id_round_number: { game_id: game.id, round_number: 1 } },
-    update: existingActive
-      ? {}
-      : { status: "ACTIVE", started_at: new Date() },
-    create: {
-      game_id: game.id,
-      round_number: 1,
-      status: "ACTIVE",
-      started_at: new Date(),
-    },
-  });
-  console.log(`Round 1: ${round1.id}`);
+  console.log(`Game: ${game.id} (${game.title}) — PENDING, start it from the mentor dashboard`);
 
   // Course de la chasse au trésor (Document_9__3_.md) : chaque fiche décrit un
   // lieu, un code à afficher, un indice et (quand elle en a) une question dont

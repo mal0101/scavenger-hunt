@@ -31,6 +31,7 @@ export async function PUT(
       data: {
         ...(parsed.data.label !== undefined && { label: parsed.data.label }),
         ...(parsed.data.description !== undefined && { description: parsed.data.description }),
+        ...(parsed.data.display_code !== undefined && { display_code: parsed.data.display_code }),
         ...(parsed.data.points !== undefined && { points: parsed.data.points }),
         ...(parsed.data.location_name !== undefined && { location_name: parsed.data.location_name }),
         ...(parsed.data.location_lat !== undefined && { location_lat: parsed.data.location_lat }),

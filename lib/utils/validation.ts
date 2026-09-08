@@ -48,6 +48,7 @@ export const indexSchema = z.object({
   game_id: z.string().uuid(),
   label: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
+  display_code: z.string().max(500).optional(),
   points: z.number().int().min(1).max(100).default(25),
   location_name: z.string().max(200).optional(),
   location_lat: z.number().min(-90).max(90).optional(),

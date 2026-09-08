@@ -23,6 +23,7 @@ export default function MentorIndexesPage() {
     game_id: "",
     label: "",
     description: "",
+    display_code: "",
     points: 25,
     location_name: "",
     enigma_type: "",
@@ -85,12 +86,13 @@ export default function MentorIndexesPage() {
           answer: form.answer || undefined,
           hint: form.hint || undefined,
           description: form.description || undefined,
+          display_code: form.display_code || undefined,
         },
       });
       if (j.success) {
         setShowCreate(false);
         const preservedGame = form.game_id;
-        setForm({ game_id: preservedGame, label: "", description: "", points: 25, location_name: "", enigma_type: "", question: "", answer: "", hint: "", sequence_order: "", answer_options: "" });
+        setForm({ game_id: preservedGame, label: "", description: "", display_code: "", points: 25, location_name: "", enigma_type: "", question: "", answer: "", hint: "", sequence_order: "", answer_options: "" });
         setRefreshKey((k) => k + 1);
         showToast("Index created", "success");
       } else {
@@ -241,6 +243,16 @@ export default function MentorIndexesPage() {
               />
             </div>
             <div>
+              <label className="font-label text-label-sm text-on-surface-variant uppercase block mb-2">Code à afficher (display_code)</label>
+              <textarea
+                value={form.display_code}
+                onChange={(e) => setForm({ ...form, display_code: e.target.value })}
+                placeholder="e.g. 2 - 8 - 8 - 3 - 8 - 8 - 3"
+                rows={2}
+                className="w-full px-4 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg font-body text-body-md text-on-surface focus:outline-none focus:border-primary"
+              />
+            </div>
+            <div>
               <label className="font-label text-label-sm text-on-surface-variant uppercase block mb-2">Hint (revealed after scan)</label>
               <textarea
                 value={form.hint}
@@ -267,38 +279,48 @@ export default function MentorIndexesPage() {
                 <option value="logic">Logic</option>
               </select>
             </div>
-            {form.enigma_type === "trap" && (
+            {(form.enigma_type === "trap" || form.enigma_type === "enigma") && (
               <>
                 <div>
-                  <label className="font-label text-label-sm text-on-surface-variant uppercase block mb-2">Trap Question</label>
+                  <label className="font-label text-label-sm text-on-surface-variant uppercase block mb-2">
+                    {form.enigma_type === "trap" ? "Trap Question" : "Question"}
+                  </label>
                   <input
                     type="text"
                     value={form.question}
                     onChange={(e) => setForm({ ...form, question: e.target.value })}
-                    placeholder="What moves steam through the city below?"
+                    placeholder={
+                      form.enigma_type === "trap"
+                        ? "What moves steam through the city below?"
+                        : "What riddle leads teams to the next checkpoint?"
+                    }
                     className="w-full px-4 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg font-body text-body-md text-on-surface focus:outline-none focus:border-primary"
                   />
                 </div>
-                <div>
-                  <label className="font-label text-label-sm text-on-surface-variant uppercase block mb-2">Answer Options (comma-separated)</label>
-                  <input
-                    type="text"
-                    value={form.answer_options}
-                    onChange={(e) => setForm({ ...form, answer_options: e.target.value })}
-                    placeholder="steam, coal, water, wind"
-                    className="w-full px-4 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg font-body text-body-md text-on-surface focus:outline-none focus:border-primary"
-                  />
-                </div>
-                <div>
-                  <label className="font-label text-label-sm text-on-surface-variant uppercase block mb-2">Correct Answer</label>
-                  <input
-                    type="text"
-                    value={form.answer}
-                    onChange={(e) => setForm({ ...form, answer: e.target.value })}
-                    placeholder="steam"
-                    className="w-full px-4 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg font-body text-body-md text-on-surface focus:outline-none focus:border-primary"
-                  />
-                </div>
+                {form.enigma_type === "trap" && (
+                  <>
+                    <div>
+                      <label className="font-label text-label-sm text-on-surface-variant uppercase block mb-2">Answer Options (comma-separated)</label>
+                      <input
+                        type="text"
+                        value={form.answer_options}
+                        onChange={(e) => setForm({ ...form, answer_options: e.target.value })}
+                        placeholder="steam, coal, water, wind"
+                        className="w-full px-4 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg font-body text-body-md text-on-surface focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="font-label text-label-sm text-on-surface-variant uppercase block mb-2">Correct Answer</label>
+                      <input
+                        type="text"
+                        value={form.answer}
+                        onChange={(e) => setForm({ ...form, answer: e.target.value })}
+                        placeholder="steam"
+                        className="w-full px-4 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg font-body text-body-md text-on-surface focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                  </>
+                )}
               </>
             )}
           </div>
@@ -479,15 +501,24 @@ export default function MentorIndexesPage() {
                 <p className="font-label text-label-sm text-on-surface-variant">
                   {index.game_title} · {index.location_name ?? "No location"} · {index.points} pts · {index.scan_count} scans
                 </p>
+                {index.display_code && (
+                  <p className="font-body text-body-sm text-on-surface-variant mt-1 flex items-start gap-1">
+                    <span className="material-symbols-outlined text-sm mt-0.5">pin</span>
+                    Code: {index.display_code}
+                  </p>
+                )}
                 {index.hint && (
                   <p className="font-body text-body-sm text-primary/80 mt-1 flex items-start gap-1">
                     <span className="material-symbols-outlined text-sm mt-0.5">route</span>
                     Hint: {index.hint}
                   </p>
                 )}
-                {index.enigma_type === "trap" && index.question && (
-                  <p className="font-body text-body-sm text-error/80 mt-1">Q: {index.question}</p>
-                )}
+                {index.question &&
+                  (index.enigma_type === "trap" || index.enigma_type === "enigma") && (
+                    <p className={`font-body text-body-sm mt-1 ${index.enigma_type === "trap" ? "text-error/80" : "text-primary/80"}`}>
+                      Q: {index.question}
+                    </p>
+                  )}
               </div>
               <button
                 onClick={() => handleOpenQr(index)}

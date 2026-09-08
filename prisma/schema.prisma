@@ -100,6 +100,7 @@ model Index {
   id             String   @id @default(uuid())
   game_id        String
   label          String
+  display_code   String?
   description    String?
   points         Int      @default(25)
   location_name  String?

@@ -1,5 +1,11 @@
 import type { NextConfig } from "next";
 
+// React's dev-mode renders eval() to reconstruct callstacks. The strict CSP
+// intentionally omits unsafe-eval, so dev needs it as a deliberate exception
+// (production builds never call eval and keep the strict policy).
+const isDev = process.env.NODE_ENV === "development";
+const scriptSrc = "script-src 'self' 'unsafe-inline'" + (isDev ? " 'unsafe-eval'" : "");
+
 const securityHeaders = [
   {
     key: "X-Content-Type-Options",
@@ -29,7 +35,7 @@ const securityHeaders = [
     key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline'",
+      scriptSrc,
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: blob:",

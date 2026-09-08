@@ -180,6 +180,34 @@ function ScanResultContent() {
               </p>
             </div>
 
+            {scanResult.display_code && (
+              <div className="bg-surface-container-lowest border border-primary/40 rounded-lg p-4 text-center space-y-1">
+                <p className="font-label text-label-sm text-primary uppercase tracking-widest flex items-center justify-center gap-1.5">
+                  <span className="material-symbols-outlined text-base">pin</span>
+                  Code à afficher
+                </p>
+                <p className="font-headline text-lg text-on-surface font-bold tracking-widest">
+                  {scanResult.display_code}
+                </p>
+              </div>
+            )}
+
+            {scanResult.question && (
+              <div className="bg-surface-container-lowest border border-outline-variant rounded-lg p-4 space-y-1 text-left">
+                <p className="font-label text-label-sm text-primary uppercase tracking-widest flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-base">help</span>
+                  Question
+                </p>
+                <p className="font-body text-body-md text-on-surface">
+                  {scanResult.question}
+                </p>
+                <p className="font-label text-label-sm text-on-surface-variant mt-2">
+                  No answer needed — keep following the clue to the next
+                  checkpoint.
+                </p>
+              </div>
+            )}
+
             {scanResult.hint && (
               <div className="bg-primary-container/15 border border-primary/30 rounded-lg p-4 space-y-1 text-left">
                 <p className="font-label text-label-sm text-primary uppercase tracking-widest flex items-center gap-1.5">

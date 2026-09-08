@@ -6,6 +6,7 @@ export interface ScanResultPayload {
   points_earned: number;
   team_total: number;
   scan_id: string;
+  display_code?: string | null;
   question?: string | null;
   answer_options?: string[] | null;
   hint?: string | null;

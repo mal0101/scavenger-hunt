@@ -168,6 +168,7 @@ export interface MentorIndexEntry {
   points: number;
   location_name: string | null;
   enigma_type: string | null;
+  display_code: string | null;
   question: string | null;
   hint: string | null;
   sequence_order: number;

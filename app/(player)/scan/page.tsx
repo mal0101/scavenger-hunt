@@ -63,6 +63,7 @@ export default function ScanPage() {
             points_earned: number;
             team_total: number;
             pending?: boolean;
+            display_code?: string | null;
             question?: string | null;
             answer_options?: string[] | null;
             hint?: string | null;
@@ -102,6 +103,7 @@ export default function ScanPage() {
           points_earned: j.data.points_earned,
           team_total: j.data.team_total,
           scan_id: j.data.scan_id,
+          display_code: j.data.display_code ?? null,
           question: j.data.question ?? null,
           answer_options: j.data.answer_options ?? null,
           hint: j.data.hint ?? null,

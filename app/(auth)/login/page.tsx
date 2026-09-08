@@ -29,8 +29,8 @@ function LoginForm() {
       setError("Username must be at least 3 characters.");
       return;
     }
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
+    if (!password) {
+      setError("Password may not be empty.");
       return;
     }
 

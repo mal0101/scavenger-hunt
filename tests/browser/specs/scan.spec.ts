@@ -165,11 +165,14 @@ test.describe("QR camera scan", () => {
 
     // No fake-stream injection: the real (permissionless/device-less) camera
     // path is exercised. Headless Chromium reports no camera device, which the
-    // app must surface and recover from without an uncaught error.
+    // app must surface and recover from without an uncaught error. The exact
+    // banner text is matched (not a regex) because Next.js' dev-mode overlay
+    // echoes the app's own console.error text, which would otherwise produce a
+    // strict-mode duplicate in non-prod runs.
     await page.getByRole("button", { name: "Start Scanner" }).click();
-    await expect(page.getByText(/Camera permission denied|not available/i)).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(
+      page.getByText("Camera not available on this device.", { exact: true })
+    ).toBeVisible({ timeout: 15000 });
     expect(new URL(page.url()).pathname).toBe("/scan");
   });
 

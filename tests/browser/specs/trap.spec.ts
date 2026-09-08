@@ -16,11 +16,6 @@ const P1 = `qa_trp_p1_${SUF}`;
 const P2 = `qa_trp_p2_${SUF}`;
 let createdUsernames: string[] = [];
 
-// The seeded 20-pt trap "The Pressure Gauge", answer "steam", sequence step 5.
-// Picked by enigma_type + question (never by offset) because QA indexes created
-// by the mentor state-machine specs share the same round/shift positions.
-const TRAP_QUESTION = "What moves steam through the city below?";
-
 async function authPlayer(page: Page, username: string): Promise<void> {
   await createUser(username, PW);
   await loginAs(page, username, PW);
@@ -38,13 +33,14 @@ test.beforeAll(async () => {
   await rearmSeededCodes((await getActiveGame()).id);
 });
 
+// The seeded course ends with the 4 floor-question traps (QCM, steps 17-20).
+// Pick the first trap deterministically by enigma_type — never by content
+// strings, which the course authors tune.
 async function setup() {
   const game = await getActiveGame();
   const indexes = await getIndexesForGame(game.id);
-  const index = indexes.find(
-    (idx) => idx.enigma_type === "trap" && idx.question === TRAP_QUESTION
-  );
-  if (!index) throw new Error(`Seed trap "${TRAP_QUESTION}" not found`);
+  const index = indexes.find((idx) => idx.enigma_type === "trap") ?? null;
+  if (!index) throw new Error("Seed trap not found");
   const qrCode = await getQrCodeForIndex(index.id);
   return { gameId: game.id, index, codeId: qrCode.id, indexes };
 }
@@ -149,9 +145,14 @@ test.describe("trap challenge", () => {
     await page.goto(`/scan-result?type=trap&data=${payload}`);
     await expect(page.getByText("TRAP TRIGGERED")).toBeVisible();
     await expect(page.getByText(res.json.data!.question!, { exact: false })).toBeVisible();
-    // The trap's hint is revealed on the scan-result card.
-    await expect(page.getByText("Next Checkpoint Hint")).toBeVisible();
-    await expect(page.getByText(index.hint!, { exact: false })).toBeVisible();
+    // The trap's hint is revealed on the scan-result card when the course
+    // defines one; a hint-less trap renders no panel at all.
+    if (index.hint) {
+      await expect(page.getByText("Next Checkpoint Hint")).toBeVisible();
+      await expect(page.getByText(index.hint, { exact: false })).toBeVisible();
+    } else {
+      await expect(page.getByText("Next Checkpoint Hint")).not.toBeVisible();
+    }
 
     // Player/team balance reflects only the pre-scan steps until the answer settles.
     const before = await api<{
@@ -164,13 +165,20 @@ test.describe("trap challenge", () => {
     await page.getByText("Engage Manual Override").click();
     await page.waitForURL("**/trap?data=*");
     await expect(page.getByText("Tidal Trap")).toBeVisible();
-    // The challenge page carries the hint through the same payload.
-    await expect(page.getByText("Next Checkpoint Hint")).toBeVisible();
-    await expect(page.getByText(index.hint!, { exact: false })).toBeVisible();
+    // The challenge page carries the hint through the same payload (when set).
+    if (index.hint) {
+      await expect(page.getByText("Next Checkpoint Hint")).toBeVisible();
+      await expect(page.getByText(index.hint, { exact: false })).toBeVisible();
+    } else {
+      await expect(page.getByText("Next Checkpoint Hint")).not.toBeVisible();
+    }
 
     // The trap is multiple choice — the proposed options render as buttons.
     await expect(page.getByRole("radiogroup")).toBeVisible();
-    await page.getByRole("radio", { name: /coal/i }).click();
+    const options = JSON.parse(index.answer_options ?? "[]") as string[];
+    const wrongOption = options.find((o) => o !== index.answer) ?? options[0];
+    if (!wrongOption) throw new Error("Trap has no answer options to pick from");
+    await page.getByRole("radio", { name: wrongOption }).click();
     await page.getByRole("button", { name: "Seal the Bulkhead" }).click();
 
     await expect(page.getByText("MANIFOLD BREACHED")).toBeVisible({ timeout: 10000 });
@@ -227,7 +235,7 @@ test.describe("trap challenge", () => {
     const again = await api<{ success: boolean; error?: string }>(
       page,
       `/api/v1/games/${gameId}/trap/${res.json.data!.scan_id}/answer`,
-      { method: "POST", body: { answer: "steam" } }
+      { method: "POST", body: { answer: index.answer ?? "" } }
     );
     expect(again.json.success).toBe(false);
     expect(again.json.error).toBe("TRAP_ALREADY_RESOLVED");

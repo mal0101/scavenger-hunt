@@ -229,6 +229,27 @@ async function createFixtures(): Promise<void> {
     `UPDATE qr_codes SET pool_value = points WHERE game_id = '${SEED_GAME_ID}'`
   );
 
+  // Seed now stages the hunt PENDING; bring it to ACTIVE (round 1 running)
+  // so the scan matrix / SSE suites in this file behave as before.
+  await db.game.update({
+    where: { id: SEED_GAME_ID },
+    data: {
+      status: "ACTIVE",
+      current_round: 1,
+      started_at: new Date(),
+    },
+  });
+  await db.round.upsert({
+    where: { game_id_round_number: { game_id: SEED_GAME_ID, round_number: 1 } },
+    update: { status: "ACTIVE", started_at: new Date() },
+    create: {
+      game_id: SEED_GAME_ID,
+      round_number: 1,
+      status: "ACTIVE",
+      started_at: new Date(),
+    },
+  });
+
   const mentor = await db.user.findUnique({ where: { username: SEED_MENTOR_USERNAME } });
   const createdBy = mentor?.id ?? "unknown";
 

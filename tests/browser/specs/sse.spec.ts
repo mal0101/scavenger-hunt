@@ -77,8 +77,15 @@ test.describe("SSE live updates", () => {
 
     const game = await getActiveGame();
     const indexes = await getIndexesForGame(game.id);
-    // Single-claim seeded codes: index 0/1 are reserved by scan.spec.
-    const index = indexes[2];
+    // Single-claim seeded codes: steps 1-2 are reserved by scan.spec. Pick the
+    // earliest non-trap checkpoint (sequence steps 1+ are reserved as follows:
+    // 1 full-scan, 2 re-scanned/depleted) so this spec never races a sibling
+    // claim, and a trap here would shorten the payout to 0.
+    const index =
+      indexes.find((i) => i.enigma_type !== "trap" && i.sequence_order >= 3) ??
+      (() => {
+        throw new Error("No non-trap checkpoint from sequence step 3 onward");
+      })();
     const qrCode = await getQrCodeForIndex(index.id);
 
     await authPlayer(pageA, A);

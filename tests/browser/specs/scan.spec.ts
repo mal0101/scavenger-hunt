@@ -19,9 +19,11 @@ const P3 = `qa_scan_p3_${SUF}`;
 let createdUsernames: string[] = [];
 
 // The seeded game's QR codes are single-claim, so every scan test grabs a
-// distinct index to never collide with a sibling spec's claim.
-const INDEX_FULL_SCAN = 0;
-const INDEX_DEPLETED = 1;
+// distinct index to never collide with a sibling spec's claim. Indexes are
+// selected by their sequence_order (stable) rather than array offset (the
+// findMany order is not deterministic).
+const INDEX_FULL_SCAN = 1;
+const INDEX_DEPLETED = 2;
 
 async function authPlayer(page: Page, username: string): Promise<void> {
   await createUser(username, PW);
@@ -52,13 +54,13 @@ interface ScanFixture {
   codeId: string;
 }
 
-async function setup(indexOffset: number): Promise<ScanFixture> {
+async function setup(sequenceOrder: number): Promise<ScanFixture> {
   const game = await getActiveGame();
   const indexes = await getIndexesForGame(game.id);
-  if (indexes.length <= indexOffset) {
-    throw new Error(`Seeded game has no index at offset ${indexOffset}`);
+  const index = indexes.find((i) => i.sequence_order === sequenceOrder);
+  if (!index) {
+    throw new Error(`Seeded game has no index at sequence_order ${sequenceOrder}`);
   }
-  const index = indexes[indexOffset];
   const qrCode = await getQrCodeForIndex(index.id);
   return { gameId: game.id, index, codeId: qrCode.id };
 }
@@ -163,11 +165,14 @@ test.describe("QR camera scan", () => {
 
     // No fake-stream injection: the real (permissionless/device-less) camera
     // path is exercised. Headless Chromium reports no camera device, which the
-    // app must surface and recover from without an uncaught error.
+    // app must surface and recover from without an uncaught error. The exact
+    // banner text is matched (not a regex) because Next.js' dev-mode overlay
+    // echoes the app's own console.error text, which would otherwise produce a
+    // strict-mode duplicate in non-prod runs.
     await page.getByRole("button", { name: "Start Scanner" }).click();
-    await expect(page.getByText(/Camera permission denied|not available/i)).toBeVisible({
-      timeout: 15000,
-    });
+    await expect(
+      page.getByText("Camera not available on this device.", { exact: true })
+    ).toBeVisible({ timeout: 15000 });
     expect(new URL(page.url()).pathname).toBe("/scan");
   });
 

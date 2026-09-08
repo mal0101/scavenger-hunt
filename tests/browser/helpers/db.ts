@@ -11,6 +11,66 @@ function dbInstance(): PrismaClient {
   return prisma;
 }
 
+// The seed now stages the hunt PENDING and lets the mentor start it at the
+// event. Browser specs need a live game to scan/join, so they self-start the
+// seeded game exactly the way the state-machine "start" action would
+// (ACTIVE + current_round 1 + round 1 ACTIVE), and then reuse it.
+const SEED_GAME_ID = "00000000-0000-0000-0000-000000000001";
+
+export interface SeedGame {
+  id: string;
+  title: string;
+  status: string;
+  current_round: number;
+}
+
+/** Find the seeded game and bring it to ACTIVE (round 1 running) if needed.
+ *  Returns null when the seeded game does not exist. */
+export async function ensureSeedActive(): Promise<SeedGame | null> {
+  const db = dbInstance();
+  const game = await db.game.findUnique({ where: { id: SEED_GAME_ID } });
+  if (!game) return null;
+
+  if (game.status !== "ACTIVE") {
+    await db.game.update({
+      where: { id: SEED_GAME_ID },
+      data: {
+        status: "ACTIVE",
+        current_round: 1,
+        started_at: game.started_at ?? new Date(),
+      },
+    });
+  }
+
+  const round1 = await db.round.findFirst({
+    where: { game_id: SEED_GAME_ID, round_number: 1 },
+  });
+  if (round1) {
+    if (round1.status !== "ACTIVE") {
+      await db.round.update({
+        where: { id: round1.id },
+        data: { status: "ACTIVE", started_at: new Date() },
+      });
+    }
+  } else {
+    await db.round.create({
+      data: {
+        game_id: SEED_GAME_ID,
+        round_number: 1,
+        status: "ACTIVE",
+        started_at: new Date(),
+      },
+    });
+  }
+
+  return {
+    id: game.id,
+    title: game.title,
+    status: "ACTIVE",
+    current_round: 1,
+  };
+}
+
 /** Creates a credential user directly in the DB (browser tests bypass the
  *  admin API for isolation). PLAYER users get an ACTIVE player row bound to
  *  the active game. Idempotent by username. */
@@ -38,11 +98,7 @@ export async function createUser(
   });
 
   if (role === "PLAYER") {
-    const game = await db.game.findFirst({
-      where: { status: "ACTIVE" },
-      orderBy: { created_at: "desc" },
-      select: { id: true },
-    });
+    const game = await ensureSeedActive();
     if (game) {
       await db.player.create({
         data: {
@@ -139,13 +195,10 @@ export async function rearmSeededCodes(gameId: string): Promise<void> {
   );
 }
 
-export async function getActiveGame(): Promise<{
-  id: string;
-  title: string;
-  status: string;
-  current_round: number;
-}> {
+export async function getActiveGame(): Promise<SeedGame> {
   const db = dbInstance();
+  const seeded = await ensureSeedActive();
+  if (seeded) return seeded;
   const game = await db.game.findFirst({
     where: { status: "ACTIVE" },
     orderBy: { created_at: "desc" },
@@ -190,6 +243,7 @@ export async function getIndexesForGame(
   const db = dbInstance();
   return db.index.findMany({
     where: { game_id: gameId },
+    orderBy: { sequence_order: "asc" },
     select: {
       id: true,
       label: true,

@@ -537,7 +537,8 @@ async function s4ScanMatrix(): Promise<string[]> {
   // The scanning player must belong to a team (the scan route enforces NO_TEAM
   // otherwise). The second player stays team-less to exercise that guard.
   let res = await api("/api/v1/players/me/team", { method: "POST", body: { team_name: "QA-Scan-Team" }, jar: jars[0] });
-  check(res.status === 200, "scan player creates a team");
+  check(res.status === 200 && res.json?.data?.invite_code, "scan player creates a team");
+  const scanInvite = res.json?.data?.invite_code as string;
 
   // Mentor is forbidden to scan.
   const mentorJar: Jar = new Map();
@@ -560,6 +561,27 @@ async function s4ScanMatrix(): Promise<string[]> {
   // The same player cannot re-claim the same index.
   res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: happy }, jar: jars[0] });
   check(res.status === 400 && res.json?.error === "ALREADY_SCANNED", "same player re-scan rejected (ALREADY_SCANNED)");
+
+  // Attribution is per TEAM: once any member has claimed a marker, another
+  // member of the SAME team is blocked even though they never scanned it
+  // personally (s4d signs in as the second member via the invite code; s4b
+  // stays team-less for the NO_TEAM guard below).
+  const mateName = uniqueUsername("s4d").slice(0, 28);
+  usernames.push(mateName);
+  await provisionUser(mateName, SEED_PLAYER_PASSWORD);
+  const mateJar: Jar = new Map();
+  await signIn(mateJar, mateName, SEED_PLAYER_PASSWORD);
+  res = await api("/api/v1/players/me/team", { method: "POST", body: { team_name: "x", invite_code: scanInvite }, jar: mateJar });
+  check(res.status === 200, "a second member joins the scanning team");
+  res = await api(`/api/v1/games/${SEED_GAME_ID}/scan`, { method: "POST", body: { qr_data: happy }, jar: mateJar });
+  check(res.status === 400 && res.json?.error === "ALREADY_SCANNED", "same-team re-scan by a teammate rejected (ALREADY_SCANNED)");
+  res = await api("/api/v1/players/me/scans", { jar: mateJar });
+  check(res.status === 200 && res.json?.data?.team?.name === "QA-Scan-Team", "member's scan history reads as the team ledger");
+  const ledgerScans = (res.json?.data?.scans ?? []) as Array<{ scanned_by: { username: string } | null; mine: boolean }>;
+  check(
+    ledgerScans.some((s) => s.scanned_by?.username === usernames[0] && s.mine === false),
+    "team ledger names the scanning player (not the reader)"
+  );
 
   // A second player/team can still claim the code but earns 33% less than the
   // original value (rounded, 67% of `points`), and that reduced rate is stable.
@@ -828,6 +850,28 @@ async function s7Ledger(): Promise<void> {
   const byGame = await api(`/api/v1/admin/games/${SEED_GAME_ID}/teams`, { jar: mentorJar });
   check(byGame.status === 200 && Array.isArray(byGame.json?.data), "per-game teams endpoint works");
   check((byGame.json?.data ?? []).length >= 1, "per-game teams endpoint lists teams");
+
+  // Team telemetry exposes the full scan ledger with per-scan attribution to
+  // the player who scanned each marker.
+  const scoredTeams = (res.json?.data ?? []) as Array<{ id: string; total_score: number }>;
+  const ledgerTeam = scoredTeams.find((t) => Number(t.total_score) > 0);
+  check(Boolean(ledgerTeam), "a scored team exists for telemetry inspection");
+  if (ledgerTeam) {
+    const tel = await api(`/api/v1/admin/teams/${ledgerTeam.id}/telemetry`, { jar: mentorJar });
+    check(tel.status === 200, "team telemetry endpoint works");
+    const telScans = (tel.json?.data?.scans ?? []) as Array<{
+      scanned_by: { username: string } | null;
+      points_earned: number;
+    }>;
+    check(telScans.length >= 1, "telemetry lists recorded scans");
+    check(
+      telScans.every((s) => typeof s.points_earned === "number") &&
+        telScans.some((s) => Boolean(s.scanned_by?.username)),
+      "telemetry names the scanning player on every ledger row"
+    );
+    const members = (tel.json?.data?.players ?? []) as unknown[];
+    check(Array.isArray(members) && members.length >= 1, "telemetry lists team members");
+  }
 }
 
 async function main(): Promise<void> {

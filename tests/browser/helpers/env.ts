@@ -19,6 +19,12 @@ function findProjectEnvLocal(): string | null {
  * dotenv behavior (KEY=VALUE, optional surrounding quotes) to keep the test
  * secrets aligned with the running app. Searches upward from the cwd so it
  * works regardless of where the suite is invoked.
+ *
+ * `.env.local` values OVERRIDE the ambient process env. The Playwright worker
+ * pre-loads the repo `.env` (production/Neon credentials) into the process
+ * before any spec module runs; without this precedence the browser suite's DB
+ * helpers would write test fixtures into the NEON database while `next dev`
+ * serves the LOCAL one (Next.js itself prefers `.env.local` over `.env`).
  */
 export function loadEnvLocal(): void {
   const envPath = findProjectEnvLocal();
@@ -37,8 +43,6 @@ export function loadEnvLocal(): void {
     ) {
       value = value.slice(1, -1);
     }
-    if (!(key in process.env)) {
-      process.env[key] = value;
-    }
+    process.env[key] = value;
   }
 }

@@ -51,14 +51,67 @@ export interface PlayerMeView {
   team: PlayerTeamView | null;
 }
 
-/* ── Player: scan history ── */
+/* ── Player: scan history (team-ledger aware) ── */
 
 export interface ScanLogEntry {
   id: string;
+  index_id?: string;
   index_label: string;
   points_earned: number;
   scanned_at: string;
   location_name?: string | null;
+  round_id?: string | null;
+  scanned_by?: { username: string; nickname: string | null } | null;
+  mine?: boolean;
+}
+
+export interface TeamScanLedger {
+  total: number;
+  total_points: number;
+  mine: { total: number; total_points: number };
+  team: {
+    id: string;
+    name: string;
+    total_score: number;
+    member_count: number;
+  } | null;
+  scans: ScanLogEntry[];
+}
+
+/* ── Mentor: team telemetry / scan ledger ── */
+
+export interface MentorTeamScanRow {
+  id: string;
+  index_label: string;
+  index_points: number;
+  points_earned: number;
+  scanned_at: string;
+  scanned_by: { username: string; nickname: string | null } | null;
+  resolved: boolean;
+  gps_lat?: number | null;
+  gps_lng?: number | null;
+}
+
+export interface MentorTeamMemberEntry {
+  id: string;
+  username: string;
+  nickname: string | null;
+  status: string;
+  total_score: number;
+}
+
+export interface MentorTeamTelemetry {
+  id: string;
+  name: string;
+  invite_code: string;
+  total_score: number;
+  eliminated: boolean;
+  captain_id: string | null;
+  captain_username: string | null;
+  member_count: number;
+  players: MentorTeamMemberEntry[];
+  scans: MentorTeamScanRow[];
+  recent_scans: number;
 }
 
 /* ── Player: /teams/me ── */

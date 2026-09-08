@@ -54,3 +54,6 @@ blob-report/
 # ── Environment (production) ──────────
 .env.production
 .env.development
+.neon
+.vercel
+.env*

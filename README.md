@@ -75,8 +75,9 @@ npm run db:studio    # open Prisma Studio GUI
    signed, time-fresh payload.
 4. **Play.** A player in a team scans a QR at a checkpoint (`/scan`). If the index is an
    **enigma**, they must solve a cipher puzzle; **trap** indexes arm a timed relay
-   sequence that can flood/breach the vault. Points land on the player → summed to the
-   team.
+   sequence that can flood/breach the vault. Scans are attributed to the **team**:
+   the points land on the team leaderboard and are mirrored to the scanning
+   player's own tally as their contribution.
 5. **Rounds & elimination.** The mentor drives the game state machine (see below): each
    round the bottom `elimination_pct` of teams by score are eliminated, a new round
    starts, until the mentor declares a winner.
@@ -91,13 +92,34 @@ npm run db:studio    # open Prisma Studio GUI
   per-team). A locked scan returns `SEQUENCE_LOCKED` and awards nothing.
 - A hint (`hint`, ≤500 chars) is only revealed **after** a marker is secured, pointing
   at the next step.
-- **Trap** indexes impose a penalty instead of a reward. `points` is the penalty
-  magnitude; a scan puts that many points "at risk" (`at_risk`). Answering the trap's
-  question correctly halves the penalty (`-round(points × 0.5)`); a wrong answer costs
-  the full `-points`. Traps may define `answer_options` to render as multiple choice —
-  submitting anything outside the accepted options is rejected (`ANSWER_NOT_OPTION`).
-- The seed (`prisma/seed.ts`) installs a 20-marker course (16 safe + 4 traps) with
-  `sequence_order` 1..20 for local development.
+- **Trap** indexes impose a penalty instead of a reward — and they are **never
+  sequence steps**. Traps carry `sequence_order` 0, so they are standalone printed
+  QR markers a team hits at any moment, in any order, with no unlocks required.
+  `points` is the penalty magnitude; a scan puts that many points "at risk"
+  (`at_risk`). Answering the trap's question correctly halves the penalty
+  (`-round(points × 0.5)`); a wrong answer costs the full `-points`. Traps may
+  define `answer_options` to render as multiple choice — submitting anything
+  outside the accepted options is rejected (`ANSWER_NOT_OPTION`).
+- The seed (`prisma/seed.ts`) installs a 20-marker course: **16 sequenced safe QR
+  codes (`sequence_order` 1..16)** plus **4 standalone trap QR markers
+  (`sequence_order` 0)** for local development. Only safe QR codes form the sequence.
+
+### Team-attributed scans & logs
+
+- Every scan is owned by the **team** that performs it. The database guarantees a
+  marker can be claimed **once per team** (`@@unique(team_id, index_id)`) on top of
+  the per-player guard: when a member of a team already scanned a QR, another member
+  of the **same team** cannot re-scan it (`ALREADY_SCANNED`) — while a different team
+  may still claim the same physical code at its (reduced) pool rate.
+- Leaderboards, ranks, and elimination always use `team.total_score`; there is no
+  per-player leaderboard. The player's own `total_score` is kept solely as an
+  individual contribution display.
+- **Logs are per team.** The player's `/logs` page shows the team's scan ledger and
+  names who scanned each marker (with a "You" badge on own scans). The mentor
+  **team-detail page** (`/mentor/teams/:id`) exposes the same ledger per team with
+  members and scan history, backed by `GET /api/v1/admin/teams/:id/telemetry`.
+- A trap stays a **scanner-only** asset: only the member who armed it may submit the
+  answer.
 
 ---
 
@@ -116,7 +138,7 @@ cp .env.example .env.local
 npm run db:generate
 npm run db:push
 
-# 4. Seed demo data (mentor, game, round, 5 indexes)
+# 4. Seed demo data (mentor, game, round, 20 markers)
 npm run db:seed
 
 # 5. Run the dev server
@@ -181,8 +203,9 @@ openssl rand -hex 32
   production `NODE_ENV` without them.
 - A game: `ESCAPE ROOM — Kick-off Week 2026` (3 rounds, 1800s, 20% cut) — staged
   **`PENDING`** (no active round yet).
-- The 20-marker hunt: 16 safe indexes + 4 QCM traps with sequenced
-  `sequence_order` (1–20), each with a `hint` (`answer_options` on the traps),
+- The 20-marker hunt: 16 safe indexes with `sequence_order` **1–16** + 4 QCM traps
+  left **unsequenced** (`sequence_order` 0, standalone QR markers), each with a
+  `hint` (`answer_options` on the traps),
   plus a matching scannable `QrCode` row per index (so mentor QR generation +
   printing works immediately, even while the game is PENDING).
 
@@ -318,7 +341,7 @@ shape with `success:false` (helper types in `lib/types/api.ts`). Admin routes re
 | GET | `/api/v1/games/[id]/leaderboard` | leaderboard (DB fallback in `lib/game/leaderboard.ts`) |
 | POST | `/api/v1/games/[id]/scan` | resolve a QR scan (rate-limited, QR-validated) |
 | GET | `/api/v1/players/me` | current player |
-| GET | `/api/v1/players/me/scans` | player's scan history |
+| GET | `/api/v1/players/me/scans` | team scan ledger (names the scanning player; personal fallback without a team) |
 | GET/POST | `/api/v1/players/me/team` | my team |
 
 ### SSE

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
 import { ErrorState } from "@/components/ui/error-state";
@@ -142,9 +143,10 @@ export default function MentorTeamsPage() {
           </div>
         ) : (
           rankedTeams.map((team) => (
-            <div
+            <Link
               key={team.id}
-              className={`bg-surface-container rounded-xl border p-5 transition-all ${
+              href={`/mentor/teams/${team.id}`}
+              className={`block bg-surface-container rounded-xl border p-5 transition-all ${
                 team.eliminated
                   ? "border-outline-variant/20 opacity-60"
                   : "border-outline-variant/30 hover:border-primary/30"
@@ -198,8 +200,12 @@ export default function MentorTeamsPage() {
                   <p className="font-headline text-xl text-primary font-bold">{team.total_score}</p>
                   <p className="font-label text-label-sm text-on-surface-variant">pts</p>
                 </div>
+
+                <span className="text-on-surface-variant">
+                  <span className="material-symbols-outlined">chevron_right</span>
+                </span>
               </div>
-            </div>
+            </Link>
           ))
         )}
       </div>

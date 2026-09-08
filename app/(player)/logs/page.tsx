@@ -3,12 +3,17 @@
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api-client";
 import { ErrorState } from "@/components/ui/error-state";
-import type { ActiveGameView, PlayerMeView, ScanLogEntry } from "@/lib/types/api-responses";
+import type {
+  ActiveGameView,
+  PlayerMeView,
+  TeamScanLedger,
+} from "@/lib/types/api-responses";
 
 export default function LogsPage() {
-  const [scans, setScans] = useState<ScanLogEntry[]>([]);
+  const [scans, setScans] = useState<TeamScanLedger["scans"]>([]);
   const [scanTotal, setScanTotal] = useState(0);
-  const [pointTotal, setPointTotal] = useState(0);
+  const [team, setTeam] = useState<TeamScanLedger["team"]>(null);
+  const [myTotal, setMyTotal] = useState(0);
   const [game, setGame] = useState<ActiveGameView | null>(null);
   const [player, setPlayer] = useState<PlayerMeView | null>(null);
   const [loading, setLoading] = useState(true);
@@ -19,16 +24,19 @@ export default function LogsPage() {
     setError(null);
     try {
       const [scansRes, gameRes, playerRes] = await Promise.all([
-apiFetch<{ success: boolean; data?: { scans: ScanLogEntry[]; total: number; total_points: number } }>(
-        "/api/v1/players/me/scans"
-      ),
+        apiFetch<{ success: boolean; data?: TeamScanLedger }>(
+          "/api/v1/players/me/scans"
+        ),
         apiFetch<{ success: boolean; data: ActiveGameView | null }>("/api/v1/games/active"),
         apiFetch<{ success: boolean; data: PlayerMeView }>("/api/v1/players/me"),
       ]);
       if (scansRes.success && scansRes.data) {
         setScans(scansRes.data.scans);
         setScanTotal(scansRes.data.total);
-        setPointTotal(scansRes.data.total_points);
+        setTeam(scansRes.data.team);
+        setMyTotal(
+          scansRes.data.mine?.total_points ?? scansRes.data.total_points
+        );
       }
       if (gameRes.success && gameRes.data) setGame(gameRes.data);
       if (playerRes.success) setPlayer(playerRes.data);
@@ -49,7 +57,7 @@ apiFetch<{ success: boolean; data?: { scans: ScanLogEntry[]; total: number; tota
       <div className="px-4 space-y-6 max-w-lg mx-auto pt-2">
         <div className="text-center space-y-1">
           <h1 className="font-headline text-headline-lg-mobile text-on-surface etched-text">
-            Scan Logs
+            Team Scan Log
           </h1>
         </div>
         <ErrorState message={error} onRetry={load} />
@@ -61,36 +69,40 @@ apiFetch<{ success: boolean; data?: { scans: ScanLogEntry[]; total: number; tota
     <div className="px-4 space-y-6 max-w-lg mx-auto">
       <div className="text-center space-y-1 mt-2">
         <h1 className="font-headline text-headline-lg-mobile text-on-surface etched-text">
-          Scan Logs
+          Team Scan Log
         </h1>
         <p className="font-label text-label-sm text-on-surface-variant uppercase tracking-widest">
-          {game ? `Round ${game.current_round} — ${game.title}` : "Scan history"}
+          {team
+            ? `${team.name} — ${game ? `Round ${game.current_round}` : "Team history"}`
+            : game
+              ? `Round ${game.current_round} — ${game.title}`
+              : "Scan history"}
         </p>
       </div>
 
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-surface-container rounded-lg border border-outline-variant/30 p-3 text-center">
           <p className="font-headline text-2xl text-primary font-bold">
+            {loading ? "--" : team ? team.total_score : player?.total_score ?? 0}
+          </p>
+          <p className="font-label text-label-sm text-on-surface-variant uppercase">
+            Team Score
+          </p>
+        </div>
+        <div className="bg-surface-container rounded-lg border border-outline-variant/30 p-3 text-center">
+          <p className="font-headline text-2xl text-primary font-bold">
             {loading ? "--" : scanTotal}
           </p>
           <p className="font-label text-label-sm text-on-surface-variant uppercase">
-            Scans
+            Markers
           </p>
         </div>
         <div className="bg-surface-container rounded-lg border border-outline-variant/30 p-3 text-center">
           <p className="font-headline text-2xl text-primary font-bold">
-            {loading ? "--" : pointTotal}
+            {loading ? "--" : myTotal}
           </p>
           <p className="font-label text-label-sm text-on-surface-variant uppercase">
-            Points
-          </p>
-        </div>
-        <div className="bg-surface-container rounded-lg border border-outline-variant/30 p-3 text-center">
-          <p className="font-headline text-2xl text-primary font-bold">
-            {loading ? "--" : player?.total_score ?? 0}
-          </p>
-          <p className="font-label text-label-sm text-on-surface-variant uppercase">
-            Total
+            My Points
           </p>
         </div>
       </div>
@@ -126,10 +138,21 @@ apiFetch<{ success: boolean; data?: { scans: ScanLogEntry[]; total: number; tota
                 </span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-headline text-sm text-on-surface truncate">
-                  {scan.index_label}
-                </p>
-                <p className="font-label text-label-sm text-on-surface-variant">
+                <div className="flex items-center gap-2">
+                  <p className="font-headline text-sm text-on-surface truncate">
+                    {scan.index_label}
+                  </p>
+                  {scan.mine && (
+                    <span className="shrink-0 rounded-full bg-primary-container border border-primary/30 px-2 py-0.5 font-label text-label-xs text-primary">
+                      You
+                    </span>
+                  )}
+                </div>
+                <p className="font-label text-label-sm text-on-surface-variant truncate">
+                  {scan.scanned_by?.nickname ??
+                    scan.scanned_by?.username ??
+                    (scan.mine ? "You" : "Team member")}
+                  {" · "}
                   {new Date(scan.scanned_at).toLocaleTimeString()}
                   {scan.location_name && ` · ${scan.location_name}`}
                 </p>

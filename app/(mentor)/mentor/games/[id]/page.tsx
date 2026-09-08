@@ -378,12 +378,13 @@ export default function MentorGameDetailPage() {
         ) : (
           <div className="space-y-2">
             {game.teams.map((t) => (
-              <div
+              <Link
                 key={t.id}
+                href={`/mentor/teams/${t.id}`}
                 className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
                   t.eliminated
                     ? "opacity-50 bg-surface-container-low border-outline-variant/20"
-                    : "bg-surface-container-low border-outline-variant/20"
+                    : "bg-surface-container-low border-outline-variant/20 hover:border-primary/30"
                 }`}
               >
                 <div
@@ -406,7 +407,10 @@ export default function MentorGameDetailPage() {
                 <span className="font-headline text-lg text-primary font-bold">
                   {t.total_score}
                 </span>
-              </div>
+                <span className="text-on-surface-variant">
+                  <span className="material-symbols-outlined text-lg">chevron_right</span>
+                </span>
+              </Link>
             ))}
           </div>
         )}

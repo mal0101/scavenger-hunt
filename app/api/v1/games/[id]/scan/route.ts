@@ -72,7 +72,7 @@ export async function POST(
 
     const teamRow = await db.team.findUnique({
       where: { id: player.team_id },
-      select: { eliminated: true },
+      select: { eliminated: true, total_score: true },
     });
 
     if (teamRow?.eliminated) {
@@ -125,6 +125,24 @@ export async function POST(
 
     if (existingScan) {
       return apiError("You have already scanned this index", "ALREADY_SCANNED");
+    }
+
+    // Scans are attributed to the TEAM: once any member has claimed a marker,
+    // no other member of the same team may re-claim it. A different team can
+    // still scan the same QR (pool-drained pool in the index branch).
+    const teamClaim = await db.scan.findFirst({
+      where: {
+        team_id: teamId,
+        index_id: payload!.index_id,
+      },
+      select: { id: true },
+    });
+
+    if (teamClaim) {
+      return apiError(
+        "Your team has already scanned this index",
+        "ALREADY_SCANNED"
+      );
     }
 
     // Sequential course: a checkpoint with sequence_order > 0 only unlocks once
@@ -183,7 +201,7 @@ export async function POST(
           answer_options: parseAnswerOptions(index.answer_options),
           hint: index.hint ?? null,
           at_risk: index.points,
-          team_total: player.total_score,
+          team_total: teamRow?.total_score ?? 0,
         },
         "Trap activated"
       );

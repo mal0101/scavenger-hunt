@@ -25,6 +25,12 @@ export async function GET(
         scans: {
           include: {
             index: { select: { id: true, label: true, points: true } },
+            player: {
+              select: {
+                id: true,
+                user: { select: { username: true, nickname: true } },
+              },
+            },
           },
           orderBy: { scanned_at: "desc" },
         },
@@ -55,6 +61,13 @@ export async function GET(
         index_points: s.index.points,
         points_earned: s.points_earned,
         scanned_at: s.scanned_at,
+        scanned_by: s.player.user
+          ? {
+              username: s.player.user.username,
+              nickname: s.player.user.nickname,
+            }
+          : null,
+        resolved: s.resolved,
         gps_lat: s.gps_lat,
         gps_lng: s.gps_lng,
       })),

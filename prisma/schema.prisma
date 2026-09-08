@@ -195,6 +195,7 @@ model Scan {
   index  Index   @relation(fields: [index_id], references: [id], onDelete: Cascade)
 
   @@unique([player_id, index_id])
+  @@unique([team_id, index_id])
   @@index([team_id])
   @@index([game_id])
   @@map("scans")

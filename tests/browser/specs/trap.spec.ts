@@ -33,16 +33,20 @@ test.beforeAll(async () => {
   await rearmSeededCodes((await getActiveGame()).id);
 });
 
-// The seeded course ends with the 4 floor-question traps (QCM, steps 17-20).
-// Pick the first trap deterministically by enigma_type — never by content
-// strings, which the course authors tune.
+// The seeded course ends with the 4 floor-question traps (QCM). They are
+// STANDALONE markers: sequence_order 0, so a team with zero prior scans can
+// hit one at any moment. Pick the first trap deterministically by enigma_type
+// — never by content strings, which the course authors tune.
 async function setup() {
   const game = await getActiveGame();
   const indexes = await getIndexesForGame(game.id);
   const index = indexes.find((idx) => idx.enigma_type === "trap") ?? null;
   if (!index) throw new Error("Seed trap not found");
+  if (index.sequence_order !== 0) {
+    throw new Error(`Expected trap to be unsequenced, got sequence_order ${index.sequence_order}`);
+  }
   const qrCode = await getQrCodeForIndex(index.id);
-  return { gameId: game.id, index, codeId: qrCode.id, indexes };
+  return { gameId: game.id, index, codeId: qrCode.id };
 }
 
 async function joinTeam(page: Page): Promise<void> {
@@ -54,40 +58,6 @@ async function joinTeam(page: Page): Promise<void> {
   if (!res.json?.success) {
     throw new Error(`Team creation failed: ${JSON.stringify(res.json)}`);
   }
-}
-
-/** Walk the sequential course up to (but not including) `targetOrder` so the
- *  trap unlocks for this team. Returns the total the team actually banked —
- *  read from the profile live, because previously-claimed steps may pay out
- *  the reduced pool value instead of the full fixture points. */
-async function unlockPriorSteps(
-  page: Page,
-  gameId: string,
-  indexes: Awaited<ReturnType<typeof getIndexesForGame>>,
-  targetOrder: number
-): Promise<number> {
-  const prior = indexes
-    .filter((i) => i.sequence_order > 0 && i.sequence_order < targetOrder)
-    .sort((a, b) => a.sequence_order - b.sequence_order);
-  for (const idx of prior) {
-    const qr = await getQrCodeForIndex(idx.id);
-    const res = await api<{ success: boolean; error?: string }>(
-      page,
-      `/api/v1/games/${gameId}/scan`,
-      { method: "POST", body: { qr_data: encodeQrPayload(createQrPayload(idx.id, gameId, qr.id)) } }
-    );
-    if (!res.json?.success) {
-      throw new Error(`Pre-scan of step ${idx.sequence_order} failed: ${JSON.stringify(res.json)}`);
-    }
-  }
-  const profile = await api<{
-    success: boolean;
-    data: { total_score: number } | null;
-  }>(page, "/api/v1/players/me");
-  if (!profile.json?.success || profile.json.data === null) {
-    throw new Error(`Could not read banked total: ${JSON.stringify(profile.json)}`);
-  }
-  return profile.json.data.total_score;
 }
 
 /** POST the signed trap QR through the API (the same validator the camera
@@ -104,13 +74,13 @@ async function scanTrapViaApi(page: Page, gameId: string, index: { id: string },
 }
 
 test.describe("trap challenge", () => {
-  test("trap scan settles no points, shows the question, and a wrong answer drains points", async ({
+  test("an unsequenced trap QR is scannable with zero prior scans and a wrong answer drains points", async ({
     page,
   }) => {
     await authPlayer(page, P1);
     await joinTeam(page);
-    const { gameId, index, codeId, indexes } = await setup();
-    const stepsTotal = await unlockPriorSteps(page, gameId, indexes, index.sequence_order);
+    const { gameId, index, codeId } = await setup();
+    // No prior steps are unlocked: the trap must fire immediately (sequence 0).
     const { res } = await scanTrapViaApi(page, gameId, index, codeId);
 
     // A trap yields no immediate points and stays pending.
@@ -132,7 +102,7 @@ test.describe("trap challenge", () => {
         index_label: index.label,
         game_id: gameId,
         points_earned: 0,
-        team_total: stepsTotal,
+        team_total: 0,
         scan_id: scanId,
         question: res.json.data?.question,
         at_risk: index.points,
@@ -154,12 +124,12 @@ test.describe("trap challenge", () => {
       await expect(page.getByText("Next Checkpoint Hint")).not.toBeVisible();
     }
 
-    // Player/team balance reflects only the pre-scan steps until the answer settles.
+    // Player/team balance reflects zero until the answer settles.
     const before = await api<{
       success: boolean;
       data: { total_score: number; team: { total_score: number } | null };
     }>(page, "/api/v1/players/me");
-    expect(before.json?.data?.total_score).toBe(stepsTotal);
+    expect(before.json?.data?.total_score).toBe(0);
 
     // Engage the trap page and answer WRONG.
     await page.getByText("Engage Manual Override").click();
@@ -184,13 +154,13 @@ test.describe("trap challenge", () => {
     await expect(page.getByText("MANIFOLD BREACHED")).toBeVisible({ timeout: 10000 });
     await expect(page.getByText(`-${index.points} pts lost`)).toBeVisible();
 
-    // Balance dropped by the full trap points (on top of the prior steps).
+    // Balance dropped by the full trap points (on top of the zero base).
     const after = await api<{
       success: boolean;
       data: { total_score: number; team: { total_score: number } | null };
     }>(page, "/api/v1/players/me");
-    expect(after.json?.data?.total_score).toBe(stepsTotal - index.points);
-    expect(after.json?.data?.team?.total_score).toBe(stepsTotal - index.points);
+    expect(after.json?.data?.total_score).toBe(-index.points);
+    expect(after.json?.data?.team?.total_score).toBe(-index.points);
   });
 
   test("a trap QR stays scannable for another team and a correct answer only halved the penalty", async ({
@@ -198,10 +168,9 @@ test.describe("trap challenge", () => {
   }) => {
     await authPlayer(page, P2);
     await joinTeam(page);
-    const { gameId, index, codeId, indexes } = await setup();
-    const stepsTotal = await unlockPriorSteps(page, gameId, indexes, index.sequence_order);
+    const { gameId, index, codeId } = await setup();
 
-    // The same trap code is NOT depleted for a second team.
+    // The same trap code is NOT depleted for a second team (no prior scans).
     const { res } = await scanTrapViaApi(page, gameId, index, codeId);
     expect(res.json.success).toBe(true);
     expect(res.json.data?.pending).toBe(true);
@@ -229,7 +198,7 @@ test.describe("trap challenge", () => {
       success: boolean;
       data: { total_score: number; team: { total_score: number } | null };
     }>(page, "/api/v1/players/me");
-    expect(profile.json?.data?.total_score).toBe(stepsTotal + half);
+    expect(profile.json?.data?.total_score).toBe(half);
 
     // Re-answering the same scan is rejected.
     const again = await api<{ success: boolean; error?: string }>(

@@ -1,11 +1,17 @@
 import { expect } from "@playwright/test";
 import { test } from "../fixtures/base";
-import { loginAs, SEED_ADMIN_USERNAME, SEED_ADMIN_PASSWORD } from "../helpers/auth";
+import { loginAs, api, SEED_ADMIN_USERNAME, SEED_ADMIN_PASSWORD } from "../helpers/auth";
 import {
   createQaGame,
+  createUser,
+  cleanupUsers,
   getActiveGame,
   getIndexesForGame,
+  getQrCodeForIndex,
 } from "../helpers/db";
+import { createQrPayload, encodeQrPayload } from "../helpers/qr";
+
+const PLAYER_PW = "TestPass_2026!";
 
 let createdGameId: string | null = null;
 let gameId: string;
@@ -138,5 +144,72 @@ test.describe("mentor admin UI", () => {
     await expect(modal.getByText(label)).toBeVisible();
     await expect(modal.getByRole("img", { name: label })).toBeVisible({ timeout: 15000 });
     await expect(modal.getByText(/Scan this code with the player app\./)).toBeVisible();
+  });
+
+  test("team detail page shows the scan ledger with the scanning player named", async ({
+    page,
+    browser,
+  }) => {
+    await signIn(page);
+
+    // A player account claims a marker so there is a scan to inspect. The scan
+    // is attributed to the team; the mentor ledger must name the scanning player.
+    const playerName = `qa_ledger_run_${Date.now().toString(36)}`;
+    const teamName = `QA-Ledger-${Date.now()}`;
+    const playerCtx = await browser.newContext();
+    let teamId = "";
+    let indexLabel = "";
+    try {
+      const playerPage = await playerCtx.newPage();
+      await createUser(playerName, PLAYER_PW);
+      await loginAs(playerPage, playerName, PLAYER_PW);
+
+      const created = await api<{ success: boolean; data?: { id: string } }>(
+        playerPage,
+        "/api/v1/players/me/team",
+        { method: "POST", body: { team_name: teamName } }
+      );
+      expect(created.json.success).toBe(true);
+      teamId = created.json?.data?.id ?? "";
+
+      const step1 = (await getIndexesForGame(gameId)).find(
+        (i) => i.sequence_order === 1
+      );
+      if (!step1) throw new Error("no sequence step 1 for the ledger test");
+      indexLabel = step1.label;
+      const qr = await getQrCodeForIndex(step1.id);
+      const scan = await api<{ success: boolean }>(
+        playerPage,
+        `/api/v1/games/${gameId}/scan`,
+        {
+          method: "POST",
+          body: {
+            qr_data: encodeQrPayload(createQrPayload(step1.id, gameId, qr.id)),
+          },
+        }
+      );
+      expect(scan.json.success).toBe(true);
+    } finally {
+      await playerCtx.close();
+    }
+
+    expect(teamId).not.toBe("");
+
+    // Mentor view: navigate to the team's scan ledger and see the scan + player.
+    await page.goto(`/mentor/teams/${teamId}`);
+    await expect(page.getByRole("heading", { name: /Scan Ledger/ })).toBeVisible();
+    await expect(page.getByText(indexLabel).first()).toBeVisible();
+    await expect(page.getByText(playerName).first()).toBeVisible();
+
+    // Clean up the QA team + player so no orphan rows survive the run.
+    const cleanCtx = await browser.newContext();
+    try {
+      const c = await cleanCtx.newPage();
+      await loginAs(c, playerName, PLAYER_PW);
+      await api(c, "/api/v1/players/me/team", { method: "DELETE" });
+    } finally {
+      await cleanCtx.close();
+    }
+    await cleanupUsers([playerName]);
   });
 });

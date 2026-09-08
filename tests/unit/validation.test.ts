@@ -213,6 +213,24 @@ test("validateIndexEnigma enforces trap question/answer and QCM answer membershi
   );
 });
 
+test("validateIndexEnigma forbids traps from being sequence steps", () => {
+  assert.notEqual(
+    validateIndexEnigma({ enigma_type: "trap", question: "Q", answer: "a", sequence_order: 5 }),
+    null,
+    "a trap with a positive sequence position is rejected"
+  );
+  assert.equal(
+    validateIndexEnigma({ enigma_type: "trap", question: "Q", answer: "a", sequence_order: 0 }),
+    null,
+    "an unsequenced trap is valid"
+  );
+  assert.equal(
+    validateIndexEnigma({ enigma_type: "enigma", question: "Q", answer: "a", sequence_order: 5 }),
+    null,
+    "safe enigmas keep their sequence position"
+  );
+});
+
 test("parseAnswerOptions decodes stored JSON arrays and tolerates garbage", () => {
   assert.deepEqual(parseAnswerOptions('["steam","coal"]'), ["steam", "coal"]);
   assert.equal(parseAnswerOptions(null), null);

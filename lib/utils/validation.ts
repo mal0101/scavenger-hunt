@@ -90,6 +90,9 @@ export function parseAnswerOptions(
  *  fields that are actually present. Returns an error message or null. */
 export function validateIndexEnigma(input: Partial<IndexInput>): string | null {
   if (input.enigma_type === "trap") {
+    if (input.sequence_order !== undefined && input.sequence_order > 0) {
+      return "Trap indexes cannot be sequence steps (Sequence Position must be 0)";
+    }
     if (input.question !== undefined && !input.question.trim()) {
       return "Trap indexes require a question";
     }

@@ -4,6 +4,8 @@ import bcrypt from "bcryptjs";
 const db = new PrismaClient();
 
 const ADMIN_USERNAME = "mentor";
+const ADMIN_PHONE =
+  process.env.CREDENTIALS_SEED_ADMIN_PHONE ?? "+212600000000";
 const ADMIN_PASSWORD =
   process.env.CREDENTIALS_SEED_ADMIN_PASSWORD ?? "ChangeMe_Admin_2026!";
 const PLAYER_PASSWORD =
@@ -30,27 +32,30 @@ async function main() {
       password_hash: adminHash,
       nickname: "Admin Mentor",
       role: "MENTOR",
-      phone_number: "+212600000000",
+      phone_number: ADMIN_PHONE,
     },
     create: {
       username: ADMIN_USERNAME,
       password_hash: adminHash,
       nickname: "Admin Mentor",
       role: "MENTOR",
-      phone_number: "+212600000000",
+      phone_number: ADMIN_PHONE,
     },
   });
   console.log(`Mentor: ${mentor.username} (${mentor.phone_number})`);
 
   // The hunt is staged PENDING (no active round): the mentor starts it from
   // the dashboard when the event goes live, which is what creates round 1.
+  const gameTitle = "ESCAPE ROOM — Kick-off Week 2026";
+  const gameDescription =
+    "A steampunk scavenger hunt across the ENSAM Casablanca campus";
   const game = await db.game.upsert({
     where: { id: "00000000-0000-0000-0000-000000000001" },
-    update: {},
+    update: { title: gameTitle, description: gameDescription },
     create: {
       id: "00000000-0000-0000-0000-000000000001",
-      title: "ESCAPE ROOM ÔÇö Kick-off Week 2026",
-      description: "A steampunk scavenger hunt across the ENSAM Casablanca campus",
+      title: gameTitle,
+      description: gameDescription,
       max_rounds: 3,
       round_duration: 1800,
       elimination_pct: 0.2,
@@ -69,11 +74,17 @@ async function main() {
   // (la POUBELLE revient 2 fois dans le fichier mais doit être trouvée une
   // seule fois — Fiche 9 fusionnée dans "Poubelle du parking"). Le dernier QR
   // du parcours est SALLE ADE (fiche 16 = "fiche 17", dernier QR code).
-  // Les 4 "trap" sont les questions d'étages (QCM) fournies séparément
-  // (trap 1..4) ; un seul `enigma_type` par index : "enigma" ou "trap".
+  //
+  // TRAQUENARDS (trap) : les 4 questions d'étages (QCM) sont des marqueurs
+  // QR INDÉPENDANTS — jamais des étapes de la séquence. Leur sequence_order
+  // est 0, donc ils sont scannables à n'importe quel moment, dans n'importe
+  // quel ordre, sans débloquer d'étape préalable. Seuls les 16 QR "safe"
+  // (enigma) forment la séquence 1..16. Un `enigma_type` par index :
+  // "enigma" ou "trap".
   const indexes = [
     {
       label: "Buvette",
+      points: 15,
       display_code: "2 - 8 - 8 - 3 - 8 - 8 - 3",
       description: "Code à afficher : 2 - 8 - 8 - 3 - 8 - 8 - 3",
       hint: "Clavier de téléphone Nokia pile (2 = A/B/C, 3 = D/E/F, 8 = T/U/V).",
@@ -84,6 +95,7 @@ async function main() {
     },
     {
       label: "Poubelle du parking",
+      points: 15,
       display_code: "16 - 15 - 21 - 2 - 5 - 12 - 12 - 5",
       description: "Code à afficher : 16 - 15 - 21 - 2 - 5 - 12 - 12 - 5",
       hint: "Alphabet numéroté (1 = A, 2 = B, 3 = C...).",
@@ -94,6 +106,7 @@ async function main() {
     },
     {
       label: "Banc vert",
+      points: 15,
       display_code: "C A N B — R E V T",
       description: "Code à afficher : C A N B — R E V T",
       hint: "Anagramme (remettez les lettres dans l'ordre).",
@@ -104,6 +117,7 @@ async function main() {
     },
     {
       label: "Terrain de foot",
+      points: 20,
       display_code: "— 🇪 —",
       description: "Code à afficher : — 🇪 —",
       hint: "Clé : =T, =R, =A, =I, =N, =D, 🇪=E, =F, =O.",
@@ -114,6 +128,7 @@ async function main() {
     },
     {
       label: "Conteneur",
+      points: 20,
       display_code: "E Q P V G P G W T",
       description: "Code à afficher : E Q P V G P G W T",
       hint: "Code César -2 (E → C, Q → O) : décalez chaque lettre de 2 rangs vers l'arrière dans l'alphabet.",
@@ -124,6 +139,7 @@ async function main() {
     },
     {
       label: "Bancs du parking 1",
+      points: 25,
       display_code: "[A1-A2-A3-A4-A5] — [A1-B2] — [B3-A2-B4-B5-C1-C2-C3]",
       description:
         "Code à afficher : [A1-A2-A3-A4-A5] — [A1-B2] — [B3-A2-B4-B5-C1-C2-C3]",
@@ -136,6 +152,7 @@ async function main() {
     },
     {
       label: "Bancs du parking 2",
+      points: 30,
       display_code: "SNCAB UD GNIKRAP2",
       description: "Code à afficher : SNCAB UD GNIKRAP2",
       hint: "Anagramme : les lettres de chaque mot ont été mélangées.",
@@ -146,6 +163,7 @@ async function main() {
     },
     {
       label: "Gradins du terrain",
+      points: 20,
       display_code: null,
       description: "Énigme : escaliers des supporters au bord du terrain.",
       hint: "Taillés en escaliers au bord du terrain, ils portent les supporters en colère ou en joie lors de chaque match.",
@@ -157,6 +175,7 @@ async function main() {
     },
     {
       label: "Terrain de volley",
+      points: 25,
       display_code:
         "Mot 1 : 25 - 5 = ? ; 10 - 5 = ? ; 20 - 2 = ? ; 22 - 4 = ? ; 5 - 4 = ? ; 15 - 6 = ? ; 20 - 6 = ? — Mot 2 : 10 - 6 = ? ; 8 - 3 = ? — Mot 3 : 25 - 3 = ? ; 20 - 5 = ? ; 15 - 3 = ? ; 20 - 8 = ? ; 12 - 7 = ? ; 3 - 5 = ?",
       description: "Code à calculer : soustractions simples.",
@@ -168,6 +187,7 @@ async function main() {
     },
     {
       label: "Réception",
+      points: 25,
       display_code: "SFDFQUJPO",
       description: "Code à afficher : SFDFQUJPO",
       hint: "Code César +1 : chaque lettre a été avancée d'un rang (S − 1 = R, F − 1 = E...). Détail de la résolution : S−1=R, F−1=E, D−1=C, F−1=E, Q−1=P, U−1=T, J−1=I, P−1=O, O−1=N.",
@@ -178,6 +198,7 @@ async function main() {
     },
     {
       label: "Terrain de basket",
+      points: 20,
       display_code: "R E T R A I N — E D — S A B K E T",
       description: "Code à afficher : R E T R A I N — E D — S A B K E T",
       hint: "Anagramme simple : les lettres de chaque mot ont été mélangées. Détail de la résolution : R E T R A I N → TERRAIN ; E D → DE ; S A B K E T → BASKET.",
@@ -188,6 +209,7 @@ async function main() {
     },
     {
       label: "Chemin de la porte principale vers la buvette",
+      points: 25,
       display_code: null,
       description: null,
       question:
@@ -199,6 +221,7 @@ async function main() {
     },
     {
       label: "Gradins en face de la buvette",
+      points: 15,
       display_code: null,
       description: null,
       question:
@@ -210,6 +233,7 @@ async function main() {
     },
     {
       label: "Escaliers des terrains",
+      points: 20,
       display_code: null,
       description: null,
       question:
@@ -221,6 +245,7 @@ async function main() {
     },
     {
       label: "Poste de sécurité du parking",
+      points: 25,
       display_code: "QPTUF EF TFDVSJUF EV QBSLJOH",
       description: "Code à afficher : QPTUF EF TFDVSJUF EV QBSLJOH",
       hint: "Code César +1 : chaque lettre a été avancée d'une case (QPTUF − 1 → POSTE...). Détail de la résolution : QPTUF−1 → POSTE ; EF−1 → DE ; TFDVSJUF−1 → SECURITE ; EV−1 → DU ; QBSLJOH−1 → PARKING.",
@@ -231,6 +256,7 @@ async function main() {
     },
     {
       label: "Salle ADE",
+      points: 15,
       display_code: "✦ ★ ♣ ♣ ♥ — ★ ◆ ♥",
       description: "Code à afficher : ✦ ★ ♣ ♣ ♥ — ★ ◆ ♥",
       hint: "Table de correspondance : ✦ = S, ★ = A, ♣ = L, ♥ = E, ◆ = D. Détail de la résolution : ✦★♣♣♥ → SALLE ; ★◆♥ → ADE.",
@@ -241,6 +267,7 @@ async function main() {
     },
     {
       label: "Salle de prototypage",
+      points: 40,
       description: "Trap 1 — question d'étage.",
       hint: null,
       question: "À quel étage se trouve la salle de prototypage ?",
@@ -252,10 +279,11 @@ async function main() {
         "2ème étage",
       ],
       enigma_type: "trap",
-      seq: 17,
+      seq: 0,
     },
     {
       label: "Travaux pratiques de métallurgie",
+      points: 25,
       description: "Trap 2 — question d'étage.",
       hint: null,
       question:
@@ -268,10 +296,11 @@ async function main() {
         "Sous-sol",
       ],
       enigma_type: "trap",
-      seq: 18,
+      seq: 0,
     },
     {
       label: "Amphi 2",
+      points: 20,
       description: "Trap 3 — question d'étage.",
       hint: null,
       question: "À quel étage se situe l'Amphi 2 ?",
@@ -283,10 +312,11 @@ async function main() {
         "Sous-sol",
       ],
       enigma_type: "trap",
-      seq: 19,
+      seq: 0,
     },
     {
       label: "Bureau de la Secrétaire Générale",
+      points: 30,
       description: "Trap 4 — question d'étage.",
       hint: null,
       question:
@@ -299,7 +329,7 @@ async function main() {
         "Entre-sol",
       ],
       enigma_type: "trap",
-      seq: 20,
+      seq: 0,
     },
   ] as const;
 
@@ -381,12 +411,23 @@ async function main() {
     console.log(`Removed ${staleRemoved.count} stale index(es)`);
   }
 
-  const devPlayers = [
-    { username: "player1", nickname: "Player One", phone_number: "+212600000001" },
-    { username: "player2", nickname: "Player Two", phone_number: "+212600000002" },
-    { username: "player3", nickname: "Player Three", phone_number: "+212600000003" },
-    { username: "player4", nickname: "Player Four", phone_number: "+212600000004" },
-  ];
+  // When a player phone override is supplied, seed exactly one player for the
+  // demo; otherwise provision the 4 placeholder players used by the test suite.
+  const playerPhoneOverride = process.env.CREDENTIALS_SEED_PLAYER_PHONE ?? null;
+  const devPlayers = playerPhoneOverride
+    ? [
+        {
+          username: "player1",
+          nickname: "Player One",
+          phone_number: playerPhoneOverride,
+        },
+      ]
+    : [
+        { username: "player1", nickname: "Player One", phone_number: "+212600000001" },
+        { username: "player2", nickname: "Player Two", phone_number: "+212600000002" },
+        { username: "player3", nickname: "Player Three", phone_number: "+212600000003" },
+        { username: "player4", nickname: "Player Four", phone_number: "+212600000004" },
+      ];
 
   for (const dp of devPlayers) {
     const user = await db.user.upsert({

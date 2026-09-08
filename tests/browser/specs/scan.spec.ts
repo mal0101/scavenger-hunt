@@ -215,4 +215,94 @@ test.describe("QR camera scan", () => {
     expect(res.json.success).toBe(false);
     expect(res.json.error).toBe("ALREADY_SCANNED");
   });
+
+  test("a teammate cannot re-scan a QR already claimed by their team, and the team log names the scanning player", async ({
+    page,
+    browser,
+  }) => {
+    const { gameId, index } = await setup(3);
+    const memberA = `qa_scan_team_a_${SUF}`;
+    const memberB = `qa_scan_team_b_${SUF}`;
+    await createUser(memberA, PW);
+    await createUser(memberB, PW);
+    createdUsernames.push(memberA, memberB);
+    await loginAs(page, memberA, PW);
+
+    // Member A creates the team.
+    const teamName = `QA-Scan-Team-${Date.now()}`;
+    const team = await api<{ success: boolean; data?: { invite_code: string } }>(
+      page,
+      "/api/v1/players/me/team",
+      { method: "POST", body: { team_name: teamName } }
+    );
+    expect(team.json.success).toBe(true);
+
+    // The target (step 3) is sequenced, so the team claims steps 1-2 first.
+    const indexes = await getIndexesForGame(gameId);
+    const step1 = indexes.find((i) => i.sequence_order === 1);
+    const step2 = indexes.find((i) => i.sequence_order === 2);
+    if (!step1 || !step2) throw new Error("missing sequence steps for team dedup test");
+
+    for (const step of [step1, step2]) {
+      const qr = await getQrCodeForIndex(step.id);
+      const res = await api<{ success: boolean }>(
+        page,
+        `/api/v1/games/${gameId}/scan`,
+        { method: "POST", body: { qr_data: encodeQrPayload(createQrPayload(step.id, gameId, qr.id)) } }
+      );
+      expect(res.json.success).toBe(true);
+    }
+
+    const code = await getQrCodeForIndex(index.id);
+    const payload = encodeQrPayload(createQrPayload(index.id, gameId, code.id));
+    const claimA = await api<{ success: boolean; data?: { points_earned: number } }>(
+      page,
+      `/api/v1/games/${gameId}/scan`,
+      { method: "POST", body: { qr_data: payload } }
+    );
+    expect(claimA.json.success).toBe(true);
+    expect(Number(claimA.json?.data?.points_earned)).toBe(index.points);
+
+    // Member B joins the same team: the marker is already claimed, so B is
+    // blocked even though B never scanned it personally.
+    const ctx = await browser.newContext();
+    try {
+      const pageB = await ctx.newPage();
+      await loginAs(pageB, memberB, PW);
+      const joinRes = await api<{ success: boolean }>(
+        pageB,
+        "/api/v1/players/me/team",
+        { method: "POST", body: { team_name: "x", invite_code: team.json?.data?.invite_code } }
+      );
+      expect(joinRes.json.success).toBe(true);
+
+      const claimB = await api<{ success: boolean; error?: string }>(
+        pageB,
+        `/api/v1/games/${gameId}/scan`,
+        { method: "POST", body: { qr_data: payload } }
+      );
+      expect(claimB.json.success).toBe(false);
+      expect(claimB.json.error).toBe("ALREADY_SCANNED");
+
+      // The team ledger attributes member A's scan to the team and names A.
+      const ledger = await api<{
+        success: boolean;
+        data: {
+          team: { name: string } | null;
+          mine: { total_points: number };
+          scans: Array<{
+            scanned_by: { username: string; nickname: string | null } | null;
+            mine: boolean;
+          }>;
+        };
+      }>(pageB, "/api/v1/players/me/scans");
+      expect(ledger.json.data?.team?.name).toBe(teamName);
+      expect(Number(ledger.json.data?.mine?.total_points)).toBe(0);
+      const latest = ledger.json.data?.scans?.[0];
+      expect(latest?.scanned_by?.username).toBe(memberA);
+      expect(latest?.mine).toBe(false);
+    } finally {
+      await ctx.close();
+    }
+  });
 });

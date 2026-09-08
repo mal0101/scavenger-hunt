@@ -51,7 +51,12 @@ async function main() {
     "A steampunk scavenger hunt across the ENSAM Casablanca campus";
   const game = await db.game.upsert({
     where: { id: "00000000-0000-0000-0000-000000000001" },
-    update: { title: gameTitle, description: gameDescription },
+    update: {
+      title: gameTitle,
+      description: gameDescription,
+      status: "PENDING",
+      current_round: 0,
+    },
     create: {
       id: "00000000-0000-0000-0000-000000000001",
       title: gameTitle,

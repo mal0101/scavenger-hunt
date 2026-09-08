@@ -24,13 +24,12 @@ test("credentialsSchema accepts valid username/password pairs", () => {
   }
 });
 
-test("credentialsSchema rejects short usernames, bad chars and weak passwords", () => {
+test("credentialsSchema rejects short usernames, bad chars and oversized passwords", () => {
   const bad = [
     { username: "ab", password: "longenough" },
     { username: "a b", password: "longenough" },
     { username: "héllo", password: "longenough" },
     { username: "x".repeat(33), password: "longenough" },
-    { username: "valid_name", password: "short" },
     { username: "valid_name", password: "x".repeat(129) },
   ];
   for (const c of bad) {
@@ -62,9 +61,10 @@ test("createUserSchema defaults role to PLAYER and allows optional nickname/game
   );
 });
 
-test("resetPasswordSchema requires a strong password", () => {
+test("resetPasswordSchema accepts any non-empty password (roster authorizes short choices)", () => {
   assert.equal(resetPasswordSchema.safeParse({ password: "12345678" }).success, true);
-  assert.equal(resetPasswordSchema.safeParse({ password: "short" }).success, false);
+  assert.equal(resetPasswordSchema.safeParse({ password: "short" }).success, true);
+  assert.equal(resetPasswordSchema.safeParse({ password: "" }).success, false);
 });
 
 test("teamSchema requires a name and optionally a 6-char invite code", () => {

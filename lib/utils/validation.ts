@@ -11,7 +11,7 @@ export const usernameSchema = z
 
 export const passwordSchema = z
   .string()
-  .min(8, "Password must be at least 8 characters")
+  .min(1, "Password may not be empty")
   .max(128, "Password must be at most 128 characters");
 
 export const credentialsSchema = z.object({

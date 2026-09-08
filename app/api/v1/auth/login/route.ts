@@ -56,13 +56,19 @@ export async function POST(request: NextRequest) {
 
     if (user.role === "PLAYER") {
       // Attach the player to the current hunt whether it is running (ACTIVE)
-      // or staged for launch (PENDING). The seed pre-provisions dev players
-      // the same way, so login must behave consistently pre- and post-launch;
-      // a player without a profile would otherwise 404 every player API.
-      const targetGame = await db.game.findFirst({
-        where: { status: { in: ["ACTIVE", "PENDING"] } },
-        orderBy: { created_at: "desc" },
-      });
+      // or staged for launch (PENDING). Prefer the ACTIVE hunt so signups
+      // always land in the real running game; fall back to the most recent
+      // PENDING game so pre-launch logins still get a working profile. A
+      // player without a profile would otherwise 404 every player API.
+      const targetGame =
+        (await db.game.findFirst({
+          where: { status: "ACTIVE" },
+          orderBy: { created_at: "desc" },
+        })) ??
+        (await db.game.findFirst({
+          where: { status: "PENDING" },
+          orderBy: { created_at: "desc" },
+        }));
       if (targetGame) {
         await db.player.upsert({
           where: { user_id: user.id },
